@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   output: 'export',
   images: {
     unoptimized: true,
+    remotePatterns: [],
   },
   trailingSlash: true,
-  remotePatterns: [],
 };
 
 export default nextConfig;
