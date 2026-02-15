@@ -1,0 +1,199 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\components\\loginpage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\components\\loginpage.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\styles\\globals.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\styles\\globals.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\tailwind.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\tailwind.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\postcss.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\postcss.config.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\main.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\main.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\components\\sidebar.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\components\\sidebar.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\app.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\app.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\.github\\copilot-instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:.github\\copilot-instructions.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B78AB64C-6F8D-52DC-18F0-531C035F5801}|..\\DFile.backend\\dfile.backend.csproj|c:\\users\\fhiona domini\\source\\repos\\dfile.backend\\dfile.backend.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|c:\\users\\fhiona domini\\source\\repos\\dfile.frontend\\dfile.frontend\\src\\index.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}",
+      "RelativeMoniker": "D:0:0:{9AA839C3-2F3B-9AE5-8E89-141F209C7320}|dfile.frontend.esproj|solutionrelative:dfile.frontend\\src\\index.jsx||{14D17961-FE51-464D-9111-C4AF11D7D99A}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "postcss.config.js",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\postcss.config.js",
+              "RelativeDocumentMoniker": "dfile.frontend\\postcss.config.js",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\postcss.config.js",
+              "RelativeToolTip": "dfile.frontend\\postcss.config.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-02-10T12:13:30.052Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "globals.css",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\styles\\globals.css",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\styles\\globals.css",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\styles\\globals.css",
+              "RelativeToolTip": "dfile.frontend\\src\\styles\\globals.css",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-02-10T12:05:39.609Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "LoginPage.jsx",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\components\\LoginPage.jsx",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\components\\LoginPage.jsx",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\components\\LoginPage.jsx",
+              "RelativeToolTip": "dfile.frontend\\src\\components\\LoginPage.jsx",
+              "ViewState": "AgIAAGgAAAAAAAAAAAAgwHcAAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-02-10T11:59:06.562Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "main.jsx",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\main.jsx",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\main.jsx",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\main.jsx",
+              "RelativeToolTip": "dfile.frontend\\src\\main.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-02-10T12:10:02.583Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "tailwind.config.js",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\tailwind.config.js",
+              "RelativeDocumentMoniker": "dfile.frontend\\tailwind.config.js",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\tailwind.config.js",
+              "RelativeToolTip": "dfile.frontend\\tailwind.config.js",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
+              "WhenOpened": "2026-02-10T12:13:50.941Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "package.json",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\package.json",
+              "RelativeDocumentMoniker": "dfile.frontend\\package.json",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\package.json",
+              "RelativeToolTip": "dfile.frontend\\package.json",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-02-10T12:14:27.045Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "index.jsx",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\index.jsx",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\index.jsx",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\index.jsx",
+              "RelativeToolTip": "dfile.frontend\\src\\index.jsx",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-02-10T12:08:07.246Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Sidebar.jsx",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\components\\Sidebar.jsx",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\components\\Sidebar.jsx",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\components\\Sidebar.jsx",
+              "RelativeToolTip": "dfile.frontend\\src\\components\\Sidebar.jsx",
+              "ViewState": "AgIAAGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-02-10T12:01:16.543Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "App.jsx",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\App.jsx",
+              "RelativeDocumentMoniker": "dfile.frontend\\src\\App.jsx",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\dfile.frontend\\src\\App.jsx",
+              "RelativeToolTip": "dfile.frontend\\src\\App.jsx",
+              "ViewState": "AgIAAFgBAAAAAAAAAAAgwJQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003663|",
+              "WhenOpened": "2026-02-10T11:48:13.573Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "copilot-instructions.md",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\.github\\copilot-instructions.md",
+              "RelativeDocumentMoniker": ".github\\copilot-instructions.md",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.frontend\\.github\\copilot-instructions.md",
+              "RelativeToolTip": ".github\\copilot-instructions.md",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAABzAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2026-02-10T02:17:10.887Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "dfile.backend",
+              "DocumentMoniker": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.backend\\dfile.backend.csproj",
+              "RelativeDocumentMoniker": "..\\DFile.backend\\dfile.backend.csproj",
+              "ToolTip": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile.backend\\dfile.backend.csproj",
+              "RelativeToolTip": "..\\DFile.backend\\dfile.backend.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-02-09T12:19:46.559Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{40ea2e6b-2121-4bb8-a43e-c83c04b51041}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

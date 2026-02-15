@@ -1,0 +1,274 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Wrench, AlertTriangle, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Asset, MaintenanceRecord } from "@/types/asset";
+
+interface CreateMaintenanceModalProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    assets: Asset[];
+    records?: MaintenanceRecord[];
+    onAddRecord?: (record: MaintenanceRecord) => void;
+    onUpdateRecord?: (record: MaintenanceRecord) => void;
+    initialData?: MaintenanceRecord | null;
+    defaultAssetId?: string | null;
+}
+
+export function CreateMaintenanceModal({ open, onOpenChange, assets, records, onAddRecord, onUpdateRecord, initialData, defaultAssetId }: CreateMaintenanceModalProps) {
+    const [formData, setFormData] = useState<Partial<MaintenanceRecord>>({
+        assetId: "",
+        description: "",
+        priority: "Medium",
+        type: "Corrective",
+        frequency: "One-time",
+        status: "Pending",
+        startDate: "",
+        endDate: "",
+        cost: 0
+    });
+
+    useEffect(() => {
+        if (open) {
+            console.log("Opening modal with initialData:", initialData);
+            if (initialData) {
+                setFormData({
+                    assetId: initialData.assetId || "",
+                    description: initialData.description || "",
+                    priority: initialData.priority || "Medium",
+                    type: initialData.type || "Corrective",
+                    frequency: initialData.frequency || "One-time",
+                    status: initialData.status,
+                    startDate: initialData.startDate || "",
+                    endDate: initialData.endDate || "",
+                    cost: initialData.cost || 0
+                });
+            } else {
+                setFormData({
+                    assetId: defaultAssetId || "",
+                    description: "",
+                    priority: "Medium",
+                    type: "Corrective",
+                    frequency: "One-time",
+                    status: "Pending",
+                    startDate: "",
+                    endDate: "",
+                    cost: 0
+                });
+            }
+        }
+    }, [open, initialData, defaultAssetId]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (initialData && onUpdateRecord) {
+            onUpdateRecord({
+                ...initialData,
+                assetId: formData.assetId || initialData.assetId,
+                description: formData.description || "No description provided",
+                priority: formData.priority as "Low" | "Medium" | "High",
+                type: formData.type as "Preventive" | "Corrective" | "Upgrade",
+                frequency: formData.frequency as any,
+                startDate: formData.startDate,
+                endDate: formData.endDate,
+                cost: Number(formData.cost),
+            });
+        } else if (onAddRecord && formData.assetId) {
+            onAddRecord({
+                id: `mr_${Date.now()}`,
+                assetId: formData.assetId,
+                description: formData.description || "No description provided",
+                priority: formData.priority as "Low" | "Medium" | "High",
+                status: "Pending",
+                type: formData.type as "Preventive" | "Corrective" | "Upgrade",
+                frequency: formData.frequency as any,
+                startDate: formData.startDate,
+                endDate: formData.endDate,
+                cost: Number(formData.cost),
+                dateReported: new Date().toISOString().split('T')[0]
+            });
+        }
+
+        onOpenChange(false);
+    };
+
+    const assetHistory = records?.filter(r => r.assetId === formData.assetId) || [];
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[1000px] rounded-2xl border-border p-0 overflow-hidden max-h-[90vh] flex flex-col">
+                <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-amber-500/10 rounded-xl text-amber-600"><Wrench size={20} /></div>
+                        <div>
+                            <DialogTitle className="text-lg font-semibold text-foreground">
+                                {initialData ? "Edit Maintenance Plan" : "Add Maintenance Plan"}
+                            </DialogTitle>
+                            <DialogDescription className="text-muted-foreground text-xs mt-1">
+                                {initialData ? "Update maintenance details" : "Schedule maintenance or report an issue"}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                    <form id="maintenance-form" onSubmit={handleSubmit} className="space-y-8">
+                        {/* Row 1: Asset, Type, Priority, Frequency */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="col-span-2 lg:col-span-1 space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Select Asset <span className="text-red-500">*</span></Label>
+                                <Select value={formData.assetId || ""} onValueChange={(v) => setFormData({ ...formData, assetId: v })}>
+                                    <SelectTrigger className="w-full border-input bg-background"><SelectValue placeholder="Select asset..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {assets.map((asset) => (
+                                            <SelectItem key={asset.id} value={asset.id}>{asset.desc}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Type <span className="text-red-500">*</span></Label>
+                                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v as any })}>
+                                    <SelectTrigger className="w-full border-input bg-background"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                    <SelectContent>
+                                        {["Preventive", "Corrective", "Upgrade", "Inspection"].map(t => (
+                                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Priority <span className="text-red-500">*</span></Label>
+                                <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v as any })}>
+                                    <SelectTrigger className="w-full border-input bg-background"><SelectValue placeholder="Select priority" /></SelectTrigger>
+                                    <SelectContent>
+                                        {["Low", "Medium", "High"].map(p => (
+                                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Frequency <span className="text-red-500">*</span></Label>
+                                <Select value={formData.frequency} onValueChange={(v) => setFormData({ ...formData, frequency: v as any })}>
+                                    <SelectTrigger className="w-full border-input bg-background"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                                    <SelectContent>
+                                        {["One-time", "Daily", "Weekly", "Monthly", "Yearly"].map(f => (
+                                            <SelectItem key={f} value={f}>{f}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+                                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as any })}>
+                                    <SelectTrigger className="w-full border-input bg-background"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                    <SelectContent>
+                                        {["Pending", "In Progress", "Completed"].map(s => (
+                                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Dates and Cost */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Start Date</Label>
+                                <Input type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} className="bg-background" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">End Date</Label>
+                                <Input type="date" value={formData.endDate} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })} className="bg-background" />
+                            </div>
+                            <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                                <Label className="text-xs font-medium text-muted-foreground">Expected Cost</Label>
+                                <Input type="number" placeholder="0.00" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })} className="bg-background" />
+                            </div>
+                        </div>
+
+                        {/* Row 3: Description and Attachments */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Maintenance Note</Label>
+                                <Textarea
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    placeholder="Describe the issue or plan in detail..."
+                                    className="border-input bg-background min-h-[120px]"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground">Attachments</Label>
+                                <div className="border-2 border-dashed border-border rounded-xl h-[120px] flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer">
+                                    <span className="text-2xl mb-1">+</span>
+                                    <span className="text-xs font-medium">Choose Files</span>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    {/* Maintenance History Table */}
+                    <div className="space-y-3 pt-6 border-t border-border">
+                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                            Maintenance & Planning Details
+                        </h4>
+                        <div className="rounded-lg border border-border overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-muted/50 text-xs text-muted-foreground uppercase font-medium">
+                                    <tr>
+                                        <th className="px-4 py-3">Maintenance ID</th>
+                                        <th className="px-4 py-3">Type</th>
+                                        <th className="px-4 py-3">Cost</th>
+                                        <th className="px-4 py-3">Planned Schedule</th>
+                                        <th className="px-4 py-3">Priority</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {assetHistory.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-xs">
+                                                No existing records found for this asset.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        assetHistory.map(record => (
+                                            <tr key={record.id} className="hover:bg-muted/30">
+                                                <td className="px-4 py-3 font-mono text-xs">{record.id}</td>
+                                                <td className="px-4 py-3">{record.type}</td>
+                                                <td className="px-4 py-3">${record.cost || 0}</td>
+                                                <td className="px-4 py-3">{record.startDate || "—"}</td>
+                                                <td className="px-4 py-3">{record.priority}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 gap-3">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl px-6">
+                        Cancel
+                    </Button>
+                    <Button type="submit" form="maintenance-form" className="rounded-xl bg-primary text-primary-foreground px-6 shadow-lg hover:bg-primary/90">
+                        {initialData ? "Save Changes" : "Submit"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}

@@ -1,0 +1,12 @@
+﻿# Copilot Instructions
+
+## General Guidelines
+- First general instruction
+- Second general instruction
+
+## Code Style
+- Use specific formatting rules
+- Follow naming conventions
+
+## Project-Specific Rules
+- Frontend uses JavaScript (no TypeScript); prefer .jsx files and avoid TypeScript-specific files like custom.d.ts.

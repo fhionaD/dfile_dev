@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="../DFile.backend/dfile.backend.csproj" />
+  <Project Path="dfile.frontend.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+</Solution>

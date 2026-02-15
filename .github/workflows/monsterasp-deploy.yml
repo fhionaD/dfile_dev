@@ -1,0 +1,54 @@
+name: Deploy to MonsterAsp.net
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout Code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. Setup Node.js and Build Frontend
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontend Dependencies
+      working-directory: ./DFile.frontend
+      run: npm ci --legacy-peer-deps
+
+    - name: Build Frontend
+      working-directory: ./DFile.frontend
+      run: npm run build
+
+    # 3. Setup .NET and Build Backend
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Publish Backend
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish
+
+    # 4. Merge Frontend into Backend wwwroot
+    - name: Copy Frontend to Backend wwwroot
+      run: |
+        mkdir -p ./publish/wwwroot
+        cp -r DFile.frontend/out/* ./publish/wwwroot/
+
+    # 5. Deploy via FTP
+    - name: Deploy to MonsterAsp.net via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./publish/

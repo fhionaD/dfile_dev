@@ -1,0 +1,6 @@
+@DFile.backend_HostAddress = http://localhost:5090
+
+GET {{DFile.backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
