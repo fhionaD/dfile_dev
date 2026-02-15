@@ -5,8 +5,10 @@ import { User, UserRole } from "@/types/asset";
 
 interface AuthContextType {
     user: User | null;
+    token: string | null;
     isLoggedIn: boolean;
-    login: (user: User) => void;
+    isLoading: boolean;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
 }
 
@@ -14,35 +16,73 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [token, setToken] = useState<string | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Persist login state (optional, for demo purposes using localStorage)
+    // Persist login state
     useEffect(() => {
         const storedUser = localStorage.getItem("dfile_user");
-        if (storedUser) {
+        const storedToken = localStorage.getItem("dfile_token");
+        if (storedUser && storedToken) {
             try {
                 setUser(JSON.parse(storedUser));
+                setToken(storedToken);
                 setIsLoggedIn(true);
             } catch (e) {
                 console.error("Failed to parse stored user", e);
             }
         }
+        setIsLoading(false);
     }, []);
 
-    const login = (newUser: User) => {
-        setUser(newUser);
-        setIsLoggedIn(true);
-        localStorage.setItem("dfile_user", JSON.stringify(newUser));
+    const login = async (email: string, password: string) => {
+        // Ensure strictly no trailing slash issues or double slashes
+        const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090').replace(/\/$/, '');
+        const targetUrl = `${apiBase}/api/auth/login`;
+
+        console.log(`[Auth] Initiating login to: ${targetUrl}`);
+
+        try {
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+
+            console.log(`[Auth] Response status: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[Auth] Login failed. Status: ${response.status}. Body:`, errorText);
+                throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const userData = data.user;
+            const token = data.token;
+
+            setUser(userData);
+            setToken(token);
+            setIsLoggedIn(true);
+            localStorage.setItem("dfile_user", JSON.stringify(userData));
+            localStorage.setItem("dfile_token", token);
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
     };
 
     const logout = () => {
         setUser(null);
+        setToken(null);
         setIsLoggedIn(false);
         localStorage.removeItem("dfile_user");
+        localStorage.removeItem("dfile_token");
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoggedIn, login, logout }}>
+        <AuthContext.Provider value={{ user, token, isLoggedIn, isLoading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

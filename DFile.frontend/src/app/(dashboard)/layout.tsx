@@ -32,17 +32,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const mainNavItems: NavItem[] = [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allowedRoles: ['Admin', 'Finance'] },
-        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement'] },
-        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement'] },
-        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin'] },
-        { href: "/dashboard/depreciation", label: "Asset Deprecation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance'] },
-        { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance'] },
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Allowed for all
+        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
+        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
+        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin', 'Super Admin'] },
+        { href: "/dashboard/depreciation", label: "Asset Deprecation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance', 'Super Admin'] },
+        { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
+        { href: "/dashboard/tasks", label: "Task Management", icon: LayoutGrid, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
     ];
 
     const adminNavItems: NavItem[] = [
-        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin'] },
-        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin'] },
+        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin', 'Super Admin'] },
+        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin', 'Super Admin'] },
+        { href: "/dashboard/super-admin/dashboard", label: "Super Admin Control", icon: UserCheck, allowedRoles: ['Super Admin'] },
     ];
 
     const allNavItems = [...mainNavItems, ...adminNavItems];

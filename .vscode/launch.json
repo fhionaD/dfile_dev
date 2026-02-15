@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Backend",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/DFile.backend/bin/Debug/net8.0/dfile.backend.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/DFile.backend",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/Views"
+            }
+        },
+        {
+            "name": "Launch Frontend (Chrome)",
+            "type": "chrome",
+            "request": "launch",
+            "preLaunchTask": "run-frontend",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}/DFile.frontend/src"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack (Backend + Frontend)",
+            "configurations": ["Launch Backend", "Launch Frontend (Chrome)"]
+        }
+    ]
+}

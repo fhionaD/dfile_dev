@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj": {}
+    "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj": {}
   },
   "projects": {
-    "D:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj": {
+    "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj",
+        "projectUniqueName": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj",
         "projectName": "dfile.backend",
-        "projectPath": "D:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj",
-        "packagesPath": "C:\\Users\\mendo\\.nuget\\packages\\",
-        "outputPath": "D:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\obj\\",
+        "projectPath": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj",
+        "packagesPath": "C:\\Users\\Fhiona Domini\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\mendo\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Fhiona Domini\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -45,12 +45,16 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.300"
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.0.3, )"
+            },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
               "version": "[8.0.14, )"
@@ -64,6 +68,16 @@
               "version": "[8.0.14, )"
             },
             "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.14, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.14, )"
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
               "target": "Package",
               "version": "[8.0.14, )"
             },
@@ -103,7 +117,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

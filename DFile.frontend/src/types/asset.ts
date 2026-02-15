@@ -29,7 +29,7 @@ export interface User {
     avatar?: string;
 }
 
-export type UserRole = 'Admin' | 'Maintenance' | 'Procurement' | 'Finance';
+export type UserRole = 'Admin' | 'Maintenance' | 'Procurement' | 'Finance' | 'Super Admin';
 
 export type AssetType = string;
 

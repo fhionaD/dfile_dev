@@ -1,24 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { Asset, Category, Room, MaintenanceRecord, PurchaseOrder, Employee, AssetType, UserRole } from "@/types/asset";
+import { Task } from "@/types/task";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
 
 // Initial Data Imports (Moved from AppShell)
-const initialAssets: Asset[] = [
-    { id: "AST-001", desc: "Samsung 55\" Smart TV", cat: "Electronics", status: "In Use", room: "R-101", value: 1200, manufacturer: "Samsung", model: "QN55Q60A", serialNumber: "SAM-TV-55-001", purchaseDate: "2023-01-15" },
-    { id: "AST-002", desc: "Office Desk (Standing)", cat: "Furniture", status: "Available", room: "—", value: 850 },
-    { id: "AST-003", desc: "HVAC Unit Central", cat: "Maintenance", status: "Maintenance", room: "R-205", value: 3400 },
-    { id: "AST-004", desc: "Leather Sofa Set", cat: "Furniture", status: "In Use", room: "R-102", value: 2100 },
-    { id: "AST-005", desc: "Security Camera Kit", cat: "Electronics", status: "Disposed", room: "—", value: 600 },
-    { id: "AST-006", desc: "MacBook Pro M3", cat: "Electronics", status: "In Use", room: "R-103", value: 2400 },
-    { id: "AST-007", desc: "Ergonomic Chair", cat: "Furniture", status: "Available", room: "—", value: 550 },
-    { id: "AST-008", desc: "Projector 4K", cat: "Electronics", status: "In Use", room: "Conf-A", value: 1800 },
-    { id: "AST-009", desc: "Drill Set", cat: "Maintenance", status: "Available", room: "—", value: 300 },
-    { id: "AST-010", desc: "Conference Table", cat: "Furniture", status: "In Use", room: "Conf-A", value: 3200 },
-    { id: "AST-011", desc: "Water Cooler", cat: "Furniture", status: "Maintenance", room: "Hall-B", value: 400 },
-    { id: "AST-012", desc: "Server Rack", cat: "Electronics", status: "In Use", room: "Server-1", value: 5000 },
-];
+const initialAssets: Asset[] = [];
 
 interface DataContextType {
     assets: Asset[];
@@ -66,13 +55,44 @@ interface DataContextType {
 
     // Role Actions
     addRole: (role: any) => void;
+
+    // Task Actions
+    tasks: Task[];
+    addTask: (task: Task) => void;
+    updateTask: (task: Task) => void;
+    archiveTask: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
+    const { token } = useAuth();
+
     // Assets
-    const [assets, setAssets] = useState<Asset[]>(initialAssets);
+    const [assets, setAssets] = useState<Asset[]>([]);
+
+    useEffect(() => {
+        if (token) {
+            fetchAssets();
+        }
+    }, [token]);
+
+    const fetchAssets = async () => {
+        if (!token) return;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090';
+        try {
+            const res = await fetch(`${apiUrl}/api/assets`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAssets(data);
+            }
+        } catch (e) {
+            console.error("Failed to fetch assets", e);
+            toast.error("Failed to load assets");
+        }
+    };
 
     // Maintenance
     const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([
@@ -119,6 +139,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     const [roles, setRoles] = useState([
         { id: "role_1", designation: "Senior Property Manager", department: "Property Operations", scope: "Full system oversight" },
+    ]);
+
+    // Tasks
+    const [tasks, setTasks] = useState<Task[]>([
+        { id: "task_1", title: "Review Monthly Report", description: "Analyze the asset depreciation report for Q1.", priority: "High", status: "Pending", assignedTo: "EMP-001", dueDate: "2024-04-10", createdAt: "2024-04-01" },
+        { id: "task_2", title: "Inspect HVAC Unit", description: "Routine inspection for AST-003.", priority: "Medium", status: "In Progress", assignedTo: "EMP-002", dueDate: "2024-04-05", createdAt: "2024-04-02" },
     ]);
 
     // --- Action Implementations ---
@@ -256,6 +282,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         toast.success("Role created");
     };
 
+    // Tasks
+    const addTask = (task: Task) => {
+        setTasks(prev => [task, ...prev]);
+        toast.success("Task created");
+    };
+
+    const updateTask = (updatedTask: Task) => {
+        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+        toast.success("Task updated");
+    };
+
+    const archiveTask = (id: string) => {
+        // For tasks we might just delete or mark as completed/archived depending on req. 
+        // User asked for CRUD, "archive" usually replaces delete here.
+        setTasks(prev => prev.filter(t => t.id !== id));
+        toast.success("Task deleted");
+    };
+
     return (
         <DataContext.Provider value={{
             assets, employees, maintenanceRecords, purchaseOrders, rooms, assetCategories, roomCategories, departments, roles,
@@ -266,7 +310,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             addRoom, updateRoom, archiveRoom,
             addAssetCategory, updateAssetCategory, archiveAssetCategory,
             addRoomCategory, updateRoomCategory, archiveRoomCategory,
-            addRole
+            addRole,
+            tasks, addTask, updateTask, archiveTask
         }}>
             {children}
         </DataContext.Provider>
