@@ -1,14 +1,11 @@
-```typescript
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export', // <--- Add this
+  output: 'export',
   images: {
-    unoptimized: true, // <--- Add this for static export compatibility
+    unoptimized: true,
     remotePatterns: [],
   },
 };
 
-
 export default nextConfig;
-```
