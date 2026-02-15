@@ -31,6 +31,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+    const mainNavItems: NavItem[] = [
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allowedRoles: ['Admin', 'Finance'] },
+        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement'] },
+        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement'] },
+        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin'] },
+        { href: "/dashboard/depreciation", label: "Asset Deprecation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance'] },
+        { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance'] },
+    ];
+
+    const adminNavItems: NavItem[] = [
+        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin'] },
+        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin'] },
+    ];
+
     const allNavItems = [...mainNavItems, ...adminNavItems];
 
     useEffect(() => {
@@ -51,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         const currentItem = allNavItems.find(item => item.href === pathname);
 
-        if (currentItem && currentItem.allowedRoles && !currentItem.allowedRoles.includes(user.role)) {
+        if (currentItem && currentItem.allowedRoles && user && !currentItem.allowedRoles.includes(user.role)) {
             // Unauthorized
             router.push("/dashboard");
             // You might want to show a toast here
