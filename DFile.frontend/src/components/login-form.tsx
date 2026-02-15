@@ -57,13 +57,21 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
 
   return (
     <div className={cn("flex flex-col gap-10", className)} {...props}>
-      <div className="space-y-2 text-center lg:text-left">
-        <h2 className="text-3xl font-bold tracking-tight text-[#182350] dark:text-white">
-          Welcome back
-        </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Sign in to manage assets with speed and clarity.
-        </p>
+      <div className="space-y-4 text-center lg:text-left">
+        <div className="flex justify-center lg:justify-start mb-4">
+          {/* Logo for Light Mode */}
+          <img src="/AMS.svg" alt="AMS Logo" className="h-16 w-auto dark:hidden" />
+          {/* Logo for Dark Mode */}
+          <img src="/AMS_dark.svg" alt="AMS Logo" className="h-16 w-auto hidden dark:block" />
+        </div>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-[#182350] dark:text-white">
+            Welcome back
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Sign in to manage assets with speed and clarity.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">

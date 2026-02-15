@@ -60,19 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!user) return null; // Or a loading spinner
 
-    const mainNavItems: NavItem[] = [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, allowedRoles: ['Admin', 'Finance'] },
-        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement'] },
-        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement'] },
-        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin'] },
-        { href: "/dashboard/depreciation", label: "Asset Deprecation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance'] },
-        { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance'] },
-    ];
 
-    const adminNavItems: NavItem[] = [
-        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin'] },
-        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin'] },
-    ];
 
     const NavButton = ({ item, isSubItem = false }: { item: NavItem; isSubItem?: boolean }) => {
         const isActive = pathname === item.href;
@@ -112,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="p-6 flex flex-col items-center shrink-0">
                     <div className="w-full flex items-center justify-center mb-2">
                         {/* Ensure image exists or fallback */}
-                        <Image src="/d_file.png" alt="DFILE" width={280} height={140} className="w-auto h-32 object-contain" priority />
+                        <Image src="/d_file.svg" alt="DFILE" width={280} height={140} className="w-auto h-32 object-contain" priority />
                     </div>
                 </div>
 
@@ -158,7 +146,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="p-6 flex flex-col items-center shrink-0">
                         <div className="w-full flex items-center justify-center mb-2">
-                            <Image src="/d_file.png" alt="DFILE" width={200} height={100} className="w-auto h-20 object-contain" />
+                            <Image src="/d_file.svg" alt="DFILE" width={200} height={100} className="w-auto h-20 object-contain" />
                         </div>
                     </div>
 
