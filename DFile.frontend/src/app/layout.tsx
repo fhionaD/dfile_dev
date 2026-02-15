@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/contexts/auth-context";
+import { DataProvider } from "@/contexts/data-context";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -10,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DFile — Asset Management System",
-  description: "DFile Asset Management System for property and rental operations",
+  title: "DFile Asset Management",
+  description: "Advanced asset management system",
 };
 
 export default function RootLayout({
@@ -21,16 +22,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster />
-        </ThemeProvider>
+      <body
+        className={`${inter.variable} antialiased`}
+      >
+        <AuthProvider>
+          <DataProvider>
+            {children}
+            <Toaster />
+          </DataProvider>
+        </AuthProvider>
       </body>
     </html>
   );
