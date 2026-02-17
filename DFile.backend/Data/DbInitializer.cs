@@ -7,13 +7,25 @@ namespace DFile.backend.Data
     {
         public static void Initialize(AppDbContext context)
         {
-            context.Database.EnsureCreated();
-
-            // Look for any users.
-            if (context.Users.Any())
+            try
             {
+                context.Database.Migrate();
+                Console.WriteLine("Database migration applied successfully.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error applying migrations: {ex.Message}");
+                // Fallback for dev environments where migrations might be messed up, but for prod we want Migrate
+            }
+
+            // Look for the super admin specifically
+            if (context.Users.Any(u => u.Email == "superadmin@dfile.com"))
+            {
+                Console.WriteLine("Super Admin already exists. Skipping seed.");
                 return;   // DB has been seeded
             }
+
+            Console.WriteLine("Seeding users...");
 
             var users = new User[]
             {
@@ -45,6 +57,7 @@ namespace DFile.backend.Data
 
             context.Users.AddRange(users);
             context.SaveChanges();
+            Console.WriteLine("Users seeded successfully.");
         }
     }
 }
