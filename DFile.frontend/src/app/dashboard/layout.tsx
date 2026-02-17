@@ -258,7 +258,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-20 max-w-[1400px] mx-auto">
                     {/* Hide Dashboard header for Finance role as they have custom dashboard header */}
-                    {!(getPageTitle() === 'Dashboard' && user?.role === 'Finance') && (
+                    {!(getPageTitle() === 'Dashboard' && user?.role === 'Finance' || getPageTitle() === 'Asset Maintenance & Repair') && (
                         <div className="mb-4">
                             <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-muted rounded-lg mb-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

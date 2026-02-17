@@ -74,13 +74,6 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground">Maintenance Dashboard</h2>
-                    <p className="text-muted-foreground">Strategic Overview & Key Performance Indicators</p>
-                </div>
-            </div>
-
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 <Card className="border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-shadow">

@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { MaintenanceDashboard } from "@/components/maintenance-dashboard";
 import { MaintenanceOperations } from "@/components/maintenance-operations";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { AcquisitionModal } from "@/components/modals/acquisition-modal";
 import { useAssets } from "@/hooks/use-assets";
 import { MaintenanceRecord, Asset } from "@/types/asset";
-import { Separator } from "@/components/ui/separator";
 
 export default function MaintenancePage() {
     const { data: assets = [] } = useAssets();
@@ -32,12 +30,6 @@ export default function MaintenancePage() {
         setIsDetailsModalOpen(true);
     };
 
-    const handleScheduleMaintenance = (assetId: string) => {
-        setSelectedRecord(null);
-        setSelectedAssetIdForMaintenance(assetId);
-        setIsCreateModalOpen(true);
-    };
-
     const handleRequestReplacement = (assetId: string) => {
         const asset = assets.find(a => a.id === assetId);
         if (asset) {
@@ -48,16 +40,7 @@ export default function MaintenancePage() {
 
     return (
         <div className="space-y-12 pb-10">
-            {/* 🔵 Maintenance Dashboard = Strategic Overview */}
-            <section>
-                <MaintenanceDashboard 
-                    onScheduleMaintenance={handleScheduleMaintenance}
-                />
-            </section>
-
-            <Separator className="my-8" />
-
-            {/* 🟢 Asset Maintenance & Repair = Operational Control */}
+            {/*  Asset Maintenance & Repair = Operational Control */}
             <section>
                 <MaintenanceOperations 
                     onCreateRequest={handleCreateRequest}
