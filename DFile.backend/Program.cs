@@ -53,10 +53,13 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // Disabled for troubleshooting 404s on HTTP host
 app.UseDefaultFiles(); // Serve index.html for /
 app.UseStaticFiles(); // Serve frontend files from wwwroot
 app.UseCors("AllowAll");
+
+app.MapGet("/debug", () => Results.Ok($"App Running. Env: {app.Environment.EnvironmentName}"));
+
 
 app.UseAuthentication();
 app.UseAuthorization();
