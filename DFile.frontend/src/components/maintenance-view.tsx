@@ -215,7 +215,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
 
             {/* Card 1: Asset List & Schedules */}
             <Card className="border-border">
-                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="px-6 py-4 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Clock size={18} />
@@ -304,7 +304,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
 
             {/* Card 2: Service Requests */}
             <Card className="border-border">
-                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="px-6 py-4 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Wrench size={18} />

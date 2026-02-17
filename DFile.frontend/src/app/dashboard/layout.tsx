@@ -79,7 +79,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 
     const NavButton = ({ item, isSubItem = false }: { item: NavItem; isSubItem?: boolean }) => {
-        const isActive = pathname === item.href;
+        const isActive = item.href === "/dashboard"
+            ? pathname === "/dashboard"
+            : pathname.startsWith(item.href);
+
         return (
             <Link
                 href={item.href}
@@ -105,7 +108,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const getPageTitle = () => {
         const allItems = [...mainNavItems, ...adminNavItems];
-        const current = allItems.find(i => i.href === pathname);
+        // Sort by length desc so we match specific sub-routes before generic parent routes
+        // e.g. /dashboard/tasks/123 matches /dashboard/tasks before /dashboard
+        const sortedItems = [...allItems].sort((a, b) => b.href.length - a.href.length);
+        const current = sortedItems.find(i => pathname.startsWith(i.href));
         return current ? current.label : "Dashboard";
     };
 
@@ -240,8 +246,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                 </header>
 
-                <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto pb-20">
-                    <div className="mb-6 lg:mb-8">
+                <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-20 max-w-[1400px] mx-auto">
+                    <div className="mb-4">
                         <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-muted rounded-lg mb-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">

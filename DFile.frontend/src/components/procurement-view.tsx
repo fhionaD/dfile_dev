@@ -134,7 +134,7 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
 
             {/* Orders Table */}
             <Card className="border-border">
-                <div className="p-6 border-b border-border bg-muted/40">
+                <div className="px-6 py-4 border-b border-border bg-muted/40">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg text-primary">

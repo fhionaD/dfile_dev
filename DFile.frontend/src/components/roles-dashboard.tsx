@@ -67,7 +67,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
             {/* Personnel Card */}
             <Card className="border-border">
                 {/* Header: Title & Actions */}
-                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="px-6 py-4 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Users size={18} />
