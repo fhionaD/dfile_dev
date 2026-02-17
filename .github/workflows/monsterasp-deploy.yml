@@ -25,10 +25,12 @@ jobs:
       working-directory: ./DFile.frontend
       run: npm ci --legacy-peer-deps
 
-    - name: Build Frontend
+    - name: Build Frontend (Next.js)
       working-directory: ./DFile.frontend
       env:
-        NEXT_PUBLIC_API_URL: http://dfile.runasp.net
+        # IMPORTANT: Keep this empty for relative paths in "Static Export" mode
+        # or use the full URL if you prefer. Relative is safest for same-domain hosting.
+        NEXT_PUBLIC_API_URL: "" 
       run: npm run build
 
     # 3. Setup .NET and Build Backend
@@ -38,17 +40,20 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Publish Backend
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish -r win-x64 --self-contained false
+      # Removed -r win-x64 to allow portable deployment (safer for shared hosting)
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish /p:UseAppHost=false
 
-    # 4. Merge Frontend into Backend wwwroot
+    # 4. Correctly Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
       run: |
-        # Clean up debug/redundant text files from Next.js export
-        find DFile.frontend/out -name "*.txt" -type f -delete
-        find DFile.frontend/out -name "__next*" -type f -delete
-        
+        # Ensure wwwroot exists
         mkdir -p ./publish/wwwroot
+        
+        # Copy Next.js static export (out folder) to wwwroot
         cp -r DFile.frontend/out/* ./publish/wwwroot/
+        
+        # Verify file structure before upload (optional logging)
+        ls -R ./publish/wwwroot | head -n 20
 
     # 5. Deploy via FTP
     - name: Deploy to MonsterAsp.net via FTP
