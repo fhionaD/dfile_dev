@@ -1,9 +1,10 @@
 
 import axios from 'axios';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // Create a centralized Axios instance
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || '',  // Use empty string as default production fallback (relative path)
+    baseURL: getApiBaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },
