@@ -48,16 +48,20 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Configure the HTTP request pipeline.
+// Enable Swagger in all environments for debugging
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // Serve frontend files from wwwroot
 app.UseCors("AllowAll");
-app.UseAuthentication(); // Must be before Authorization
+
+app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
+
 app.MapControllers();
 
 // Seed Database
