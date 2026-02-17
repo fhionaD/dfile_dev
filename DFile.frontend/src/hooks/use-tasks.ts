@@ -3,18 +3,6 @@ import api from '@/lib/api';
 import { Task } from '@/types/task';
 import { toast } from 'sonner';
 
-export type Task = {
-    id: string;
-    title: string;
-    description: string;
-    priority: 'Low' | 'Medium' | 'High';
-    status: 'Pending' | 'In Progress' | 'Completed';
-    assignedTo?: string;
-    dueDate?: string;
-    createdAt: string;
-    archived?: boolean;
-}
-
 // In-memory store for session
 let MOCK_TASKS: Task[] = [
     {
