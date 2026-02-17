@@ -3,12 +3,59 @@ import api from '@/lib/api';
 import { Task } from '@/types/task';
 import { toast } from 'sonner';
 
+export type Task = {
+    id: string;
+    title: string;
+    description: string;
+    priority: 'Low' | 'Medium' | 'High';
+    status: 'Pending' | 'In Progress' | 'Completed';
+    assignedTo?: string;
+    dueDate?: string;
+    createdAt: string;
+    archived?: boolean;
+}
+
+// In-memory store for session
+let MOCK_TASKS: Task[] = [
+    {
+        id: "T-001",
+        title: "Review Monthly Safety Checklist",
+        description: "Conduct a full safety audit of the warehouse floor.",
+        priority: "High",
+        status: "Pending", 
+        assignedTo: "John Doe",
+        createdAt: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 86400000 * 2).toISOString()
+    },
+    {
+        id: "T-002",
+        title: "Update Asset Inventory",
+        description: "Check for new assets and tag them accordingly.",
+        priority: "Medium",
+        status: "In Progress",
+        assignedTo: "Jane Smith",
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+        dueDate: new Date(Date.now() + 86400000 * 5).toISOString()
+    },
+        {
+        id: "T-003",
+        title: "Purchase Office Supplies",
+        description: "Restock printer paper and ink cartridges.",
+        priority: "Low",
+        status: "Completed",
+        assignedTo: "Bob Johnson",
+        createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+        dueDate: new Date(Date.now() - 86400000).toISOString()
+    }
+];
+
 export function useTasks(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['tasks', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<Task[]>(`/api/tasks?showArchived=${showArchived}`);
-            return data;
+             // MOCK DATA ONLY
+            await new Promise(resolve => setTimeout(resolve, 300));
+            return [...MOCK_TASKS].filter(t => showArchived ? true : !t.archived);
         },
     });
 }
@@ -18,12 +65,15 @@ export function useAddTask() {
 
     return useMutation({
         mutationFn: async (task: Task) => {
-            const { data } = await api.post<Task>('/api/tasks', task);
-            return data;
+             // MOCK DATA ONLY
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const newTask = { ...task, id: `T-MOCK-${Date.now()}` };
+            MOCK_TASKS.push(newTask);
+            return newTask;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            toast.success('Task created successfully');
+            toast.success('Task created successfully (Mock)');
         },
         onError: (error) => {
             console.error('Failed to create task:', error);
@@ -37,12 +87,14 @@ export function useUpdateTask() {
 
     return useMutation({
         mutationFn: async (task: Task) => {
-            const { data } = await api.put<Task>(`/api/tasks/${task.id}`, task);
-            return data;
+             // MOCK DATA ONLY
+            await new Promise(resolve => setTimeout(resolve, 300));
+            MOCK_TASKS = MOCK_TASKS.map(t => t.id === task.id ? task : t);
+            return task;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            toast.success('Task updated successfully');
+            toast.success('Task updated successfully (Mock)');
         },
         onError: (error) => {
             console.error('Failed to update task:', error);
