@@ -124,15 +124,22 @@ export function useArchiveEmployee() {
 
     return useMutation({
         mutationFn: async (employeeId: string) => {
-            await api.delete(`/api/employees/${employeeId}`);
+             // MOCK DATA ONLY
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const emp = MOCK_EMPLOYEES.find(e => e.id === employeeId);
+            if (emp) {
+                emp.status = emp.status === "Archived" ? "Active" : "Archived";
+            }
+            return emp;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            toast.success('Employee archived');
+            const message = data?.status === 'Archived' ? 'Employee archived (Mock)' : 'Employee restored (Mock)';
+            toast.success(message);
         },
         onError: (error) => {
-            console.error('Failed to archive employee:', error);
-            toast.error('Failed to archive employee');
+            console.error('Failed to change employee status:', error);
+            toast.error('Failed to update employee status');
         },
     });
 }
