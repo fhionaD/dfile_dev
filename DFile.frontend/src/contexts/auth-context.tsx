@@ -35,7 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setToken(storedToken);
                     setIsLoggedIn(true);
 
-                    // 2. Validate with Backend
+                    // 2. Validate with Backend - DISABLED FOR MOCK MODE
+                    /*
                     let apiBase = process.env.NEXT_PUBLIC_API_URL;
                     if (apiBase === undefined) {
                         apiBase = 'http://localhost:5090';
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         // const freshUser = await res.json();
                         // setUser(freshUser);
                     }
+                    */
 
                 } catch (e) {
                     console.error("Failed to restore session", e);
@@ -65,6 +67,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = async (email: string, password: string) => {
+        /* 
+         * TEMPORARY OVERRIDE: Mock Login for UI Testing in Deployment
+         * Bypassing API to avoid CORS/Connection issues while testing frontend layout.
+         */
+        console.log(`[Auth] Mock login initiated for: ${email}`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+
+        // Determine mock role based on email for testing different views
+        let role: User["role"] = "Admin";
+        if (email.toLowerCase().includes("maintenance")) role = "Maintenance";
+        if (email.toLowerCase().includes("procurement")) role = "Procurement";
+        if (email.toLowerCase().includes("finance")) role = "Finance";
+
+        const mockUser: User = {
+            name: "Test User",
+            role: role,
+            roleLabel: role,
+            avatar: "https://github.com/shadcn.png" // random avatar
+        };
+        const mockToken = "mock-jwt-token-bypass";
+
+        setUser(mockUser);
+        setToken(mockToken);
+        setIsLoggedIn(true);
+        
+        localStorage.setItem("dfile_user", JSON.stringify(mockUser));
+        localStorage.setItem("dfile_token", mockToken);
+        
+        return; // Stop here, do not call actual API
+
+        /* ORIGINAL API CODE COMMENTED OUT
         // Ensure strictly no trailing slash issues or double slashes
         // For local development, fallback to localhost:5090.
         // For Production (where env var is empty string), use relative path.
@@ -108,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             throw error;
         }
+        */
     };
 
     const logout = () => {
