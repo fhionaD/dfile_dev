@@ -63,49 +63,33 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
     };
 
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div className="rounded-xl border border-border overflow-hidden bg-card">
-                <div className="p-6 border-b border-border bg-muted/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Fingerprint size={18} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-foreground">Organization Management</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">Manage personnel and role assignments</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={onAddPersonnel} size="sm" className="rounded-xl h-8 text-xs border-dashed border-border hover:border-primary/50 hover:bg-primary/5">
-                                <Plus size={14} className="mr-1.5" />
-                                Register Personnel
-                            </Button>
-                            <Button onClick={onOpenModal} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
-                                <Shield size={14} className="mr-1.5" />
-                                Deploy Role
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Personnel Table */}
+        <div className="space-y-6">
+            {/* Personnel Card */}
             <Card className="border-border">
-                <div className="p-6 border-b border-border bg-muted/40 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                {/* Header: Title & Actions */}
+                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Users size={18} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-foreground">Registered Personnel</h3>
+                            <h3 className="text-lg font-semibold text-foreground">Personnel Directory</h3>
                             <p className="text-xs text-muted-foreground mt-0.5">{showArchived ? `${archivedEmps.length} archived` : `${activeEmps.length} active`} employee{(showArchived ? archivedEmps.length : activeEmps.length) !== 1 ? "s" : ""}</p>
                         </div>
                     </div>
-                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                        {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeEmps.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedEmps.length})</>}
-                    </Button>
+                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                        <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
+                            {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeEmps.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedEmps.length})</>}
+                        </Button>
+                        <Button variant="outline" onClick={onAddPersonnel} size="sm" className="rounded-xl h-8 text-xs border-dashed border-border hover:border-primary/50 hover:bg-primary/5">
+                            <Plus size={14} className="mr-1.5" />
+                            Register Personnel
+                        </Button>
+                        <Button onClick={onOpenModal} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
+                            <Shield size={14} className="mr-1.5" />
+                            Deploy Role
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Filters */}

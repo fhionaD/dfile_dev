@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface CreateRoleModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSave: (role: { id: number; designation: string; department: string; scope: string }) => void;
+    onSave: (role: { id: string; designation: string; department: string; scope: string }) => void;
 }
 
 export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalProps) {
@@ -19,7 +19,7 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave({ ...roleData, id: Date.now() });
+        onSave({ ...roleData, id: Date.now().toString() });
         setRoleData({ designation: "", department: "", scope: "" });
         onOpenChange(false);
     };

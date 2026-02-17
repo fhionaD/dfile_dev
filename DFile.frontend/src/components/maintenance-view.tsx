@@ -1,28 +1,35 @@
 import { useState } from "react";
-import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, ShoppingCart, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { MaintenanceRecord, Asset } from "@/types/asset";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useAddMaintenanceRecord } from "@/hooks/use-maintenance";
+import { useAssets } from "@/hooks/use-assets";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 
 interface MaintenanceViewProps {
-    records: MaintenanceRecord[];
-    assets: Asset[];
-    onCreateRequest: () => void;
-    onRecordClick?: (record: MaintenanceRecord) => void;
-    onArchiveRecord?: (id: string) => void;
-    onEditRecord?: (record: MaintenanceRecord) => void;
+    // No longer needs data props
     onScheduleMaintenance?: (assetId: string) => void;
-    onUpdateStatus?: (id: string, status: MaintenanceRecord['status']) => void;
     onRequestReplacement?: (assetId: string) => void;
 }
 
-export function MaintenanceView({ records, assets, onCreateRequest, onRecordClick, onArchiveRecord, onEditRecord, onScheduleMaintenance, onUpdateStatus, onRequestReplacement }: MaintenanceViewProps) {
+export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }: MaintenanceViewProps) {
+    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
+    const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
+
+    // Mutations
+    const updateStatusMutation = useUpdateMaintenanceStatus();
+    const archiveRecordMutation = useArchiveMaintenanceRecord();
+
     const [showArchived, setShowArchived] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Request Filters
     const [searchQuery, setSearchQuery] = useState("");
@@ -38,6 +45,36 @@ export function MaintenanceView({ records, assets, onCreateRequest, onRecordClic
         const asset = assets.find(a => a.id === id);
         return asset ? asset.desc : id;
     };
+
+
+
+    // Loading State
+    if (isLoadingRecords || isLoadingAssets) {
+        return (
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-8 w-12" />
+                            </div>
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                        </div>
+                    ))}
+                </div>
+                <div className="rounded-xl border border-border overflow-hidden bg-card p-6 space-y-4">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-10 w-full" />
+                    <div className="space-y-2">
+                        {[...Array(5)].map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // Filter Logic for Requests
     const filteredRecords = records.filter(record => {
@@ -127,7 +164,7 @@ export function MaintenanceView({ records, assets, onCreateRequest, onRecordClic
         }
     };
 
-    // KPI Calculations (Keep consistent with total active records for dashboard accuracy)
+    // KPI Calculations
     const fixedAssetsCount = assets.filter(a => (a.status === 'Available' || a.status === 'In Use') && !records.some(r => r.assetId === a.id && !r.archived && r.status !== 'Completed')).length;
     const damagedAssetsCount = assets.filter(a => records.some(r => r.assetId === a.id && !r.archived && r.status === 'Pending' && r.type === 'Corrective')).length;
     const inRepairAssetsCount = assets.filter(a => a.status === 'Maintenance' || records.some(r => r.assetId === a.id && !r.archived && r.status === 'In Progress')).length;
@@ -174,236 +211,238 @@ export function MaintenanceView({ records, assets, onCreateRequest, onRecordClic
                 </div>
             </div>
 
-            <div className="rounded-xl border border-border overflow-hidden bg-card">
-                {/* Header */}
-                <div className="p-6 border-b border-border bg-muted/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Wrench size={18} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-foreground">Maintenance Hub</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    Manage repairs and asset schedules
-                                </p>
-                            </div>
-                        </div>
-                        <Button onClick={onCreateRequest} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
-                            <Plus size={14} className="mr-2" />
-                            New Request
-                        </Button>
-                    </div>
-                </div>
+            {/* PROPOSAL: Two Cards for cleaner separation */}
 
-                <div className="p-6">
-                    <div className="space-y-6">
-                        {/* Section: Asset Maintenance Schedules */}
+            {/* Card 1: Asset List & Schedules */}
+            <Card className="border-border">
+                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            <Clock size={18} />
+                        </div>
                         <div>
-                            <div className="flex items-center justify-between mb-3 px-1">
-                                <h4 className="text-sm font-semibold flex items-center gap-2">
-                                    <Clock size={16} /> Asset List & Schedules
-                                </h4>
-                            </div>
-
-                            {/* Mini Toolbar for Asset List */}
-                            <div className="mb-3 p-3 bg-muted/20 border border-border rounded-lg flex gap-3">
-                                <div className="relative flex-1 max-w-sm">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search assets..."
-                                        value={assetSearchQuery}
-                                        onChange={(e) => setAssetSearchQuery(e.target.value)}
-                                        className="pl-9 h-9 bg-background"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="rounded-lg border border-border overflow-hidden">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                            <TableHead className="text-center text-xs font-medium text-muted-foreground">Asset</TableHead>
-                                            <TableHead className="text-center text-xs font-medium text-muted-foreground">Warranty Expiry</TableHead>
-                                            <TableHead className="text-center text-xs font-medium text-muted-foreground">Next Maintenance</TableHead>
-                                            <TableHead className="text-center text-xs font-medium text-muted-foreground">EOL Estimate</TableHead>
-                                            <TableHead className="text-center text-xs font-medium text-muted-foreground">Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredAssets.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-xs">
-                                                    No assets found.
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            filteredAssets.slice(0, 5).map(asset => (
-                                                <TableRow key={asset.id} className="hover:bg-muted/30 transition-colors">
-                                                    <TableCell className="font-medium text-sm text-center">
-                                                        {asset.desc}
-                                                        <span className="block text-xs text-muted-foreground font-mono">{asset.id}</span>
-                                                    </TableCell>
-                                                    <TableCell className="text-sm text-center">{asset.warrantyExpiry || "—"}</TableCell>
-                                                    <TableCell className="text-sm text-center">
-                                                        {asset.nextMaintenance ? (
-                                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
-                                                                <Clock size={10} /> {asset.nextMaintenance}
-                                                            </span>
-                                                        ) : "—"}
-                                                    </TableCell>
-                                                    <TableCell className="text-sm text-muted-foreground text-center">{asset.notes || "—"}</TableCell>
-                                                    <TableCell className="text-center">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10"
-                                                            onClick={() => onScheduleMaintenance?.(asset.id)}
-                                                        >
-                                                            <Plus size={12} className="mr-1" /> Schedule
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        )}
-                                        {filteredAssets.length > 5 && (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="text-center text-xs text-muted-foreground p-2 bg-muted/20">
-                                                    ...and {filteredAssets.length - 5} more assets
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </div>
-
-                        {/* Section: Active Requests */}
-                        <div className="pt-4 border-t border-border">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                <h4 className="text-sm font-semibold flex items-center gap-2">
-                                    <Wrench size={16} /> Service Requests
-                                </h4>
-                                <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                                    {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeRecords.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedRecords.length})</>}
-                                </Button>
-                            </div>
-
-                            {/* Filters Toolbar */}
-                            <div className="mb-4 p-3 bg-muted/20 border border-border rounded-lg flex flex-col sm:flex-row gap-3">
-                                <div className="relative flex-1 max-w-sm">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search requests..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-9 h-9 bg-background"
-                                    />
-                                </div>
-                                <div className="flex gap-2 flex-wrap">
-                                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                        <SelectTrigger className="w-[180px] h-9 bg-background">
-                                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                            <SelectValue placeholder="Status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="All">All Status</SelectItem>
-                                            <SelectItem value="Pending">Pending</SelectItem>
-                                            <SelectItem value="In Progress">In Progress</SelectItem>
-                                            <SelectItem value="Completed">Completed</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                                        <SelectTrigger className="w-[180px] h-9 bg-background">
-                                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                            <SelectValue placeholder="Priority" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="All">All Priority</SelectItem>
-                                            <SelectItem value="High">High</SelectItem>
-                                            <SelectItem value="Medium">Medium</SelectItem>
-                                            <SelectItem value="Low">Low</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Select value={dateFilter} onValueChange={setDateFilter}>
-                                        <SelectTrigger className="w-[180px] h-9 bg-background">
-                                            <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
-                                            <SelectValue placeholder="Date" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="All Time">All Time</SelectItem>
-                                            <SelectItem value="This Month">This Month</SelectItem>
-                                            <SelectItem value="Last Month">Last Month</SelectItem>
-                                            <SelectItem value="This Year">This Year</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="rounded-lg border border-border overflow-hidden">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                            <TableHead className="w-[150px] text-center">Request ID</TableHead>
-                                            <TableHead className="w-[250px] text-center">Asset</TableHead>
-                                            <TableHead className="min-w-[300px]">Description</TableHead>
-                                            <TableHead className="w-[150px] text-center">Priority</TableHead>
-                                            <TableHead className="w-[180px] text-center">Date</TableHead>
-                                            <TableHead className="w-[160px] text-center">Status</TableHead>
-                                            <TableHead className="w-[80px] text-center">{showArchived ? "Restore" : "Archive"}</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredRecords.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
-                                                    No maintenance records match your filters.
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            filteredRecords.map((record) => (
-                                                <TableRow key={record.id} className="border-border cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => onRecordClick?.(record)}>
-                                                    <TableCell className="font-mono text-sm font-medium text-foreground text-center">{record.id}</TableCell>
-                                                    <TableCell className="text-sm text-foreground font-medium text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span>{getAssetName(record.assetId)}</span>
-                                                            <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-sm text-muted-foreground max-w-[400px] truncate" title={record.description}>{record.description}</TableCell>
-                                                    <TableCell className={`text-sm text-center ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
-                                                    <TableCell className="text-sm text-muted-foreground text-center">{record.dateReported}</TableCell>
-                                                    <TableCell className="text-center">
-                                                        <Badge variant="outline" className={getStatusColor(record.status)}>
-                                                            {getStatusIcon(record.status)} {record.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    onArchiveRecord?.(record.id);
-                                                                }}
-                                                                className={`p-1.5 rounded-md transition-colors ${record.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                                title={record.archived ? 'Restore' : 'Archive'}
-                                                            >
-                                                                {record.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
-                                                            </button>
-
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            <h3 className="text-lg font-semibold text-foreground">Asset List & Schedules</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">Track warranty and maintenance schedules</p>
                         </div>
                     </div>
+                    <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
+                        <Plus size={14} className="mr-2" />
+                        New Request
+                    </Button>
                 </div>
-            </div>
-        </div >
+
+                <div className="p-4 border-b border-border bg-muted/20">
+                    <div className="relative max-w-sm">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search assets..."
+                            value={assetSearchQuery}
+                            onChange={(e) => setAssetSearchQuery(e.target.value)}
+                            className="pl-9 h-9 bg-background"
+                        />
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableHead className="text-center text-xs font-medium text-muted-foreground">Asset</TableHead>
+                                <TableHead className="text-center text-xs font-medium text-muted-foreground">Warranty Expiry</TableHead>
+                                <TableHead className="text-center text-xs font-medium text-muted-foreground">Next Maintenance</TableHead>
+                                <TableHead className="text-center text-xs font-medium text-muted-foreground">EOL Estimate</TableHead>
+                                <TableHead className="text-center text-xs font-medium text-muted-foreground">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredAssets.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-xs">
+                                        No assets found.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                filteredAssets.slice(0, 5).map(asset => (
+                                    <TableRow key={asset.id} className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="font-medium text-sm text-center">
+                                            {asset.desc}
+                                            <span className="block text-xs text-muted-foreground font-mono">{asset.id}</span>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-center">{asset.warrantyExpiry || "—"}</TableCell>
+                                        <TableCell className="text-sm text-center">
+                                            {asset.nextMaintenance ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                                                    <Clock size={10} /> {asset.nextMaintenance}
+                                                </span>
+                                            ) : "—"}
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground text-center">{asset.notes || "—"}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                                                onClick={() => onScheduleMaintenance?.(asset.id)}
+                                            >
+                                                <Plus size={12} className="mr-1" /> Schedule
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                            {filteredAssets.length > 5 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center text-xs text-muted-foreground p-2 bg-muted/20">
+                                        ...and {filteredAssets.length - 5} more assets
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
+
+            {/* Card 2: Service Requests */}
+            <Card className="border-border">
+                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            <Wrench size={18} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-foreground">Service Requests</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">Manage maintenance and repair tickets</p>
+                        </div>
+                    </div>
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
+                        {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeRecords.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedRecords.length})</>}
+                    </Button>
+                </div>
+
+                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search requests..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 h-9 bg-background"
+                        />
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-[180px] h-9 bg-background">
+                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Status</SelectItem>
+                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="In Progress">In Progress</SelectItem>
+                                <SelectItem value="Completed">Completed</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                            <SelectTrigger className="w-[180px] h-9 bg-background">
+                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Priority" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Priority</SelectItem>
+                                <SelectItem value="High">High</SelectItem>
+                                <SelectItem value="Medium">Medium</SelectItem>
+                                <SelectItem value="Low">Low</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                            <SelectTrigger className="w-[180px] h-9 bg-background">
+                                <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Date" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All Time">All Time</SelectItem>
+                                <SelectItem value="This Month">This Month</SelectItem>
+                                <SelectItem value="Last Month">Last Month</SelectItem>
+                                <SelectItem value="This Year">This Year</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableHead className="w-[150px] text-center">Request ID</TableHead>
+                                <TableHead className="w-[250px] text-center">Asset</TableHead>
+                                <TableHead className="min-w-[300px]">Description</TableHead>
+                                <TableHead className="w-[150px] text-center">Priority</TableHead>
+                                <TableHead className="w-[180px] text-center">Date</TableHead>
+                                <TableHead className="w-[160px] text-center">Status</TableHead>
+                                <TableHead className="w-[80px] text-center">{showArchived ? "Restore" : "Archive"}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredRecords.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground text-sm">
+                                        No maintenance records match your filters.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                filteredRecords.map((record) => (
+                                    <TableRow key={record.id} className="border-border cursor-pointer hover:bg-muted/30 transition-colors">
+                                        <TableCell className="font-mono text-sm font-medium text-foreground text-center">{record.id}</TableCell>
+                                        <TableCell className="text-sm text-foreground font-medium text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span>{getAssetName(record.assetId)}</span>
+                                                <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground max-w-[400px] truncate" title={record.description}>{record.description}</TableCell>
+                                        <TableCell className={`text-sm text-center ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground text-center">{record.dateReported}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Select
+                                                value={record.status}
+                                                onValueChange={(val) => updateStatusMutation.mutateAsync({ id: record.id, status: val })}
+                                            >
+                                                <SelectTrigger className={`h-8 border-none ${getStatusColor(record.status)}`}>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Pending">Pending</SelectItem>
+                                                    <SelectItem value="In Progress">In Progress</SelectItem>
+                                                    <SelectItem value="Completed">Completed</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        archiveRecordMutation.mutateAsync(record.id);
+                                                    }}
+                                                    className={`p-1.5 rounded-md transition-colors ${record.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
+                                                    title={record.archived ? 'Restore' : 'Archive'}
+                                                >
+                                                    {record.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
+                                                </button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </Card>
+
+            <CreateMaintenanceModal
+                open={isCreateModalOpen}
+                onOpenChange={setIsCreateModalOpen}
+            />
+        </div>
     );
 }

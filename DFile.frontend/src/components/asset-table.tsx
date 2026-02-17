@@ -1,10 +1,9 @@
-"use client";
-
 import { useState, useMemo } from "react";
-import { QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown, Archive, RotateCcw, Search, Filter } from "lucide-react";
+import { QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown, Archive, RotateCcw, Search, Filter, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeModal } from "@/components/modals/qr-code-modal";
 import {
@@ -12,6 +11,8 @@ import {
 } from "@/components/ui/table";
 
 import { Asset } from "@/types/asset";
+import { useAssets, useArchiveAsset } from "@/hooks/use-assets";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<string, string> = {
     "In Use": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
@@ -24,12 +25,13 @@ type SortKey = keyof Asset;
 type SortDirection = "asc" | "desc";
 
 interface AssetTableProps {
-    assets: Asset[];
     onAssetClick?: (asset: Asset) => void;
-    onArchiveAsset?: (id: string) => void;
 }
 
-export function AssetTable({ assets, onAssetClick, onArchiveAsset }: AssetTableProps) {
+export function AssetTable({ onAssetClick }: AssetTableProps) {
+    const { data: assets = [], isLoading } = useAssets();
+    const archiveAssetMutation = useArchiveAsset();
+
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -129,29 +131,48 @@ export function AssetTable({ assets, onAssetClick, onArchiveAsset }: AssetTableP
         document.body.removeChild(link);
     };
 
+    if (isLoading) {
+        return (
+            <div className="rounded-xl border border-border overflow-hidden bg-card p-6 space-y-4">
+                <div className="flex justify-between items-center mb-6">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-8 w-32" />
+                </div>
+                <div className="flex gap-4 mb-6">
+                    <Skeleton className="h-10 flex-1" />
+                    <Skeleton className="h-10 w-32" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+                <div className="space-y-2">
+                    {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
-            {/* ... [keep existing header] ... */}
+        <div className="space-y-4">
             <QRCodeModal
                 open={!!selectedAssetForQR}
                 onOpenChange={(open) => !open && setSelectedAssetForQR(null)}
                 asset={selectedAssetForQR}
             />
-            {/* Header */}
-            <div className="p-6 border-b border-border bg-muted/40">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
+
+            <Card className="border-border">
+                {/* Header */}
+                <div className="p-6 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <FileBarChart size={18} />
+                            <Package size={18} />
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold text-foreground">Fleet Registry</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {showArchived ? "Archived assets" : "Active assets across all categories"}
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Manage and track all company assets</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-4 sm:ml-auto sm:mt-0">
+                    <div className="flex items-center gap-2">
                         <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
                             {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({assets.filter(a => a.status !== "Archived").length})</> : <><Archive size={14} className="mr-1.5" />Archived ({assets.filter(a => a.status === "Archived").length})</>}
                         </Button>
@@ -161,11 +182,9 @@ export function AssetTable({ assets, onAssetClick, onArchiveAsset }: AssetTableP
                         </Button>
                     </div>
                 </div>
-            </div>
 
-            <div className="p-6">
                 {/* Filters */}
-                <div className="mb-4 p-3 bg-muted/20 border border-border rounded-lg flex flex-col sm:flex-row gap-3">
+                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -204,107 +223,106 @@ export function AssetTable({ assets, onAssetClick, onArchiveAsset }: AssetTableP
                     </div>
                 </div>
 
-                <div className="rounded-lg border border-border overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    <TableHead onClick={() => handleSort("id")} className="cursor-pointer hover:bg-muted/50 transition-colors text-center text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center justify-center">Asset ID {getSortIcon("id")}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => handleSort("desc")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center">Asset Name {getSortIcon("desc")}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => handleSort("cat")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center">Category {getSortIcon("cat")}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => handleSort("status")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center">Status {getSortIcon("status")}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => handleSort("room")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center">Room {getSortIcon("room")}</div>
-                                    </TableHead>
-                                    <TableHead onClick={() => handleSort("value")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                        <div className="flex items-center">Value {getSortIcon("value")}</div>
-                                    </TableHead>
-                                    <TableHead className="text-xs font-medium text-muted-foreground">QR</TableHead>
-                                    <TableHead className="text-xs font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableHead onClick={() => handleSort("id")} className="cursor-pointer hover:bg-muted/50 transition-colors text-center text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center justify-center">Asset ID {getSortIcon("id")}</div>
+                                </TableHead>
+                                <TableHead onClick={() => handleSort("desc")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center">Asset Name {getSortIcon("desc")}</div>
+                                </TableHead>
+                                <TableHead onClick={() => handleSort("cat")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center">Category {getSortIcon("cat")}</div>
+                                </TableHead>
+                                <TableHead onClick={() => handleSort("status")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center">Status {getSortIcon("status")}</div>
+                                </TableHead>
+                                <TableHead onClick={() => handleSort("room")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center">Room {getSortIcon("room")}</div>
+                                </TableHead>
+                                <TableHead onClick={() => handleSort("value")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
+                                    <div className="flex items-center">Value {getSortIcon("value")}</div>
+                                </TableHead>
+                                <TableHead className="text-xs font-medium text-muted-foreground">QR</TableHead>
+                                <TableHead className="text-xs font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedAssets.filter(a => showArchived ? a.status === "Archived" : a.status !== "Archived").map((asset) => (
+                                <TableRow
+                                    key={asset.id}
+                                    className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
+                                    onClick={() => onAssetClick?.(asset)}
+                                >
+                                    <TableCell className="font-mono text-xs font-medium text-foreground text-center">{asset.id}</TableCell>
+                                    <TableCell className="text-sm text-foreground font-medium">{asset.desc}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{asset.cat}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={`${statusColors[asset.status]} rounded-md text-xs font-medium`}>
+                                            {asset.status}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{asset.room}</TableCell>
+                                    <TableCell className="text-sm font-medium text-foreground">{formatCurrency(asset.value)}</TableCell>
+                                    <TableCell>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedAssetForQR(asset);
+                                            }}
+                                            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                                        >
+                                            <QrCode size={16} />
+                                        </button>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                archiveAssetMutation.mutate(asset.id);
+                                            }}
+                                            className={`p-1.5 rounded-md transition-colors ${asset.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
+                                            title={asset.status === 'Archived' ? 'Restore' : 'Archive'}
+                                        >
+                                            {asset.status === 'Archived' ? <RotateCcw size={16} /> : <Archive size={16} />}
+                                        </button>
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paginatedAssets.filter(a => showArchived ? a.status === "Archived" : a.status !== "Archived").map((asset) => (
-                                    <TableRow
-                                        key={asset.id}
-                                        className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
-                                        onClick={() => onAssetClick?.(asset)}
-                                    >
-                                        <TableCell className="font-mono text-xs font-medium text-foreground text-center">{asset.id}</TableCell>
-                                        <TableCell className="text-sm text-foreground font-medium">{asset.desc}</TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">{asset.cat}</TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline" className={`${statusColors[asset.status]} rounded-md text-xs font-medium`}>
-                                                {asset.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">{asset.room}</TableCell>
-                                        <TableCell className="text-sm font-medium text-foreground">{formatCurrency(asset.value)}</TableCell>
-                                        <TableCell>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedAssetForQR(asset);
-                                                }}
-                                                className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
-                                            >
-                                                <QrCode size={16} />
-                                            </button>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onArchiveAsset?.(asset.id);
-                                                }}
-                                                className={`p-1.5 rounded-md transition-colors ${asset.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                title={asset.status === 'Archived' ? 'Restore' : 'Archive'}
-                                            >
-                                                {asset.status === 'Archived' ? <RotateCcw size={16} /> : <Archive size={16} />}
-                                            </button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
 
-                    {/* Pagination Footer */}
-                    <div className="p-4 border-t border-border flex items-center justify-between bg-muted/20">
-                        <div className="text-xs text-muted-foreground font-medium">
-                            Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedAssets.length)} of {sortedAssets.length}
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs font-medium"
-                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs font-medium"
-                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                disabled={currentPage === totalPages}
-                            >
-                                Next
-                            </Button>
-                        </div>
+                {/* Pagination Footer */}
+                <div className="p-4 border-t border-border flex items-center justify-between bg-muted/20">
+                    <div className="text-xs text-muted-foreground font-medium">
+                        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedAssets.length)} of {sortedAssets.length}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs font-medium"
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs font-medium"
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </Button>
                     </div>
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }

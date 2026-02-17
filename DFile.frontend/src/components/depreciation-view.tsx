@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset } from "@/types/asset";
+import { useAssets } from "@/hooks/use-assets";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DepreciationViewProps {
-    assets: Asset[];
     onAssetClick?: (asset: Asset) => void;
 }
 
@@ -40,7 +41,8 @@ function calculateDepreciation(asset: Asset) {
     return { monthlyDep, currentBookValue, totalDepreciation, depPercent, ageMonths };
 }
 
-export function DepreciationView({ assets, onAssetClick }: DepreciationViewProps) {
+export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
+    const { data: assets = [], isLoading } = useAssets();
     const [searchQuery, setSearchQuery] = useState("");
     const [dateFilter, setDateFilter] = useState("All Time");
 
@@ -94,6 +96,29 @@ export function DepreciationView({ assets, onAssetClick }: DepreciationViewProps
         { label: "Current Book Value", value: `$${totalCurrentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: BarChart3, color: "bg-emerald-500" },
         { label: "Avg. Useful Life", value: `${avgUsefulLife.toFixed(1)} yrs`, icon: Calendar, color: "bg-amber-500" },
     ];
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <Skeleton key={i} className="h-28 rounded-xl" />
+                    ))}
+                </div>
+                <div className="rounded-xl border border-border p-6 space-y-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-8 w-32" />
+                    </div>
+                    <div className="space-y-2">
+                        {[...Array(5)].map((_, i) => (
+                            <Skeleton key={i} className="h-16 w-full" />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

@@ -7,11 +7,13 @@ import { Separator } from "@/components/ui/separator";
 import { Wrench, Calendar, AlertTriangle, Package, RefreshCw } from "lucide-react";
 import { MaintenanceRecord } from "@/types/asset";
 
+import { useAssets } from "@/hooks/use-assets"; // Add import
+
 interface MaintenanceDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     record: MaintenanceRecord | null;
-    assetName?: string;
+    // assetName removed
     onEdit?: () => void;
     onRequestReplacement?: (assetId: string) => void;
 }
@@ -28,8 +30,13 @@ const priorityColor: Record<string, string> = {
     High: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export function MaintenanceDetailsModal({ open, onOpenChange, record, assetName, onEdit, onRequestReplacement }: MaintenanceDetailsModalProps) {
+export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, onRequestReplacement }: MaintenanceDetailsModalProps) {
+    const { data: assets = [] } = useAssets();
+
     if (!record) return null;
+
+    const asset = assets.find(a => a.id === record.assetId);
+    const assetName = asset ? asset.desc : record.assetId;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

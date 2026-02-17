@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 namespace DFile.backend.Controllers
 {
@@ -25,16 +26,45 @@ namespace DFile.backend.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
+            Console.WriteLine($"[Auth] Login attempt for: {model.Email}");
+            
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
             
-            // Simple string comparison for demo. In prod use BCrypt
-            if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
+            if (user == null)
             {
+                Console.WriteLine($"[Auth] User not found: {model.Email}");
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
+            if (!BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
+            {
+                Console.WriteLine($"[Auth] Invalid password for: {model.Email}");
+                return Unauthorized(new { message = "Invalid credentials" });
+            }
+
+            Console.WriteLine($"[Auth] Login successful for: {model.Email}");
             var token = GenerateJwtToken(user);
             return Ok(new { token, user });
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return Unauthorized();
+
+            // Be careful not to return PasswordHash
+            return Ok(new { 
+                user.Id, 
+                user.Name, 
+                user.Email, 
+                user.Role, 
+                user.RoleLabel 
+            });
         }
 
         [HttpPost("register")] // Helper for us to create users

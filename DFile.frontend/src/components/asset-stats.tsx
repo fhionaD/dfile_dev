@@ -1,19 +1,31 @@
 "use client";
 
 import { Package, BarChart3, AlertTriangle, DollarSign } from "lucide-react";
-import { Asset } from "@/types/asset";
+import { useAssets } from "@/hooks/use-assets";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface AssetStatsProps {
-    assets: Asset[];
-}
+export function AssetStats() {
+    const { data: assets = [], isLoading } = useAssets();
 
-export function AssetStats({ assets }: AssetStatsProps) {
+    if (isLoading) {
+        return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-8 w-16" />
+                        </div>
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     const totalAssets = assets.length;
 
-    // "Pending Review" proxy: Assets with default/missing room allocation (Available but not In Use/Maintenance/etc, or explicit logic)
-    // For now, let's use "Available" assets as "Ready to Deploy" or similar, 
-    // OR sticking to the card label "Pending Review" -> maybe Unallocated assets?
-    // Let's us "Unallocated" (Status Available) roughly.
+    // "Pending Review" proxy
     const pendingReviewCount = assets.filter(a => a.status === "Available" && (a.room === "—" || !a.room)).length;
 
     // Calculate Values

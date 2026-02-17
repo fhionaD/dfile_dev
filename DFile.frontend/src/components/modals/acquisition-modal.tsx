@@ -7,17 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Category, PurchaseOrder, Asset } from "@/types/asset";
+import { PurchaseOrder, Asset } from "@/types/asset";
+import { useCategories } from "@/hooks/use-categories";
+import { useCreateOrder } from "@/hooks/use-procurement";
 
 interface AcquisitionModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    categories: Category[];
-    onCreateOrder?: (order: PurchaseOrder, asset: Asset) => void;
     replacementAsset?: Asset | null;
 }
 
-export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder, replacementAsset }: AcquisitionModalProps) {
+export function AcquisitionModal({ open, onOpenChange, replacementAsset }: AcquisitionModalProps) {
+    const { data: categories = [] } = useCategories();
+    const createOrderMutation = useCreateOrder();
+
     const [depreciationResult, setDepreciationResult] = useState<{ bookValue: number; monthlyDep: number } | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>(replacementAsset?.cat || "");
 
@@ -42,7 +45,7 @@ export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder
         }
     };
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const form = e.currentTarget;
         const formData = new FormData(form);
@@ -50,12 +53,12 @@ export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder
         const purchasePrice = Number(formData.get("purchasePrice")) || 0;
         const usefulLifeYears = Number(formData.get("usefulLife")) || 0;
         const purchaseDate = formData.get("purchaseDate") as string;
-        const assetName = formData.get("assetName") as string; // Changed from 'name' to 'assetName'
+        const assetName = formData.get("assetName") as string;
         const manufacturer = formData.get("manufacturer") as string;
         const model = formData.get("model") as string;
         const serialNumber = formData.get("serialNumber") as string;
         const vendor = formData.get("vendor") as string;
-        const category = categories.find(c => c.name === selectedCategory); // Changed to match by name
+        const category = categories.find(c => c.name === selectedCategory);
 
         const assetId = `AST-${Date.now().toString().slice(-6)}`;
         const orderId = `PO-${Date.now().toString().slice(-6)}`;
@@ -105,9 +108,7 @@ export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder
             assetId,
         };
 
-        if (onCreateOrder) {
-            onCreateOrder(newOrder, newAsset);
-        }
+        await createOrderMutation.mutateAsync({ order: newOrder, asset: newAsset });
 
         setDepreciationResult(null);
         setSelectedCategory("");
@@ -138,7 +139,7 @@ export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <Tag size={12} /> Asset Name
                             </Label>
-                            <Input name="name" required placeholder="e.g. Industrial Washer Unit" className="border-input bg-background" />
+                            <Input name="assetName" required placeholder="e.g. Industrial Washer Unit" className="border-input bg-background" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
@@ -150,7 +151,7 @@ export function AcquisitionModal({ open, onOpenChange, categories, onCreateOrder
                                 </SelectTrigger>
                                 <SelectContent>
                                     {categories.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

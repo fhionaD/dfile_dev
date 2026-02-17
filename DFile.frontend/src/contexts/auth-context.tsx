@@ -21,19 +21,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     // Persist login state
+    // Persist login state and validate session
     useEffect(() => {
-        const storedUser = localStorage.getItem("dfile_user");
-        const storedToken = localStorage.getItem("dfile_token");
-        if (storedUser && storedToken) {
-            try {
-                setUser(JSON.parse(storedUser));
-                setToken(storedToken);
-                setIsLoggedIn(true);
-            } catch (e) {
-                console.error("Failed to parse stored user", e);
+        const initAuth = async () => {
+            const storedUser = localStorage.getItem("dfile_user");
+            const storedToken = localStorage.getItem("dfile_token");
+
+            if (storedUser && storedToken) {
+                try {
+                    // 1. Optimistically set state
+                    const parsedUser = JSON.parse(storedUser);
+                    setUser(parsedUser);
+                    setToken(storedToken);
+                    setIsLoggedIn(true);
+
+                    // 2. Validate with Backend
+                    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090').replace(/\/$/, '');
+                    const res = await fetch(`${apiBase}/api/auth/me`, {
+                        headers: { Authorization: `Bearer ${storedToken}` }
+                    });
+
+                    if (!res.ok) {
+                        console.warn("[Auth] Session invalid, logging out");
+                        logout();
+                    } else {
+                        // Optional: Update user details from backend if changed
+                        // const freshUser = await res.json();
+                        // setUser(freshUser);
+                    }
+
+                } catch (e) {
+                    console.error("Failed to restore session", e);
+                    logout();
+                }
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        };
+
+        initAuth();
     }, []);
 
     const login = async (email: string, password: string) => {
@@ -54,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`[Auth] Login failed. Status: ${response.status}. Body:`, errorText);
+                // console.error(`[Auth] Login failed. Status: ${response.status}. Body:`, errorText);
                 throw new Error(`Login failed: ${response.status} ${response.statusText}`);
             }
 
@@ -67,8 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoggedIn(true);
             localStorage.setItem("dfile_user", JSON.stringify(userData));
             localStorage.setItem("dfile_token", token);
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            // Only log if not a 401 (expected auth failure)
+            if (!error.message?.includes("401")) {
+                console.error(error);
+            }
             throw error;
         }
     };

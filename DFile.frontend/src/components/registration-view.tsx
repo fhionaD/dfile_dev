@@ -2,79 +2,35 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, QrCode, Search, Package, Printer, Download, Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeSVG } from "qrcode.react";
 
-import { Asset, Category } from "@/types/asset";
+import { Asset } from "@/types/asset";
+import { useAssets } from "@/hooks/use-assets";
 
 interface RegistrationViewProps {
-    assets: Asset[];
-    categories: Category[];
     onRegister?: () => void;
     onManageCategories?: () => void;
+    onAssetClick?: (asset: Asset) => void;
 }
 
 import { AssetStats } from "@/components/asset-stats";
 import { AssetTable } from "@/components/asset-table";
-import { Filter, Calendar as CalendarIcon } from "lucide-react";
 
-// ... existing imports
-
-export function RegistrationView({ assets, categories, onRegister, onManageCategories, onAssetClick }: RegistrationViewProps & { onAssetClick?: (asset: Asset) => void }) {
+export function RegistrationView({ onRegister, onManageCategories, onAssetClick }: RegistrationViewProps) {
+    const { data: assets = [] } = useAssets();
     const [selectedAssetId, setSelectedAssetId] = useState<string>("");
-    const [activeTab, setActiveTab] = useState<string>("inventory"); // Default to inventory list
-
-    // Filter States
-    const [searchQuery, setSearchQuery] = useState("");
-    const [categoryFilter, setCategoryFilter] = useState("All");
-    const [statusFilter, setStatusFilter] = useState("All");
-    const [dateFilter, setDateFilter] = useState("All Time");
+    const [activeTab, setActiveTab] = useState<string>("inventory");
 
     const selectedAsset = assets.find(a => a.id === selectedAssetId);
 
-
-
-    // Filter Logic
-    const filteredAssets = assets.filter(asset => {
-        // 1. Text Search
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
-            asset.id.toLowerCase().includes(query) ||
-            asset.desc.toLowerCase().includes(query) ||
-            (asset.serialNumber && asset.serialNumber.toLowerCase().includes(query)) ||
-            (asset.model && asset.model.toLowerCase().includes(query));
-
-        if (!matchesSearch) return false;
-
-        // 2. Category Filter
-        if (categoryFilter !== "All" && asset.cat !== categoryFilter) return false;
-
-        // 3. Status Filter
-        if (statusFilter !== "All" && asset.status !== statusFilter) return false;
-
-        // 4. Date Filter (Purchase Date)
-        if (dateFilter !== "All Time") {
-            if (!asset.purchaseDate) return false;
-
-            const date = new Date(asset.purchaseDate);
-            const now = new Date();
-
-            if (dateFilter === "This Month") {
-                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-            }
-            if (dateFilter === "This Year") {
-                return date.getFullYear() === now.getFullYear();
-            }
-        }
-
-        return true;
-    });
+    // Filter out archived assets for tagging dropdown
+    const activeAssets = assets.filter(a => a.status !== 'Archived');
 
     return (
         <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
                     <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-muted/50 p-1 rounded-xl">
                         <TabsTrigger value="inventory" className="rounded-lg">Inventory List</TabsTrigger>
                         <TabsTrigger value="tagging" className="rounded-lg">Tagging & QR</TabsTrigger>
@@ -95,12 +51,11 @@ export function RegistrationView({ assets, categories, onRegister, onManageCateg
                 </div>
 
                 <TabsContent value="inventory" className="space-y-6">
-                    <AssetStats assets={assets} />
-                    <AssetTable assets={assets} onAssetClick={onAssetClick} />
+                    <AssetStats />
+                    <AssetTable onAssetClick={onAssetClick} />
                 </TabsContent>
 
                 <TabsContent value="tagging">
-                    {/* ... existing content ... */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="md:col-span-2 border border-border rounded-2xl overflow-hidden bg-card p-6 min-h-[400px]">
                             <h3 className="text-lg font-semibold text-foreground mb-4">Generate Asset Tags</h3>
@@ -112,7 +67,7 @@ export function RegistrationView({ assets, categories, onRegister, onManageCateg
                                             <SelectValue placeholder="Search or select an asset..." />
                                         </SelectTrigger>
                                         <SelectContent className="max-h-[300px]">
-                                            {assets.map(asset => (
+                                            {activeAssets.map(asset => (
                                                 <SelectItem key={asset.id} value={asset.id}>
                                                     <span className="font-mono mr-2 text-muted-foreground">{asset.id}</span>
                                                     {asset.desc}

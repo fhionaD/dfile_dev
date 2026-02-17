@@ -1,25 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Clock, CheckCircle2, DollarSign, Plus, Package, Archive, RotateCcw } from "lucide-react";
+import { ShoppingCart, Clock, CheckCircle2, DollarSign, Plus, Package, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PurchaseOrder } from "@/types/asset";
-
-interface ProcurementViewProps {
-    orders: PurchaseOrder[];
-    onNewOrder: () => void;
-    onOrderClick?: (order: PurchaseOrder) => void;
-    onArchiveOrder?: (id: string) => void;
-}
-
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { PurchaseOrder } from "@/types/asset";
+import { usePurchaseOrders, useArchiveOrder } from "@/hooks/use-procurement";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export function ProcurementView({ orders, onNewOrder, onOrderClick, onArchiveOrder }: ProcurementViewProps) {
+interface ProcurementViewProps {
+    onNewOrder: () => void;
+    onOrderClick?: (order: PurchaseOrder) => void;
+}
+
+export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewProps) {
+    const { data: orders = [], isLoading } = usePurchaseOrders();
+    const archiveOrderMutation = useArchiveOrder();
+
     const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
@@ -68,7 +69,7 @@ export function ProcurementView({ orders, onNewOrder, onOrderClick, onArchiveOrd
     const activeOrders = orders.filter(o => !o.archived);
     const archivedOrders = orders.filter(o => o.archived);
 
-    // Summary stats (keep based on TOTAL active orders, or filtered? Usually total context is better for KPIs)
+    // Summary stats
     const totalOrders = orders.length;
     const pendingOrders = orders.filter(o => o.status === "Pending").length;
     const approvedOrders = orders.filter(o => o.status === "Approved" || o.status === "Delivered").length;
@@ -87,6 +88,28 @@ export function ProcurementView({ orders, onNewOrder, onOrderClick, onArchiveOrd
         { label: "Approved / Delivered", value: approvedOrders.toString(), icon: CheckCircle2, color: "bg-emerald-500" },
         { label: "Total Spend", value: `$${totalSpend.toLocaleString()}`, icon: DollarSign, color: "bg-blue-500" },
     ];
+
+    if (isLoading) {
+        return (
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm h-24">
+                            <Skeleton className="h-full w-full" />
+                        </div>
+                    ))}
+                </div>
+                <div className="rounded-xl border border-border p-6 space-y-4">
+                    <Skeleton className="h-8 w-full mb-4" />
+                    <div className="space-y-2">
+                        {[...Array(5)].map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -234,7 +257,7 @@ export function ProcurementView({ orders, onNewOrder, onOrderClick, onArchiveOrd
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onArchiveOrder?.(order.id);
+                                                    archiveOrderMutation.mutate(order.id);
                                                 }}
                                                 className={`p-1.5 rounded-md transition-colors ${order.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
                                                 title={order.archived ? 'Restore' : 'Archive'}

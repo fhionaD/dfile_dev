@@ -98,3 +98,34 @@ export interface Employee {
     hireDate: string;
     status: "Active" | "Inactive" | "Archived";
 }
+
+export interface RoomCategory {
+    id: string;
+    name: string;
+    description: string;
+    baseRate: number;
+    maxOccupancy?: number;
+    status: "Active" | "Archived";
+}
+
+export interface Role {
+    id: string;
+    designation: string;
+    department: string;
+    scope: string;
+    // Optional fields for backward compatibility or future use
+    title?: string;
+    description?: string;
+    permissions?: string[];
+    users?: number;
+    status?: "Active" | "Archived";
+}
+
+export interface Department {
+    id: string;
+    name: string;
+    description: string;
+    head: string;
+    itemCount: number;
+    status: "Active" | "Archived";
+}

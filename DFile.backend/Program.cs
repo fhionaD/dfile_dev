@@ -60,4 +60,31 @@ app.UseAuthentication(); // Must be before Authorization
 app.UseAuthorization();
 app.MapControllers();
 
+// Seed Database
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        // Check connectivity first
+        if (context.Database.CanConnect())
+        {
+            Console.WriteLine("Database connection successful.");
+            DbInitializer.Initialize(context);
+        }
+        else
+        {
+             Console.WriteLine("WARNING: Could not connect to the database.");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "CRITICAL ERROR: An error occurred creating the DB.");
+        Console.WriteLine($"CRITICAL ERROR: {ex.Message}");
+        if (ex.InnerException != null) Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+    }
+}
+
 app.Run();

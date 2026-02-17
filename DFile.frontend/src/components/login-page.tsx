@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import { LoginForm } from "@/components/login-form";
-import { UserRole } from "@/types/asset";
+
 
 interface LoginPageProps {
-    onLogin: (user: import("@/types/asset").User) => void;
+    onLogin: (email: string, password: string) => Promise<void>;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -44,7 +44,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                             <div className="absolute -inset-8 rounded-[2.5rem] bg-white/5 blur-2xl" />
                             <div className="relative p-6">
                                 <Image
-                                    src="/AMS_dark.png"
+                                    src="/AMS_dark.svg"
                                     alt="DFile Logo"
                                     width={520}
                                     height={520}

@@ -23,19 +23,16 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
     setIsLoading(true);
     setError(null);
 
-    // Simulate network delay
-    // await new Promise((resolve) => setTimeout(resolve, 1000)); // Remove mock delay
-
     if (onLogin) {
       try {
         await onLogin(email, password);
       } catch (err) {
-        console.error(err);
-        setError("Login failed. Check your credentials.");
+        // console.warn("Login failed (expected for invalid credentials)");
+        setError("Invalid email or password. Please try again.");
         setIsLoading(false);
       }
     } else {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -83,12 +80,12 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
 
           {/* Password */}
           <div className="space-y-2 group">
-              <Label
-                htmlFor="password"
-                className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-[#182350] transition-colors pl-1"
-              >
-                Password
-              </Label>
+            <Label
+              htmlFor="password"
+              className="text-[11px] font-bold uppercase tracking-wider text-slate-400 group-focus-within:text-[#182350] transition-colors pl-1"
+            >
+              Password
+            </Label>
             <div className="relative">
               <Input
                 id="password"
@@ -114,7 +111,7 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
         </div>
 
         {error && (
-            <div className="text-red-500 text-sm font-medium text-center">{error}</div>
+          <div className="text-red-500 text-sm font-medium text-center">{error}</div>
         )}
 
         {/* Actions */}

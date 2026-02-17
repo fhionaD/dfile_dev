@@ -4,7 +4,6 @@ import { useState } from "react";
 import { AssetStats } from "@/components/asset-stats";
 import { AssetTable } from "@/components/asset-table";
 import { AssetDetailsModal } from "@/components/modals/asset-details-modal";
-import { useData } from "@/contexts/data-context";
 import { useAuth } from "@/contexts/auth-context";
 import { Asset } from "@/types/asset";
 import { MaintenanceView } from "@/components/maintenance-view";
@@ -15,13 +14,7 @@ import { AcquisitionModal } from "@/components/modals/acquisition-modal";
 
 export default function DashboardPage() {
     const { user } = useAuth();
-    const { 
-        assets, archiveAsset,
-        maintenanceRecords, addMaintenanceRecord, updateMaintenanceRecord, archiveMaintenanceRecord, updateMaintenanceStatus,
-        purchaseOrders, createOrder, archiveOrder,
-        assetCategories
-    } = useData();
-    
+
     // UI State
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -39,33 +32,23 @@ export default function DashboardPage() {
 
     if (user.role === 'Maintenance') {
         content = (
-            <MaintenanceView 
-                records={maintenanceRecords}
-                assets={assets}
-                onCreateRequest={() => setIsCreateMaintenanceOpen(true)}
-                onArchiveRecord={archiveMaintenanceRecord}
-                onUpdateStatus={updateMaintenanceStatus}
-            />
+            <MaintenanceView />
         );
     } else if (user.role === 'Procurement') {
         content = (
-            <ProcurementView 
-                orders={purchaseOrders}
+            <ProcurementView
                 onNewOrder={() => setIsCreateOrderOpen(true)}
-                onArchiveOrder={archiveOrder}
             />
         );
     } else if (user.role === 'Finance') {
-        content = <DepreciationView assets={assets} />;
+        content = <DepreciationView />;
     } else {
         // Admin & Super Admin View (Stats + Table)
         content = (
             <div className="space-y-6">
-                <AssetStats assets={assets} />
+                <AssetStats />
                 <AssetTable
-                    assets={assets}
                     onAssetClick={handleAssetClick}
-                    onArchiveAsset={archiveAsset}
                 />
             </div>
         );
@@ -75,18 +58,10 @@ export default function DashboardPage() {
         <>
             {content}
 
-            <CreateMaintenanceModal 
-                open={isCreateMaintenanceOpen} 
-                onOpenChange={setIsCreateMaintenanceOpen}
-                assets={assets}
-                onAddRecord={addMaintenanceRecord} 
-            />
-            
+
             <AcquisitionModal
                 open={isCreateOrderOpen}
                 onOpenChange={setIsCreateOrderOpen}
-                categories={assetCategories}
-                onCreateOrder={createOrder}
             />
 
             <AssetDetailsModal

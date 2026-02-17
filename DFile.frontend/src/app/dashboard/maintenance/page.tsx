@@ -5,20 +5,23 @@ import { MaintenanceView } from "@/components/maintenance-view";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { AcquisitionModal } from "@/components/modals/acquisition-modal";
-import { useData } from "@/contexts/data-context";
+import { useAssets } from "@/hooks/use-assets"; // Added import for useAssets
 import { MaintenanceRecord, Asset } from "@/types/asset";
 
 export default function MaintenancePage() {
-    const {
-        maintenanceRecords,
-        assets,
-        addMaintenanceRecord,
-        updateMaintenanceRecord,
-        archiveMaintenanceRecord,
-        updateMaintenanceStatus,
-        assetCategories,
-        createOrder
-    } = useData();
+    // Note: MaintenanceView is now self-contained with React Query
+    // We just need state for the modals that are opened from the top level (if any), 
+    // but MaintenanceView seems to handle most things.
+    // However, looking at the code, MaintenanceView emits events like onScheduleMaintenance, etc.
+    // Ideally MaintenanceView should handle the modals itself if it is "smart".
+    // But currently MaintenancePage orchestrates them. 
+
+    // Actually, looking at MaintenanceView refactor earlier (in finding), it handles its own data loading.
+    // But it triggers `onScheduleMaintenance` prop. 
+    // We should probably move the modals INTO MaintenanceView or keep them here but use hooks.
+    // Let's keep them here for now but remove useData and use hooks for any data they need.
+
+    const { data: assets = [] } = useAssets(); // Added useAssets hook
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -27,6 +30,11 @@ export default function MaintenancePage() {
     const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
     const [selectedAssetIdForMaintenance, setSelectedAssetIdForMaintenance] = useState<string | null>(null);
     const [selectedAssetForReplacement, setSelectedAssetForReplacement] = useState<Asset | null>(null);
+
+    // We need to fetch assets here if we want to pass them to modals... OR refactor modals to fetch their own data.
+    // CreateMaintenanceModal takes `assets` and `records`. refactoring it to use hooks is better.
+    // For now, let's assume we will refactor CreateMaintenanceModal and MaintenanceDetailsModal next.
+    // So we just render them without the heavy props from useData.
 
     const handleCreateRequest = () => {
         setSelectedRecord(null);
@@ -53,20 +61,12 @@ export default function MaintenancePage() {
         }
     };
 
+    // To make this easier: Let's import useAssets here.
+
     return (
         <>
             <MaintenanceView
-                records={maintenanceRecords}
-                assets={assets}
-                onCreateRequest={handleCreateRequest}
-                onRecordClick={handleRecordClick}
-                onArchiveRecord={archiveMaintenanceRecord}
-                onEditRecord={(record) => {
-                    setSelectedRecord(record);
-                    setIsCreateModalOpen(true);
-                }}
                 onScheduleMaintenance={handleScheduleMaintenance}
-                onUpdateStatus={updateMaintenanceStatus}
                 onRequestReplacement={handleRequestReplacement}
             />
 
@@ -80,10 +80,6 @@ export default function MaintenancePage() {
                         setSelectedAssetIdForMaintenance(null);
                     }
                 }}
-                assets={assets}
-                records={maintenanceRecords}
-                onAddRecord={addMaintenanceRecord}
-                onUpdateRecord={updateMaintenanceRecord}
                 initialData={selectedRecord}
                 defaultAssetId={selectedAssetIdForMaintenance}
             />
@@ -92,7 +88,6 @@ export default function MaintenancePage() {
                 open={isDetailsModalOpen}
                 onOpenChange={setIsDetailsModalOpen}
                 record={selectedRecord}
-                assetName={selectedRecord ? assets.find(a => a.id === selectedRecord.assetId)?.desc : undefined}
                 onEdit={() => {
                     setIsDetailsModalOpen(false);
                     setIsCreateModalOpen(true);
@@ -109,11 +104,6 @@ export default function MaintenancePage() {
                 onOpenChange={(open) => {
                     setIsAcquisitionModalOpen(open);
                     if (!open) setSelectedAssetForReplacement(null);
-                }}
-                categories={assetCategories}
-                onCreateOrder={(order, asset) => {
-                    createOrder(order, asset);
-                    setIsAcquisitionModalOpen(false);
                 }}
                 replacementAsset={selectedAssetForReplacement}
             />

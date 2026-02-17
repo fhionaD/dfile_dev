@@ -233,7 +233,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <p className="text-xs text-muted-foreground">{user.roleLabel}</p>
                             </div>
                             <Avatar className="h-8 w-8 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
-                                <AvatarImage src="/d_file.png" alt="Profile" />
+                                {/* <AvatarImage src="/d_file.png" alt="Profile" /> */}
                                 <AvatarFallback className="bg-muted text-foreground"><User size={14} /></AvatarFallback>
                             </Avatar>
                         </div>
