@@ -38,7 +38,7 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Publish Backend
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish -r win-x64 --self-contained false -r win-x64 --self-contained false
 
     # 4. Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
