@@ -54,6 +54,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+app.UseDefaultFiles(); // Serve index.html for /
 app.UseStaticFiles(); // Serve frontend files from wwwroot
 app.UseCors("AllowAll");
 

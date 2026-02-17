@@ -21,6 +21,7 @@
     <PackageReference Include="QRCoder" Version="1.7.0" />
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <Content Include="web.config" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
 </Project>
