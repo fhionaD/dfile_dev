@@ -40,8 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const res = await fetch(`${apiBase}/api/auth/me`, {
                         headers: { Authorization: `Bearer ${storedToken}` }
                     });
-                        headers: { Authorization: `Bearer ${storedToken}` }
-                    });
 
                     if (!res.ok) {
                         console.warn("[Auth] Session invalid, logging out");
