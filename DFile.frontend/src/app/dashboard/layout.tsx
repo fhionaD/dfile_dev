@@ -36,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
         { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
         { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin', 'Super Admin'] },
-        { href: "/dashboard/depreciation", label: "Asset Deprecation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance', 'Super Admin'] },
+        { href: "/dashboard/depreciation", label: "Asset Depreciation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance', 'Super Admin'] },
         { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
         { href: "/dashboard/tasks", label: "Task Management", icon: LayoutGrid, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
     ];
@@ -79,19 +79,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 
     const NavButton = ({ item, isSubItem = false }: { item: NavItem; isSubItem?: boolean }) => {
-        const isActive = item.href === "/dashboard"
-            ? pathname === "/dashboard"
-            : pathname.startsWith(item.href);
+        // Strict active check to avoid partial matches on root path being active for subpaths
+        // Normalize pathname by removing trailing slash for consistent comparison
+        const normalizedPath = pathname?.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+        
+        const isActive = item.href === "/dashboard" 
+            ? normalizedPath === "/dashboard"
+            : normalizedPath.startsWith(item.href);
+
+        const activeClasses = "bg-primary text-primary-foreground shadow-md shadow-primary/20 ring-1 ring-primary-foreground/20 font-medium";
+        const inactiveClasses = "text-muted-foreground hover:text-foreground hover:bg-muted font-normal hover:pl-4";
 
         return (
             <Link
                 href={item.href}
                 onClick={() => setIsMobileSidebarOpen(false)}
                 className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left group
-                ${isActive
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }
+                ${isActive ? activeClasses : inactiveClasses}
                 ${isSubItem ? "py-2 px-3" : ""}`}
             >
                 <div className={`shrink-0 grid place-items-center rounded-md transition-colors duration-200
@@ -99,21 +103,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ${isSubItem ? "h-6 w-6" : "h-9 w-9"}`}>
                     <item.icon size={isSubItem ? 13 : 18} className={isActive ? "stroke-primary-foreground" : "stroke-muted-foreground group-hover:stroke-foreground"} />
                 </div>
-                <span className={`font-medium tracking-tight leading-snug ${isSubItem ? "text-xs" : "text-sm"}`}>
+                <span className={`tracking-tight leading-snug flex-1 ${isSubItem ? "text-xs" : "text-sm"}`}>
                     {item.label}
                 </span>
+                {isActive && (
+                    <div className="absolute right-3 w-2 h-2 rounded-full bg-white ml-auto animate-pulse shadow-sm ring-2 ring-primary/20" /> 
+                )}
             </Link>
         );
     };
 
     const getPageTitle = () => {
         const allItems = [...mainNavItems, ...adminNavItems];
-        // Sort by length desc so we match specific sub-routes before generic parent routes
-        // e.g. /dashboard/tasks/123 matches /dashboard/tasks before /dashboard
         const sortedItems = [...allItems].sort((a, b) => b.href.length - a.href.length);
         const current = sortedItems.find(i => pathname.startsWith(i.href));
         return current ? current.label : "Dashboard";
     };
+
+    // Debugging logic to diagnose why header isn't hiding
+    // useEffect(() => {
+    //     console.log('Layout Debug:', { pathname, role: user?.role });
+    // }, [pathname, user]);
 
     return (
         <div className="min-h-screen bg-background flex">
@@ -247,17 +257,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </header>
 
                 <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-20 max-w-[1400px] mx-auto">
-                    <div className="mb-4">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-muted rounded-lg mb-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                System Active
-                            </p>
+                    {/* Hide Dashboard header for Finance role as they have custom dashboard header */}
+                    {!(getPageTitle() === 'Dashboard' && user?.role === 'Finance') && (
+                        <div className="mb-4">
+                            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-muted rounded-lg mb-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                    System Active
+                                </p>
+                            </div>
+                            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                                {getPageTitle()}
+                            </h1>
                         </div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-                            {getPageTitle()}
-                        </h1>
-                    </div>
+                    )}
                     {children}
                 </div>
             </main>

@@ -10,7 +10,10 @@ import { MaintenanceView } from "@/components/maintenance-view";
 import { ProcurementView } from "@/components/procurement-view";
 import { DepreciationView } from "@/components/depreciation-view";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
+import { FinanceDashboard } from "@/components/finance-dashboard";
 import { AcquisitionModal } from "@/components/modals/acquisition-modal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PieChart, TrendingDown, FileBadge } from "lucide-react";
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -41,7 +44,7 @@ export default function DashboardPage() {
             />
         );
     } else if (user.role === 'Finance') {
-        content = <DepreciationView />;
+        content = <FinanceDashboard />;
     } else {
         // Admin & Super Admin View (Stats + Table)
         content = (

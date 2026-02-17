@@ -33,9 +33,9 @@ export function AssetStats() {
     const bookValue = assets.reduce((sum, a) => sum + (a.currentBookValue || a.value || 0), 0);
 
     const formatCurrency = (val: number) => {
-        if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-        if (val >= 1000) return `$${(val / 1000).toFixed(1)}K`;
-        return `$${val.toLocaleString()}`;
+        if (val >= 1000000) return `₱${(val / 1000000).toFixed(1)}M`;
+        if (val >= 1000) return `₱${(val / 1000).toFixed(1)}K`;
+        return `₱${val.toLocaleString()}`;
     };
 
     return (

@@ -86,7 +86,7 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
         { label: "Total Orders", value: totalOrders.toString(), icon: ShoppingCart, color: "bg-primary" },
         { label: "Pending Approval", value: pendingOrders.toString(), icon: Clock, color: "bg-amber-500" },
         { label: "Approved / Delivered", value: approvedOrders.toString(), icon: CheckCircle2, color: "bg-emerald-500" },
-        { label: "Total Spend", value: `$${totalSpend.toLocaleString()}`, icon: DollarSign, color: "bg-blue-500" },
+        { label: "Total Spend", value: `₱${totalSpend.toLocaleString()}`, icon: DollarSign, color: "bg-blue-500" },
     ];
 
     if (isLoading) {
@@ -242,7 +242,7 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
                                             <Badge variant="outline" className="text-[10px]">{order.category}</Badge>
                                         </TableCell>
                                         <TableCell className="text-sm">{order.vendor || "—"}</TableCell>
-                                        <TableCell className="text-right text-sm font-medium">${order.purchasePrice.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-sm font-medium">₱{order.purchasePrice.toLocaleString()}</TableCell>
                                         <TableCell className="text-center text-sm">{order.purchaseDate}</TableCell>
                                         <TableCell className="text-center text-sm">{order.usefulLifeYears} yrs</TableCell>
                                         <TableCell className="text-center">

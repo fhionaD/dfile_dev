@@ -1,269 +1,350 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { TrendingDown, DollarSign, Calendar, Package, BarChart3, Search, Filter } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TrendingDown, TrendingUp, AlertTriangle, Building2, Calendar, DollarSign, Package, PieChart, Info, Download, Lock, RefreshCw, FileText, Search, Filter, ChevronDown, ChevronRight, Calculator } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { useAssets } from "@/hooks/use-assets";
 import { Input } from "@/components/ui/input";
+import {
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset } from "@/types/asset";
-import { useAssets } from "@/hooks/use-assets";
-import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface DepreciationViewProps {
     onAssetClick?: (asset: Asset) => void;
 }
 
-function calculateDepreciation(asset: Asset) {
-    const purchasePrice = asset.purchasePrice ?? asset.value ?? 0;
-    const usefulLifeYears = asset.usefulLifeYears ?? 0;
+// Helper to calculate depreciation details
+function calculateAssetDepreciation(asset: Asset) {
+    const cost = asset.purchasePrice ?? asset.value ?? 0;
+    const usefulLifeYears = asset.usefulLifeYears ?? 5; // Default 5 years if not set
+    const purchaseDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date();
+    const now = new Date();
+    
+    // Calculate Age in Months
+    const ageInMonths = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
+    const totalLifeMonths = usefulLifeYears * 12;
+    
+    // Monthly Depreciation
+    const monthlyDepreciation = usefulLifeYears > 0 ? cost / totalLifeMonths : 0;
+    
+    // Accumulated Depreciation
+    const accumulatedDepreciation = Math.min(cost, monthlyDepreciation * ageInMonths);
+    
+    // Current Book Value
+    const currentBookValue = Math.max(0, cost - accumulatedDepreciation);
+    
+    // Remaining Life
+    const remainingMonths = Math.max(0, totalLifeMonths - ageInMonths);
+    const remainingYears = (remainingMonths / 12).toFixed(1);
 
-    if (purchasePrice <= 0 || usefulLifeYears <= 0) {
-        return { monthlyDep: 0, currentBookValue: purchasePrice, depPercent: 0, totalDepreciation: 0, ageMonths: 0 };
-    }
+    // End Date
+    const endDate = new Date(purchaseDate);
+    endDate.setMonth(endDate.getMonth() + totalLifeMonths);
 
-    const monthlyDep = purchasePrice / (usefulLifeYears * 12);
+    // Status Flags
+    const isFullyDepreciated = currentBookValue === 0;
+    const isNearEndOfLife = !isFullyDepreciated && remainingMonths <= 6;
+    const isLowValue = currentBookValue > 0 && currentBookValue < (cost * 0.1); // < 10% value
 
-    // Calculate age in months from purchase date
-    let ageMonths = 0;
-    if (asset.purchaseDate) {
-        const purchaseDate = new Date(asset.purchaseDate);
-        const now = new Date();
-        ageMonths = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + (now.getMonth() - purchaseDate.getMonth());
-        if (ageMonths < 0) ageMonths = 0;
-    }
-
-    const totalDepreciation = Math.min(monthlyDep * ageMonths, purchasePrice);
-    const currentBookValue = Math.max(purchasePrice - totalDepreciation, 0);
-    const depPercent = purchasePrice > 0 ? (totalDepreciation / purchasePrice) * 100 : 0;
-
-    return { monthlyDep, currentBookValue, totalDepreciation, depPercent, ageMonths };
+    return {
+        cost,
+        usefulLifeYears,
+        ageInMonths,
+        monthlyDepreciation,
+        accumulatedDepreciation,
+        currentBookValue,
+        remainingMonths,
+        remainingYears,
+        endDate,
+        isFullyDepreciated,
+        isNearEndOfLife,
+        isLowValue
+    };
 }
+
 
 export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
     const { data: assets = [], isLoading } = useAssets();
+    const [viewMode, setViewMode] = useState<"assets" | "rooms">("assets");
     const [searchQuery, setSearchQuery] = useState("");
-    const [dateFilter, setDateFilter] = useState("All Time");
+    const [roomFilter, setRoomFilter] = useState("All");
+    const [categoryFilter, setCategoryFilter] = useState("All");
+    const [statusFilter, setStatusFilter] = useState("Active"); // Default active only
 
-    const depreciationData = useMemo(() => {
-        // Filter assets first
-        const filteredAssets = assets.filter(asset => {
-            // Text Search
-            const query = searchQuery.toLowerCase();
-            const matchesSearch = asset.desc.toLowerCase().includes(query) || asset.id.toLowerCase().includes(query);
-            if (!matchesSearch) return false;
+    // --- Computed Data ---
+    const processedAssets = useMemo(() => {
+        return assets.map(asset => {
+            const depDetails = calculateAssetDepreciation(asset);
+            return { ...asset, ...depDetails };
+        });
+    }, [assets]);
 
-            // Date Filter (Acquisition Date)
-            if (dateFilter !== "All Time") {
-                if (!asset.purchaseDate) return false;
-                const date = new Date(asset.purchaseDate);
-                const now = new Date();
+    const filteredAssets = useMemo(() => {
+        return processedAssets.filter(asset => {
+            if (statusFilter === "Active" && (asset.status === "Archived" || asset.status === "Disposed")) return false;
+            if (statusFilter === "Archived" && asset.status !== "Archived" && asset.status !== "Disposed") return false;
+            if (statusFilter === "Fully Depreciated" && !asset.isFullyDepreciated) return false;
+            if (statusFilter === "Near End-of-Life" && !asset.isNearEndOfLife) return false;
 
-                if (dateFilter === "Acquired This Year") {
-                    if (date.getFullYear() !== now.getFullYear()) return false;
-                }
-                if (dateFilter === "Acquired Last Year") {
-                    if (date.getFullYear() !== now.getFullYear() - 1) return false;
-                }
+            if (roomFilter !== "All" && asset.room !== roomFilter) return false;
+            if (categoryFilter !== "All" && asset.cat !== categoryFilter) return false;
+
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                return asset.desc.toLowerCase().includes(q) || 
+                       asset.id.toLowerCase().includes(q) || 
+                       (asset.room || "").toLowerCase().includes(q);
             }
+
             return true;
         });
+    }, [processedAssets, statusFilter, roomFilter, categoryFilter, searchQuery]);
 
-        return filteredAssets.map(asset => ({
-            asset,
-            ...calculateDepreciation(asset),
-        }));
-    }, [assets, searchQuery, dateFilter]);
 
-    // Summary calculations (based on filtered data or total? Usually total for high level, but let's do filtered to reflect view)
-    // Actually, summary cards usually show the "Total Portfolio", so maybe keep them based on ALL assets?
-    // Let's stick to ALL assets for the summary cards to show global health, and filter the table.
+    // --- Room Aggregation ---
+    const roomDepreciationData = useMemo(() => {
+        const rooms: Record<string, { 
+            name: string, 
+            totalAssets: number, 
+            totalCost: number, 
+            totalBookValue: number, 
+            monthlyDepreciation: number,
+            fullyDepreciatedCount: number 
+        }> = {};
 
-    const allDepreciationData = useMemo(() => assets.map(asset => ({ asset, ...calculateDepreciation(asset) })), [assets]);
+        processedAssets.forEach(asset => {
+            if (asset.status === "Archived" || asset.status === "Disposed") return; // Skip archived for active report
 
-    const totalPortfolioValue = allDepreciationData.reduce((sum, d) => sum + (d.asset.purchasePrice ?? d.asset.value ?? 0), 0);
-    const totalDepreciation = allDepreciationData.reduce((sum, d) => sum + d.totalDepreciation, 0);
-    const totalCurrentValue = allDepreciationData.reduce((sum, d) => sum + d.currentBookValue, 0);
-    const assetsWithLife = allDepreciationData.filter(d => (d.asset.usefulLifeYears ?? 0) > 0);
-    const avgUsefulLife = assetsWithLife.length > 0
-        ? assetsWithLife.reduce((sum, d) => sum + (d.asset.usefulLifeYears ?? 0), 0) / assetsWithLife.length
-        : 0;
+            const roomName = asset.room || "Unassigned";
+            if (!rooms[roomName]) {
+                rooms[roomName] = { 
+                    name: roomName, 
+                    totalAssets: 0, 
+                    totalCost: 0, 
+                    totalBookValue: 0, 
+                    monthlyDepreciation: 0,
+                    fullyDepreciatedCount: 0 
+                };
+            }
 
-    const summaryCards = [
-        { label: "Original Portfolio Value", value: `$${totalPortfolioValue.toLocaleString()}`, icon: DollarSign, color: "bg-primary" },
-        { label: "Total Depreciation", value: `$${totalDepreciation.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: TrendingDown, color: "bg-red-500" },
-        { label: "Current Book Value", value: `$${totalCurrentValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, icon: BarChart3, color: "bg-emerald-500" },
-        { label: "Avg. Useful Life", value: `${avgUsefulLife.toFixed(1)} yrs`, icon: Calendar, color: "bg-amber-500" },
-    ];
+            rooms[roomName].totalAssets++;
+            rooms[roomName].totalCost += asset.cost;
+            rooms[roomName].totalBookValue += asset.currentBookValue;
+            rooms[roomName].monthlyDepreciation += asset.monthlyDepreciation;
+            if (asset.isFullyDepreciated) rooms[roomName].fullyDepreciatedCount++;
+        });
 
-    if (isLoading) {
-        return (
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[...Array(4)].map((_, i) => (
-                        <Skeleton key={i} className="h-28 rounded-xl" />
-                    ))}
-                </div>
-                <div className="rounded-xl border border-border p-6 space-y-4">
-                    <div className="flex justify-between items-center mb-6">
-                        <Skeleton className="h-8 w-48" />
-                        <Skeleton className="h-8 w-32" />
-                    </div>
-                    <div className="space-y-2">
-                        {[...Array(5)].map((_, i) => (
-                            <Skeleton key={i} className="h-16 w-full" />
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+        return Object.values(rooms).sort((a, b) => b.totalBookValue - a.totalBookValue);
+    }, [processedAssets]);
+
+
+    // --- Unique Select Options ---
+    const uniqueRooms = useMemo(() => Array.from(new Set(assets.map(a => a.room || "Unassigned").filter(Boolean))), [assets]);
+    const uniqueCategories = useMemo(() => Array.from(new Set(assets.map(a => a.cat).filter(Boolean))), [assets]);
+
+    // Format Currency
+    const fmt = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(val);
+
+
+    if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading Depreciation Data...</div>;
 
     return (
-        <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {summaryCards.map((stat) => (
-                    <Card key={stat.label} className="border-border">
-                        <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-lg font-semibold text-foreground tracking-tight">{stat.value}</p>
-                                    <p className="text-[11px] font-medium text-muted-foreground mt-0.5">{stat.label}</p>
-                                </div>
-                                <div className={`${stat.color} p-1.5 rounded-md`}>
-                                    <stat.icon size={14} className="text-white" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* Depreciation Table */}
-            <Card className="border-border">
-                <div className="p-6 border-b border-border bg-muted/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <TrendingDown size={18} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-foreground">Asset Depreciation Schedule</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">Straight-line depreciation auto-calculated per asset</p>
-                            </div>
-                        </div>
+        <div className="space-y-6 pb-10">
+            {/* Header & Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-2">
+                     <div className="bg-muted p-1 rounded-lg flex items-center">
+                        <Button 
+                            variant={viewMode === "assets" ? "secondary" : "ghost"} 
+                            size="sm" 
+                            onClick={() => setViewMode("assets")}
+                            className="h-7 text-xs"
+                        >
+                            <Package className="w-3 h-3 mr-1.5" /> By Asset
+                        </Button>
+                        <Button 
+                            variant={viewMode === "rooms" ? "secondary" : "ghost"} 
+                            size="sm" 
+                            onClick={() => setViewMode("rooms")}
+                            className="h-7 text-xs"
+                        >
+                            <Building2 className="w-3 h-3 mr-1.5" /> By Room
+                        </Button>
                     </div>
                 </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-9">
+                        <Lock className="w-3.5 h-3.5 mr-1.5" /> Lock Period
+                    </Button>
+                     <Button variant="default" size="sm" className="h-9">
+                        <Download className="w-3.5 h-3.5 mr-1.5" /> Export Report
+                    </Button>
+                </div>
+            </div>
 
-                {/* Filters */}
-                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1 max-w-sm">
+            {/* Controls / Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card p-4 rounded-xl border border-border shadow-sm">
+                <div className="flex flex-1 w-full gap-3">
+                     <div className="relative flex-1 max-w-xs">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search assets..."
+                            placeholder="Search asset, ID, or room..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 bg-background h-9"
                         />
                     </div>
-                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="w-[160px] h-9 bg-background">
-                            <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
-                            <SelectValue placeholder="Acquisition Date" />
+                            <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="All Time">All Time</SelectItem>
-                            <SelectItem value="Acquired This Year">Acquired This Year</SelectItem>
-                            <SelectItem value="Acquired Last Year">Acquired Last Year</SelectItem>
+                            <SelectItem value="All">All Status</SelectItem>
+                            <SelectItem value="Active">Active Assets</SelectItem>
+                            <SelectItem value="Fully Depreciated">Fully Depreciated</SelectItem>
+                            <SelectItem value="Near End-of-Life">Near End-of-Life</SelectItem>
+                            <SelectItem value="Archived">Archived / Retired</SelectItem>
+                        </SelectContent>
+                    </Select>
+                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <SelectTrigger className="w-[160px] h-9 bg-background">
+                            <Package className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Categories</SelectItem>
+                             {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/30">
-                                <TableHead className="text-xs font-medium text-muted-foreground">Asset</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Category</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-right">Purchase Price</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Useful Life</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Age (Months)</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-right">Monthly Dep.</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-right">Total Dep.</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-right">Book Value</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Dep. %</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {depreciationData.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="h-32 text-center">
-                                        <div className="flex flex-col items-center text-muted-foreground">
-                                            <Package size={32} className="mb-2 opacity-30" />
-                                            <p className="text-sm">No assets match your filters</p>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                depreciationData.map(({ asset, monthlyDep, currentBookValue, totalDepreciation, depPercent, ageMonths }) => {
-                                    const purchasePrice = asset.purchasePrice ?? asset.value ?? 0;
-                                    const hasDepData = (asset.usefulLifeYears ?? 0) > 0 && purchasePrice > 0;
+                 <div className="flex items-center text-xs text-muted-foreground">
+                    <RefreshCw className="w-3 h-3 mr-1.5" /> Last Computed: Today
+                </div>
+            </div>
 
-                                    return (
-                                        <TableRow key={asset.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onAssetClick?.(asset)}>
+            {/* Content View */}
+            {viewMode === "assets" ? (
+                <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader className="bg-muted/30">
+                                <TableRow>
+                                    <TableHead className="w-[200px]">Asset Details</TableHead>
+                                    <TableHead>Purchased</TableHead>
+                                    <TableHead className="text-right">Cost Basis</TableHead>
+                                    <TableHead className="text-center">Useful Life</TableHead>
+                                    <TableHead className="text-right">Monthly Depr.</TableHead>
+                                    <TableHead className="text-right">Accum. Depr.</TableHead>
+                                    <TableHead className="text-right font-bold text-emerald-600">Book Value</TableHead>
+                                    <TableHead className="text-center">Remaining</TableHead>
+                                    <TableHead className="text-center">End Date</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAssets.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                                            No assets found matching filters.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredAssets.map(asset => (
+                                        <TableRow key={asset.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => onAssetClick?.(asset)}>
                                             <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-medium text-foreground">{asset.desc}</span>
-                                                    <span className="text-[10px] font-mono text-muted-foreground">{asset.id}</span>
+                                                <div className="font-medium text-sm text-foreground">{asset.desc}</div>
+                                                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                                    <span className="font-mono">{asset.id}</span> • {asset.room || "Unassigned"}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="outline" className="text-[10px]">{asset.cat}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm font-medium">
-                                                ${purchasePrice.toLocaleString()}
-                                            </TableCell>
+                                            <TableCell className="text-sm">{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "—"}</TableCell>
+                                            <TableCell className="text-right text-sm font-medium">{fmt(asset.cost)}</TableCell>
+                                            <TableCell className="text-center text-sm">{asset.usefulLifeYears} yr</TableCell>
+                                            <TableCell className="text-right text-sm">{fmt(asset.monthlyDepreciation)}</TableCell>
+                                            <TableCell className="text-right text-sm text-muted-foreground">{fmt(asset.accumulatedDepreciation)}</TableCell>
+                                            <TableCell className="text-right text-sm font-bold text-foreground">{fmt(asset.currentBookValue)}</TableCell>
                                             <TableCell className="text-center text-sm">
-                                                {hasDepData ? `${asset.usefulLifeYears} yrs` : <span className="text-muted-foreground">—</span>}
+                                                 <Badge variant="outline" className={cn("font-mono font-normal text-xs", asset.isNearEndOfLife ? "bg-red-50 text-red-600 border-red-200" : "")}>
+                                                    {asset.remainingYears} yr
+                                                </Badge>
                                             </TableCell>
-                                            <TableCell className="text-center text-sm">
-                                                {hasDepData && asset.purchaseDate ? ageMonths : <span className="text-muted-foreground">—</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm font-mono">
-                                                {hasDepData ? `$${monthlyDep.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm font-mono text-red-600 dark:text-red-400">
-                                                {hasDepData ? `$${totalDepreciation.toFixed(0)}` : <span className="text-muted-foreground">—</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm font-semibold">
-                                                ${currentBookValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            <TableCell className="text-center text-xs text-muted-foreground">
+                                                {asset.endDate.toLocaleDateString()}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                {hasDepData ? (
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                                            <div
-                                                                className={`h-full rounded-full transition-all ${depPercent >= 80 ? "bg-red-500" : depPercent >= 50 ? "bg-amber-500" : "bg-emerald-500"}`}
-                                                                style={{ width: `${Math.min(depPercent, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-[10px] font-medium text-muted-foreground w-10 text-right">
-                                                            {depPercent.toFixed(0)}%
-                                                        </span>
-                                                    </div>
+                                                {asset.isFullyDepreciated ? (
+                                                    <Badge variant="secondary" className="bg-muted text-muted-foreground text-[10px]">Fully Depreciated</Badge>
+                                                ) : asset.isNearEndOfLife ? (
+                                                    <Badge variant="destructive" className="text-[10px]">Expiring Soon</Badge>
                                                 ) : (
-                                                    <span className="text-muted-foreground text-sm">—</span>
+                                                    <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 text-[10px]">Depreciating</Badge>
                                                 )}
                                             </TableCell>
                                         </TableRow>
-                                    );
-                                })
-                            )}
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                     <div className="bg-muted/20 p-2 border-t border-border text-center text-xs text-muted-foreground">
+                        Showing {filteredAssets.length} assets
+                    </div>
+                </div>
+            ) : (
+                <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                     <Table>
+                        <TableHeader className="bg-muted/30">
+                            <TableRow>
+                                <TableHead className="w-[200px]">Room / Location</TableHead>
+                                <TableHead className="text-center">Total Assets</TableHead>
+                                <TableHead className="text-right">Total Initial Cost</TableHead>
+                                <TableHead className="text-right font-bold text-emerald-600">Current Book Value</TableHead>
+                                <TableHead className="text-right">Monthly Depreciation Exposure</TableHead>
+                                <TableHead className="text-center">Fully Depreciated Assets</TableHead>
+                                <TableHead className="text-right">Value Retention</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                             {roomDepreciationData.map(room => (
+                                <TableRow key={room.name} className="hover:bg-muted/40">
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <Building2 className="w-4 h-4 text-muted-foreground" />
+                                            {room.name}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center text-sm">{room.totalAssets}</TableCell>
+                                    <TableCell className="text-right text-sm">{fmt(room.totalCost)}</TableCell>
+                                    <TableCell className="text-right text-sm font-bold text-foreground">{fmt(room.totalBookValue)}</TableCell>
+                                    <TableCell className="text-right text-sm text-red-600 font-medium">-{fmt(room.monthlyDepreciation)}</TableCell>
+                                    <TableCell className="text-center text-sm">
+                                        {room.fullyDepreciatedCount > 0 ? (
+                                             <Badge variant="secondary">{room.fullyDepreciatedCount}</Badge>
+                                        ) : (
+                                            <span className="text-muted-foreground">-</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm">
+                                        <div className="flex items-center justify-end gap-2">
+                                             <span className="text-xs text-muted-foreground">
+                                                {room.totalCost > 0 ? ((room.totalBookValue / room.totalCost) * 100).toFixed(1) : 0}%
+                                            </span>
+                                            <Progress value={room.totalCost > 0 ? (room.totalBookValue / room.totalCost) * 100 : 0} className="w-16 h-1.5" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                             ))}
                         </TableBody>
                     </Table>
                 </div>
-            </Card>
+            )}
         </div>
     );
 }
