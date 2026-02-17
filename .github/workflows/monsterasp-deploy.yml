@@ -27,6 +27,8 @@ jobs:
 
     - name: Build Frontend
       working-directory: ./DFile.frontend
+      env:
+        NEXT_PUBLIC_API_URL: http://dfile.runasp.net
       run: npm run build
 
     # 3. Setup .NET and Build Backend
