@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, UserRole } from "@/types/asset";
+import { User } from "@/types/asset";
+import { buildApiUrl } from "@/lib/api-base-url";
 
 interface AuthContextType {
     user: User | null;
@@ -36,8 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setIsLoggedIn(true);
 
                     // 2. Validate with Backend
-                    const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
-                    const res = await fetch(`${apiBase}/api/auth/me`, {
+                    const res = await fetch(buildApiUrl('/api/auth/me'), {
                         headers: { Authorization: `Bearer ${storedToken}` }
                     });
 
@@ -62,9 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = async (email: string, password: string) => {
-        // Ensure strictly no trailing slash issues or double slashes
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
-        const targetUrl = `${apiBase}/api/auth/login`;
+        const targetUrl = buildApiUrl('/api/auth/login');
 
         console.log(`[Auth] Initiating login to: ${targetUrl}`);
 
@@ -78,8 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log(`[Auth] Response status: ${response.status} ${response.statusText}`);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                // console.error(`[Auth] Login failed. Status: ${response.status}. Body:`, errorText);
+                await response.text();
                 throw new Error(`Login failed: ${response.status} ${response.statusText}`);
             }
 
@@ -92,9 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoggedIn(true);
             localStorage.setItem("dfile_user", JSON.stringify(userData));
             localStorage.setItem("dfile_token", token);
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             // Only log if not a 401 (expected auth failure)
-            if (!error.message?.includes("401")) {
+            if (!message.includes("401")) {
                 console.error(error);
             }
             throw error;
