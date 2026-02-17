@@ -192,3 +192,10 @@ C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\ru\Micr
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\tr\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\zh-Hans\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\web.config
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\appsettings.Development.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\appsettings.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\dfile.backend.deps.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\dfile.backend.runtimeconfig.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\dfile.backend.staticwebassets.endpoints.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.staticwebassets.runtime.json

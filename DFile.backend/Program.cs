@@ -68,6 +68,9 @@ app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 
 app.MapControllers();
 
+// Add this immediately after MapControllers
+app.MapFallbackToFile("index.html");
+
 // Seed Database
 using (var scope = app.Services.CreateScope())
 {

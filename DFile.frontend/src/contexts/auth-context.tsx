@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setIsLoggedIn(true);
 
                     // 2. Validate with Backend
-                    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090').replace(/\/$/, '');
+                    const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
                     const res = await fetch(`${apiBase}/api/auth/me`, {
                         headers: { Authorization: `Bearer ${storedToken}` }
                     });
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         // Ensure strictly no trailing slash issues or double slashes
-        const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090').replace(/\/$/, '');
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
         const targetUrl = `${apiBase}/api/auth/login`;
 
         console.log(`[Auth] Initiating login to: ${targetUrl}`);

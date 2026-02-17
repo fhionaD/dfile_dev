@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Create a centralized Axios instance
 const api = axios.create({
-    baseURL: (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5090').replace(/\/$/, ''),
+    baseURL: process.env.NEXT_PUBLIC_API_URL || '',  // Use empty string as default production fallback (relative path)
     headers: {
         'Content-Type': 'application/json',
     },
