@@ -43,6 +43,10 @@ jobs:
     # 4. Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
       run: |
+        # Clean up debug/redundant text files from Next.js export
+        find DFile.frontend/out -name "*.txt" -type f -delete
+        find DFile.frontend/out -name "__next*" -type f -delete
+        
         mkdir -p ./publish/wwwroot
         cp -r DFile.frontend/out/* ./publish/wwwroot/
 
