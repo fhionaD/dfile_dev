@@ -92,7 +92,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                             <div className="space-y-1.5 align-top">
                                 <Label className="text-xs font-semibold text-foreground">Asset Name *</Label>
-                                <Input name="name" required placeholder="e.g. Executive Desk" className="h-9 text-sm" />
+                                <Input name="name" required placeholder="e.g. Executive Desk" className="h-10 text-sm" />
                             </div>
 
                             <div className="space-y-1.5">
@@ -106,7 +106,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                         setSelectedType(cat.type);
                                     }
                                 }}>
-                                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
                                     <SelectContent>
                                         {categories.map((c) => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
@@ -118,7 +118,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Asset Type *</Label>
                                 <Select name="type" value={selectedType} onValueChange={setSelectedType}>
-                                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {/* Dynamic types from categories + defaults */}
                                         {Array.from(new Set([...categories.map(c => c.type), "Tangible", "Intangible"])).map(t => (
@@ -131,7 +131,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Status *</Label>
                                 <Select name="status" defaultValue="Available">
-                                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Available">Available</SelectItem>
                                         <SelectItem value="In Use">In Use</SelectItem>
@@ -142,21 +142,21 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Serial Number</Label>
-                                <Input name="serialNumber" className="h-9 text-sm" />
+                                <Input name="serialNumber" className="h-10 text-sm" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Purchase Date</Label>
-                                <Input name="purchaseDate" type="date" className="h-9 text-sm" />
+                                <Input name="purchaseDate" type="date" className="h-10 text-sm" />
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Cost</Label>
-                                <Input name="purchasePrice" type="number" placeholder="0.00" className="h-9 text-sm" />
+                                <Input name="purchasePrice" type="number" placeholder="0.00" className="h-10 text-sm" />
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-foreground">Useful Life (Years)</Label>
-                                <Input name="usefulLifeYears" type="number" placeholder="e.g. 5" className="h-9 text-sm" />
+                                <Input name="usefulLifeYears" type="number" placeholder="e.g. 5" className="h-10 text-sm" />
                             </div>
 
                             <div className="col-span-1 md:col-span-2 space-y-1.5">
@@ -210,19 +210,19 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-border/50">
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-muted-foreground">Manufacturer</Label>
-                                <Input name="manufacturer" className="h-8 text-sm" />
+                                <Input name="manufacturer" className="h-10 text-sm" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-muted-foreground">Model</Label>
-                                <Input name="model" className="h-8 text-sm" />
+                                <Input name="model" className="h-10 text-sm" />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-muted-foreground">Vendor Name</Label>
-                                <Input name="vendor" className="h-8 text-sm" />
+                                <Input name="vendor" className="h-10 text-sm" />
                             </div>
                             <div className="col-span-1 md:col-span-3 space-y-1.5">
                                 <Label className="text-xs font-semibold text-muted-foreground">Warranty Terms / Remarks</Label>
-                                <Input name="warranty" className="h-8 text-sm" />
+                                <Input name="warranty" className="h-10 text-sm" />
                             </div>
                         </div>
                     </CollapsibleContent>

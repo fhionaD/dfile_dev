@@ -75,7 +75,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
 
     const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        if (value === "" || (/^\d+$/.test(value) && value.length <= 12)) {
+        if (value === "" || (/^\d+$/.test(value) && value.length <= 11)) {
             setFormData({ ...formData, contactNumber: value });
         }
     };
@@ -144,15 +144,15 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground">First Name</Label>
-                            <Input required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="e.g. John" className="border-input bg-background" />
+                            <Input required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="e.g. John" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground">Middle Name</Label>
-                            <Input value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} placeholder="Optional" className="border-input bg-background" />
+                            <Input value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} placeholder="Optional" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground">Last Name</Label>
-                            <Input required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Smith" className="border-input bg-background" />
+                            <Input required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Smith" className="h-10 bg-background text-sm" />
                         </div>
                     </div>
 
@@ -162,7 +162,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <Mail size={12} /> Email
                             </Label>
-                            <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="employee@company.com" className="border-input bg-background" />
+                            <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="employee@company.com" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
@@ -171,13 +171,12 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                             <Input
                                 type="text"
                                 inputMode="numeric"
-                                required
                                 value={formData.contactNumber}
                                 onChange={handleContactChange}
-                                placeholder="12 digits max"
-                                className="border-input bg-background"
+                                placeholder="Optional (11 digits max)"
+                                className="h-10 bg-background text-sm"
                             />
-                            <p className="text-[10px] text-muted-foreground text-right">{formData.contactNumber.length}/12</p>
+                            <p className="text-[10px] text-muted-foreground text-right">{formData.contactNumber.length}/11</p>
                         </div>
                     </div>
 
@@ -188,7 +187,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                 <Building2 size={12} /> Department
                             </Label>
                             <Select value={formData.department} onValueChange={(val) => setFormData({ ...formData, department: val })}>
-                                <SelectTrigger className="w-full border-input bg-background">
+                                <SelectTrigger className="w-full h-10 bg-background px-3 text-sm">
                                     <SelectValue placeholder="Select Department" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -201,7 +200,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                 <ShieldCheck size={12} /> Role
                             </Label>
                             <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
-                                <SelectTrigger className="w-full border-input bg-background">
+                                <SelectTrigger className="w-full h-10 bg-background px-3 text-sm">
                                     <SelectValue placeholder="Select Role" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -217,7 +216,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <CalendarClock size={12} /> Hire Date
                             </Label>
-                            <Input type="date" required value={formData.hireDate} onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })} className="border-input bg-background" />
+                            <Input type="date" required value={formData.hireDate} onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })} className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-2">
@@ -231,7 +230,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                         placeholder="••••••••"
-                                        className="border-input bg-background pr-9"
+                                        className="h-10 bg-background pr-9 text-sm"
                                     />
                                     <button
                                         type="button"
@@ -254,7 +253,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             placeholder="••••••••"
-                                            className={`border-input bg-background pr-9 ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                            className={`h-10 bg-background pr-9 text-sm ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                         />
                                         <button
                                             type="button"

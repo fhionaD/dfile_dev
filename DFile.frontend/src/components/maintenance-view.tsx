@@ -3,7 +3,7 @@ import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, S
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { MaintenanceRecord, Asset } from "@/types/asset";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -149,13 +149,13 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     const getStatusColor = (status: string) => {
         switch (status) {
             case "Pending":
-                return "bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/20";
+                return "text-amber-700 border-amber-500/20";
             case "In Progress":
-                return "bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/20";
+                return "text-blue-700 border-blue-500/20";
             case "Completed":
-                return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 hover:bg-emerald-500/20";
+                return "text-emerald-700 border-emerald-500/20";
             default:
-                return "bg-muted text-muted-foreground border-border";
+                return "text-muted-foreground border-border";
         }
     };
 
@@ -172,99 +172,96 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     return (
         <div className="space-y-6">
             {/* KPI Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                <Card className="p-4 border-l-4 border-l-red-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full text-red-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-muted-foreground">Open Requests</p>
+                            <h3 className="text-2xl font-bold text-red-600 mt-1">{openRequests}</h3>
+                        </div>
+                        <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-600">
                             <AlertTriangle size={20} />
                         </div>
+                    </CardContent>
+                </Card>
+                
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Open Requests</p>
-                            <h3 className="text-2xl font-bold text-foreground">{openRequests}</h3>
+                            <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                            <h3 className="text-2xl font-bold text-orange-600 mt-1">{overdueRequests}</h3>
                         </div>
-                    </div>
+                        <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600">
+                             <Clock size={20} />
+                        </div>
+                    </CardContent>
                 </Card>
 
-                <Card className="p-4 border-l-4 border-l-orange-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-full text-orange-600">
-                            <Clock size={20} />
-                        </div>
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Overdue</p>
-                            <h3 className="text-2xl font-bold text-foreground">{overdueRequests}</h3>
+                            <p className="text-sm font-medium text-muted-foreground">In Repair</p>
+                            <h3 className="text-2xl font-bold text-blue-600 mt-1">{inRepair}</h3>
                         </div>
-                    </div>
+                        <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600">
+                             <Wrench size={20} />
+                        </div>
+                    </CardContent>
                 </Card>
 
-                 <Card className="p-4 border-l-4 border-l-blue-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-full text-blue-600">
-                            <Wrench size={20} />
-                        </div>
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">In Repair</p>
-                            <h3 className="text-2xl font-bold text-foreground">{inRepair}</h3>
+                            <p className="text-sm font-medium text-muted-foreground">Attention Needed</p>
+                            <h3 className="text-2xl font-bold text-yellow-600 mt-1">{immediateAttention}</h3>
                         </div>
-                    </div>
+                        <div className="h-10 w-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600">
+                             <AlertTriangle size={20} />
+                        </div>
+                    </CardContent>
                 </Card>
 
-                <Card className="p-4 border-l-4 border-l-yellow-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-full text-yellow-600">
-                            <AlertTriangle size={20} />
-                        </div>
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Needs Attention</p>
-                            <h3 className="text-2xl font-bold text-foreground">{immediateAttention}</h3>
+                            <p className="text-sm font-medium text-muted-foreground">Scheduled (Week)</p>
+                            <h3 className="text-2xl font-bold text-emerald-600 mt-1">{scheduledThisWeek}</h3>
                         </div>
-                    </div>
+                        <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                             <CalendarIcon size={20} />
+                        </div>
+                    </CardContent>
                 </Card>
 
-                <Card className="p-4 border-l-4 border-l-emerald-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-full text-emerald-600">
-                            <CalendarIcon size={20} />
-                        </div>
+                <Card className="rounded-xl border-border shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Scheduled (Week)</p>
-                            <h3 className="text-2xl font-bold text-foreground">{scheduledThisWeek}</h3>
+                            <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
+                            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{mttrDays} <span className="text-sm font-medium text-muted-foreground">days</span></h3>
                         </div>
-                    </div>
-                </Card>
-
-                <Card className="p-4 border-l-4 border-l-indigo-500 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 rounded-full text-indigo-600">
-                            <TrendingDown size={20} />
+                        <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600">
+                             <TrendingDown size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Avg MTTR</p>
-                            <div className="flex items-baseline gap-1">
-                                <h3 className="text-2xl font-bold text-foreground">{mttrDays}</h3>
-                                <span className="text-xs text-muted-foreground font-medium">days</span>
-                            </div>
-                        </div>
-                    </div>
+                    </CardContent>
                 </Card>
             </div>
 
-            {/* Filter Controls Row */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card p-4 rounded-xl border border-border shadow-sm">
-                <div className="flex flex-1 w-full sm:w-auto gap-3">
-                    <div className="relative flex-1 max-w-sm">
+            {/* Action Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 items-center">
+                    <div className="relative flex-1 max-w-sm min-w-[200px]">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search requests or assets..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
                     
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[140px] bg-background">
-                             <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                        <SelectTrigger className="w-[180px] bg-background h-10 text-sm">
+                                <Filter className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -276,8 +273,8 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </SelectContent>
                     </Select>
 
-                     <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger className="w-[140px] bg-background">
+                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="w-[180px] bg-background h-10 text-sm">
                             <AlertTriangle className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Priority" />
                         </SelectTrigger>
@@ -288,10 +285,11 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                             <SelectItem value="High">High</SelectItem>
                         </SelectContent>
                     </Select>
-                     <Select value={dateFilter} onValueChange={setDateFilter}>
-                        <SelectTrigger className="w-[140px] bg-background">
-                             <CalendarIcon className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
-                            <SelectValue placeholder="Date" />
+
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[180px] bg-background h-10 text-sm">
+                                <CalendarIcon className="w-3.5 h-3.5 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="All Time">All Time</SelectItem>
@@ -301,40 +299,40 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </SelectContent>
                     </Select>
                 </div>
-                
-                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Button variant={showArchived ? "default" : "outline"} size="sm" onClick={() => setShowArchived(!showArchived)}>
-                         {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active</> : <><Archive size={14} className="mr-1.5" />Archives</>}
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button 
+                        variant={showArchived ? "default" : "outline"} 
+                        size="sm" 
+                        className="text-sm h-10" 
+                        onClick={() => setShowArchived(!showArchived)}
+                    >
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active View</> : <><Archive size={16} className="mr-2" />Archived</>}
                     </Button>
-                    <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="bg-primary text-primary-foreground shadow-sm">
-                        <Plus size={16} className="mr-1.5" />
+                    <Button 
+                        onClick={() => setIsCreateModalOpen(true)} 
+                        size="sm" 
+                        className="text-sm h-10 bg-primary text-primary-foreground shadow-sm"
+                    >
+                        <Plus size={16} className="mr-2" />
                         Create Request
                     </Button>
                 </div>
             </div>
 
-            {/* Request List */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 {/* Left: Request List */}
-                <div className="lg:col-span-2 space-y-4">
-                     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col h-[600px]">
-                        <div className="p-4 border-b border-border bg-muted/30 flex justify-between items-center">
-                            <h3 className="font-semibold text-sm flex items-center">
-                                <Wrench size={16} className="mr-2 text-primary" />
-                                {showArchived ? 'Archived Requests' : 'Active Requests'}
-                                <Badge variant="secondary" className="ml-2 text-[10px] h-5">{filteredRecords.length}</Badge>
-                            </h3>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto">
-                             <Table>
-                                <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
-                                    <TableRow className="border-b border-border hover:bg-transparent">
-                                        <TableHead className="w-[100px] text-xs font-semibold pl-6">ID</TableHead>
-                                        <TableHead className="text-xs font-semibold">Asset / Description</TableHead>
-                                        <TableHead className="text-center w-[100px] text-xs font-semibold">Status</TableHead>
-                                        <TableHead className="text-center w-[100px] text-xs font-semibold">Priority</TableHead>
-                                        <TableHead className="text-right w-[120px] text-xs font-semibold pr-6">Date</TableHead>
+            {/* Main Content Card */}
+            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="hover:bg-muted/50 bg-muted/50 border-b border-border">
+                                        <TableHead className="w-[100px] h-10 px-4 text-center align-middle font-medium text-muted-foreground">ID</TableHead>
+                                        <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Asset / Description</TableHead>
+                                        <TableHead className="text-center w-[100px] h-10 px-4 align-middle font-medium text-muted-foreground">Status</TableHead>
+                                        <TableHead className="text-center w-[100px] h-10 px-4 align-middle font-medium text-muted-foreground">Priority</TableHead>
+                                        <TableHead className="text-center w-[120px] h-10 px-4 align-middle font-medium text-muted-foreground">Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -357,22 +355,22 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                                     // This needs callback prop
                                                 }}
                                             >
-                                                <TableCell className="font-mono text-[11px] text-muted-foreground pl-6 font-medium group-hover:text-primary transition-colors">
+                                                <TableCell className="p-4 align-middle font-mono text-[11px] text-muted-foreground text-center font-medium group-hover:text-primary transition-colors">
                                                     {record.id}
                                                 </TableCell>
-                                                <TableCell className="py-3">
+                                                <TableCell className="p-4 align-middle">
                                                     <div className="space-y-0.5">
                                                         <span className="text-sm font-medium text-foreground block line-clamp-1">{getAssetName(record.assetId)}</span>
                                                         <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                     <Badge className={`text-[10px] px-2 py-0.5 h-5 font-medium border ${getStatusColor(record.status)}`}>
+                                                <TableCell className="p-4 align-middle text-center">
+                                                     <Badge variant="outline" className={`text-[10px] px-2 py-0.5 h-5 font-medium border rounded-none bg-transparent ${getStatusColor(record.status)}`}>
                                                         {record.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${
+                                                <TableCell className="p-4 align-middle text-center">
+                                                    <div className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-medium border ${
                                                         record.priority === 'High' ? 'bg-red-500/10 text-red-700 border-red-500/20' :
                                                         record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700 border-orange-500/20' :
                                                         'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
@@ -380,7 +378,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                                        {record.priority!.charAt(0)}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-right text-xs text-muted-foreground pr-6 tabular-nums">
+                                                <TableCell className="p-4 align-middle text-center text-xs text-muted-foreground tabular-nums">
                                                     {new Date(record.dateReported).toLocaleDateString()}
                                                 </TableCell>
                                             </TableRow>
@@ -389,31 +387,8 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                 </TableBody>
                             </Table>
                         </div>
-                    </div>
-                </div>
-
-                {/* Right: Asset Schedule / Calendar-like view */}
-                <div className="space-y-4">
-                     <div className="bg-card rounded-xl border border-border shadow-sm h-[600px] flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-border bg-muted/30">
-                            <h3 className="font-semibold text-sm flex items-center">
-                                <CalendarIcon size={16} className="mr-2 text-primary" />
-                                Maintenance Calender
-                            </h3>
-                        </div>
-                         <div className="p-4 flex-1 flex flex-col justify-center items-center text-center text-muted-foreground space-y-3">
-                             <CalendarIcon size={48} className="opacity-10" />
-                            <p className="text-sm max-w-[200px]">Select a scheduled request to view details</p>
-                            <Button variant="outline" size="sm" className="mt-2" disabled>View Full Calendar</Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <CreateMaintenanceModal 
-                open={isCreateModalOpen} 
-                onOpenChange={setIsCreateModalOpen}
-            />
+                </CardContent>
+            </Card>
         </div>
     );
 }

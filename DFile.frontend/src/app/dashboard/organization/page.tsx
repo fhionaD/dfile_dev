@@ -6,9 +6,11 @@ import { CreateRoleModal } from "@/components/modals/create-role-modal";
 import { AddEmployeeModal } from "@/components/modals/add-employee-modal";
 import { EmployeeDetailsModal } from "@/components/modals/employee-details-modal";
 import { useRoles, useEmployees, useDepartments, useAddRole, useAddEmployee, useArchiveEmployee, useUpdateEmployee } from "@/hooks/use-organization";
+import { useAuth } from "@/contexts/auth-context";
 import { Employee } from "@/types/asset";
 
 export default function OrganizationPage() {
+    const { user } = useAuth();
     const { data: roles = [] } = useRoles();
     const { data: employees = [] } = useEmployees();
     const { data: departments = [] } = useDepartments();

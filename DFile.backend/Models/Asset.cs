@@ -21,5 +21,6 @@ namespace DFile.backend.Models
         public decimal PurchasePrice { get; set; }
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
+        public int? TenantId { get; set; }
     }
 }

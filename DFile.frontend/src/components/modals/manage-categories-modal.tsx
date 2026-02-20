@@ -73,7 +73,7 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                             variant="outline"
                             size="sm"
                             onClick={() => setView(view === 'active' ? 'archived' : 'active')}
-                            className="text-xs h-8 bg-background"
+                            className="text-sm h-10 bg-background"
                         >
                             {view === 'active' ? (
                                 <>

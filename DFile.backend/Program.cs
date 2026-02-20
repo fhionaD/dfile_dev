@@ -13,7 +13,13 @@ builder.Services.AddSwaggerGen();
 
 // Database Context
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), sqlOptions => 
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null);
+    }));
 
 // Authentication
 var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ?? "superSecretKey12345678901234567890"); // Use env var in prod
@@ -65,6 +71,25 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
+
+app.MapGet("/api/db-test", (AppDbContext db) => 
+{
+    try
+    {
+        if (db.Database.CanConnect())
+        {
+            return Results.Ok("Database connection successful.");
+        }
+        else
+        {
+            return Results.Problem("Database connection failed (CanConnect returned false). Check logs for details.");
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Database connection error: {ex.Message}");
+    }
+});
 
 app.MapControllers();
 

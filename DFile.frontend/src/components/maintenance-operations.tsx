@@ -3,7 +3,7 @@ import { Wrench, Plus, Archive, RotateCcw, Search, Filter, Calendar as CalendarI
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
@@ -41,13 +41,13 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     const getStatusColor = (status: string) => {
         switch (status) {
             case "Pending":
-                return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+                return "text-amber-700";
             case "In Progress":
-                return "bg-blue-500/10 text-blue-700 border-blue-500/20";
+                return "text-blue-700";
             case "Completed":
-                return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+                return "text-emerald-700";
             default:
-                return "bg-muted text-muted-foreground border-border";
+                return "text-muted-foreground";
         }
     };
 
@@ -96,89 +96,88 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
 
     return (
         <div className="space-y-6">
-             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Wrench size={24} />
-                        </div>
-                        Asset Maintenance & Repair
-                    </h2>
-                    <p className="text-muted-foreground">Operational Control & Workflow Management</p>
-                </div>
-                <div className="flex gap-2">
-                      <Button variant={showArchived ? "default" : "outline"} size="sm" onClick={() => setShowArchived(!showArchived)}>
-                        {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeRecordsCount})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedRecordsCount})</>}
-                    </Button>
-                    <Button onClick={onCreateRequest} className="bg-primary text-primary-foreground shadow-sm">
-                        <Plus size={16} className="mr-1.5" />
-                        Create Ticket
-                    </Button>
-                </div>
+            <div>
+                <h2 className="text-3xl font-bold tracking-tight">Asset Maintenance & Repair</h2>
             </div>
 
-            <Card className="border-border">
-                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 items-center">
+                    <div className="relative flex-1 max-w-sm min-w-[200px]">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search requests..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
-                    <div className="flex gap-2 flex-wrap">
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Status</SelectItem>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="In Progress">In Progress</SelectItem>
-                                <SelectItem value="Completed">Completed</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Priority</SelectItem>
-                                <SelectItem value="High">High</SelectItem>
-                                <SelectItem value="Medium">Medium</SelectItem>
-                                <SelectItem value="Low">Low</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={dateFilter} onValueChange={setDateFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Date" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All Time">All Time</SelectItem>
-                                <SelectItem value="This Month">This Month</SelectItem>
-                                <SelectItem value="Last Month">Last Month</SelectItem>
-                                <SelectItem value="This Year">This Year</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Status</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Priority</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All Time">All Time</SelectItem>
+                            <SelectItem value="This Month">This Month</SelectItem>
+                            <SelectItem value="Last Month">Last Month</SelectItem>
+                            <SelectItem value="This Year">This Year</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <Table>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button 
+                        variant={showArchived ? "default" : "outline"} 
+                        size="sm" 
+                        className="h-10 text-sm"
+                        onClick={() => setShowArchived(!showArchived)}
+                    >
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active ({activeRecordsCount})</> : <><Archive size={16} className="mr-2" />Archived ({archivedRecordsCount})</>}
+                    </Button>
+                    <Button onClick={onCreateRequest} size="sm" className="h-10 text-sm bg-primary text-primary-foreground shadow-sm">
+                        <Plus size={16} className="mr-2" />
+                        Create Ticket
+                    </Button>
+                </div>
+            </div>
+
+            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="w-[150px] text-center">Request ID</TableHead>
-                                <TableHead className="w-[250px] text-center">Asset</TableHead>
-                                <TableHead className="min-w-[300px]">Description</TableHead>
-                                <TableHead className="w-[150px] text-center">Priority</TableHead>
-                                <TableHead className="w-[180px] text-center">Date Reported</TableHead>
-                                <TableHead className="w-[160px] text-center">Status</TableHead>
-                                <TableHead className="w-[80px] text-center">Action</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Request ID</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Asset</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Description</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Priority</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Date Reported</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Status</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-center">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -195,32 +194,22 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                                         className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
                                         onClick={() => onRecordClick(record)}
                                     >
-                                        <TableCell className="font-mono text-sm font-medium text-foreground text-center">{record.id}</TableCell>
-                                        <TableCell className="text-sm text-foreground font-medium text-center">
-                                            <div className="flex flex-col items-center">
+                                        <TableCell className="p-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
+                                        <TableCell className="p-4 align-middle text-sm text-foreground font-medium text-left">
+                                            <div className="flex flex-col items-start">
                                                 <span>{getAssetName(record.assetId)}</span>
                                                 <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground max-w-[400px] truncate" title={record.description}>{record.description}</TableCell>
-                                        <TableCell className={`text-sm text-center ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
-                                        <TableCell className="text-sm text-muted-foreground text-center">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                            <Select
-                                                value={record.status}
-                                                onValueChange={(val) => updateStatusMutation.mutateAsync({ id: record.id, status: val })}
-                                            >
-                                                <SelectTrigger className={`h-8 border-none ${getStatusColor(record.status)}`}>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Pending">Pending</SelectItem>
-                                                    <SelectItem value="In Progress">In Progress</SelectItem>
-                                                    <SelectItem value="Completed">Completed</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                        <TableCell className="p-4 align-middle text-sm text-muted-foreground max-w-[400px] truncate text-left" title={record.description}>{record.description}</TableCell>
+                                        <TableCell className={`p-4 align-middle text-sm text-left ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
+                                        <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
+                                        <TableCell className="p-4 align-middle text-left">
+                                            <Badge variant="outline" className={`text-sm border-none rounded-none bg-transparent ${getStatusColor(record.status)}`}>
+                                                {record.status}
+                                            </Badge>
                                         </TableCell>
-                                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                        <TableCell className="p-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-center gap-1">
                                                 <button
                                                     onClick={() => archiveRecordMutation.mutateAsync(record.id)}
@@ -236,7 +225,8 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                             )}
                         </TableBody>
                     </Table>
-                </div>
+                    </div>
+                </CardContent>
             </Card>
         </div>
     );

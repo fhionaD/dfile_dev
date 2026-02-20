@@ -36,6 +36,16 @@ namespace DFile.backend.Controllers
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
+            // Check Tenant Status if user belongs to a tenant
+            if (user.TenantId.HasValue)
+            {
+                var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
+                if (tenant != null && tenant.Status != "Active")
+                {
+                     return Unauthorized(new { message = "Your organization's account is inactive. Please contact support." });
+                }
+            }
+
             if (!BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
             {
                 Console.WriteLine($"[Auth] Invalid password for: {model.Email}");
@@ -51,8 +61,9 @@ namespace DFile.backend.Controllers
         [Authorize]
         public async Task<IActionResult> GetCurrentUser()
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId)) 
+                return Unauthorized();
 
             var user = await _context.Users.FindAsync(userId);
             if (user == null) return Unauthorized();

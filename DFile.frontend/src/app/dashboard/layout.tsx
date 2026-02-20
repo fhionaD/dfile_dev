@@ -30,6 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const router = useRouter();
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const mainNavItems: NavItem[] = [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Allowed for all
@@ -45,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin', 'Super Admin'] },
         { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin', 'Super Admin'] },
         { href: "/dashboard/super-admin/dashboard", label: "Super Admin Control", icon: UserCheck, allowedRoles: ['Super Admin'] },
+        { href: "/dashboard/super-admin/create-tenant", label: "Create Tenant", icon: Building2, allowedRoles: ['Super Admin'] },
     ];
 
     const allNavItems = [...mainNavItems, ...adminNavItems];
@@ -88,26 +90,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             : normalizedPath.startsWith(item.href);
 
         const activeClasses = "bg-primary text-primary-foreground shadow-md shadow-primary/20 ring-1 ring-primary-foreground/20 font-medium";
-        const inactiveClasses = "text-muted-foreground hover:text-foreground hover:bg-muted font-normal hover:pl-4";
+        const inactiveClasses = "text-muted-foreground hover:text-foreground hover:bg-muted font-normal";
 
         return (
             <Link
                 href={item.href}
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-left group
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left group
                 ${isActive ? activeClasses : inactiveClasses}
-                ${isSubItem ? "py-2 px-3" : ""}`}
+                ${isSubItem ? "py-2 px-3" : ""}
+                ${isCollapsed ? "justify-center px-2" : ""}`}
+                title={isCollapsed ? item.label : undefined}
             >
-                <div className={`shrink-0 grid place-items-center rounded-md transition-colors duration-200
+                <div className={`shrink-0 grid place-items-center rounded-md
                 ${isActive ? "bg-white/20 border border-white/20" : "bg-muted/50 border border-border group-hover:bg-muted group-hover:border-primary/20"}
                 ${isSubItem ? "h-6 w-6" : "h-9 w-9"}`}>
                     <item.icon size={isSubItem ? 13 : 18} className={isActive ? "stroke-primary-foreground" : "stroke-muted-foreground group-hover:stroke-foreground"} />
                 </div>
-                <span className={`tracking-tight leading-snug flex-1 ${isSubItem ? "text-xs" : "text-sm"}`}>
-                    {item.label}
-                </span>
-                {isActive && (
-                    <div className="absolute right-3 w-2 h-2 rounded-full bg-white ml-auto animate-pulse shadow-sm ring-2 ring-primary/20" /> 
+                {!isCollapsed && (
+                    <span className={`tracking-tight leading-snug flex-1 ${isSubItem ? "text-xs" : "text-sm"}`}>
+                        {item.label}
+                    </span>
                 )}
             </Link>
         );
@@ -128,20 +131,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
         <div className="min-h-screen bg-background flex">
             {/* Desktop Sidebar */}
-            <div className="hidden lg:flex w-72 h-screen bg-card flex-col fixed left-0 top-0 border-r border-border z-50 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
-                <div className="p-6 flex flex-col items-center shrink-0">
-                    <div className="w-full flex items-center justify-center mb-2">
-                        {/* Ensure image exists or fallback */}
-                        <Image src="/d_file.svg" alt="DFILE" width={280} height={140} className="w-auto h-32 object-contain" priority />
-                    </div>
+            <div className={`hidden lg:flex ${isCollapsed ? "w-20" : "w-72"} h-screen bg-card flex-col fixed left-0 top-0 border-r border-border z-50 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-all duration-300`}>
+                <div className={`p-4 flex ${isCollapsed ? "flex-col gap-4" : "flex-row justify-between"} items-center shrink-0`}>
+                    {!isCollapsed && (
+                        <div className="flex items-center justify-center">
+                            {/* Ensure image exists or fallback */}
+                            <Image src="/d_file.svg" alt="DFILE" width={180} height={90} className="w-auto h-24 object-contain" priority />
+                        </div>
+                    )}
+                     <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        className="text-muted-foreground hover:text-foreground"
+                    >
+                        <Menu size={20} />
+                    </Button>
                 </div>
 
-                <div className="flex-1 px-3 space-y-6 pb-6 overflow-y-auto">
+                <div className="flex-1 px-3 space-y-6 pb-6 overflow-y-auto overflow-x-hidden">
                     <section>
-                        <div className="flex items-center gap-2 px-2 mb-2">
-                            <span className="w-1 h-3 rounded-full bg-primary/40"></span>
-                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Asset Management</p>
-                        </div>
+                        {!isCollapsed && (
+                            <div className="flex items-center gap-2 px-2 mb-2">
+                                <span className="w-1 h-3 rounded-full bg-primary/40"></span>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Asset Management</p>
+                            </div>
+                        )}
                         <div className="space-y-1">
                             {mainNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
                                 <NavButton key={item.href} item={item} />
@@ -151,10 +166,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     {adminNavItems.some(item => !item.allowedRoles || item.allowedRoles.includes(user.role)) && (
                         <section>
-                            <div className="flex items-center gap-2 px-2 mb-2">
-                                <span className="w-1 h-3 rounded-full bg-primary/40"></span>
-                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Administrator</p>
-                            </div>
+                             {!isCollapsed && (
+                                <div className="flex items-center gap-2 px-2 mb-2">
+                                    <span className="w-1 h-3 rounded-full bg-primary/40"></span>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Administrator</p>
+                                </div>
+                             )}
                             <div className="space-y-1">
                                 {adminNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
                                     <NavButton key={item.href} item={item} />
@@ -165,9 +182,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
 
                 <div className="p-4 mt-auto border-t border-border bg-card/50 backdrop-blur-sm sticky bottom-0">
-                    <Button variant="ghost" onClick={logout} className="w-full h-10 rounded-xl border border-border/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all">
-                        <LogOut size={16} className="mr-2" />
-                        <span className="font-semibold text-xs uppercase tracking-wider">Terminate Session</span>
+                    <Button variant="ghost" onClick={logout} className={`w-full h-10 rounded-xl border border-border/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-all ${isCollapsed ? "px-0 justify-center" : ""}`}>
+                        <LogOut size={16} className={isCollapsed ? "" : "mr-2"} />
+                        {!isCollapsed && <span className="font-semibold text-xs uppercase tracking-wider">Terminate Session</span>}
                     </Button>
                 </div>
             </div>
@@ -220,7 +237,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Sheet>
 
             {/* Main Content */}
-            <main className="flex-1 ml-0 lg:ml-72 min-w-0 bg-background min-h-screen">
+            <main className={`flex-1 min-w-0 bg-background min-h-screen transition-all duration-300 ${isCollapsed ? "lg:ml-20" : "lg:ml-72"}`}>
                 <header className="h-14 bg-card border-b border-border px-3 sm:px-6 flex items-center justify-between sticky top-0 z-10">
                     <button
                         onClick={() => setIsMobileSidebarOpen(true)}
@@ -260,12 +277,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {/* Hide Dashboard header for Finance role as they have custom dashboard header */}
                     {!(getPageTitle() === 'Dashboard' && user?.role === 'Finance' || getPageTitle() === 'Asset Maintenance & Repair') && (
                         <div className="mb-4">
-                            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-muted rounded-lg mb-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                    System Active
-                                </p>
-                            </div>
                             <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
                                 {getPageTitle()}
                             </h1>

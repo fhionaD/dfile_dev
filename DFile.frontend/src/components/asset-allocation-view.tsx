@@ -75,55 +75,57 @@ export function AssetAllocationView({ assets, rooms, onAllocate }: AssetAllocati
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lg:h-[calc(100vh-12rem)]">
             {/* Left Panel: Available Assets */}
-            <Card className="lg:col-span-2 flex flex-col h-full border-border/50 shadow-sm">
-                <CardHeader className="p-6 border-b border-border/50 bg-muted/40 uppercase tracking-wider">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Package size={18} />
-                            </div>
-                            <div>
-                                <CardTitle className="text-lg font-semibold text-foreground">Asset Inventory</CardTitle>
-                                <CardDescription className="text-xs text-muted-foreground">Select an available asset</CardDescription>
-                            </div>
-                        </div>
-                        <Badge variant="outline" className="bg-background">{availableAssets.length} Available</Badge>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            <div className="lg:col-span-2 flex flex-col h-full gap-4">
+                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                    <div className="flex flex-1 gap-2 w-full sm:w-auto">
                         <div className="relative flex-1">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by name or ID..."
-                                className="pl-9 h-9 bg-background"
+                                className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <div className="flex gap-2">
-                            <Select value={filterCategory} onValueChange={setFilterCategory}>
-                                <SelectTrigger className="w-full sm:w-[200px] h-9 bg-background">
-                                    <SelectValue placeholder="Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Categories</SelectItem>
-                                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={dateFilter} onValueChange={setDateFilter}>
-                                <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-                                    <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
-                                    <SelectValue placeholder="Period" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All Time">All Time</SelectItem>
-                                    <SelectItem value="This Month">This Month</SelectItem>
-                                    <SelectItem value="This Year">This Year</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                            <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                                <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                            <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                                <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Period" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All Time">All Time</SelectItem>
+                                <SelectItem value="This Month">This Month</SelectItem>
+                                <SelectItem value="This Year">This Year</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto p-0">
+                 </div>
+
+                <Card className="flex-1 flex flex-col border-border/50 shadow-sm">
+                    <CardHeader className="p-6 border-b border-border/50 bg-muted/40 uppercase tracking-wider">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                    <Package size={18} />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-lg font-semibold text-foreground">Asset Inventory</CardTitle>
+                                    <CardDescription className="text-xs text-muted-foreground">Select an available asset</CardDescription>
+                                </div>
+                            </div>
+                            <Badge variant="outline" className="bg-background">{availableAssets.length} Available</Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-y-auto p-0">
                     {availableAssets.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
                             <Package className="h-10 w-10 mb-2 opacity-20" />
@@ -160,6 +162,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate }: AssetAllocati
                     )}
                 </CardContent>
             </Card>
+            </div>
 
             {/* Right Panel: Allocation Action */}
             <div className="flex flex-col gap-6 h-full">
@@ -179,7 +182,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate }: AssetAllocati
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search room..."
-                                className="pl-9 h-9 bg-background"
+                                className="pl-9 h-10 bg-background text-sm"
                                 value={roomSearchTerm}
                                 onChange={(e) => setRoomSearchTerm(e.target.value)}
                             />

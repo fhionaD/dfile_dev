@@ -54,57 +54,29 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
         return true;
     });
 
-    const uniqueRoles = Array.from(new Set(employees.map(e => e.role))).sort();
+    const uniqueRoles = Array.from(new Set(employees.map(e => e.role).filter(role => role && role.trim() !== ""))).sort();
 
     const statusColor: Record<string, string> = {
-        Active: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-        Inactive: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-        Archived: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+        Active: "text-emerald-800 dark:text-emerald-400",
+        Inactive: "text-red-800 dark:text-red-400",
+        Archived: "text-gray-800 dark:text-gray-400",
     };
 
     return (
         <div className="space-y-6">
-            {/* Personnel Card */}
-            <Card className="border-border">
-                {/* Header: Title & Actions */}
-                <div className="px-6 py-4 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Users size={18} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-foreground">Personnel Directory</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">{showArchived ? `${archivedEmps.length} archived` : `${activeEmps.length} active`} employee{(showArchived ? archivedEmps.length : activeEmps.length) !== 1 ? "s" : ""}</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-                        <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                            {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeEmps.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedEmps.length})</>}
-                        </Button>
-                        <Button variant="outline" onClick={onAddPersonnel} size="sm" className="rounded-xl h-8 text-xs border-dashed border-border hover:border-primary/50 hover:bg-primary/5">
-                            <Plus size={14} className="mr-1.5" />
-                            Register Personnel
-                        </Button>
-                        <Button onClick={onOpenModal} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
-                            <Shield size={14} className="mr-1.5" />
-                            Deploy Role
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 items-center">
+                    <div className="relative flex-1 max-w-sm min-w-[200px]">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search employees..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
                     <Select value={roleFilter} onValueChange={setRoleFilter}>
-                        <SelectTrigger className="w-[180px] h-9 bg-background">
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
                             <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Filter Role" />
                         </SelectTrigger>
@@ -117,19 +89,36 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                     </Select>
                 </div>
 
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm" onClick={() => setShowArchived(!showArchived)}>
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active ({activeEmps.length})</> : <><Archive size={16} className="mr-2" />Archived ({archivedEmps.length})</>}
+                    </Button>
+                    <Button variant="outline" onClick={onAddPersonnel} size="sm" className="h-10 text-sm border-dashed border-border hover:border-primary/50 hover:bg-primary/5">
+                        <Plus size={16} className="mr-2" />
+                        Register Personnel
+                    </Button>
+                    <Button onClick={onOpenModal} size="sm" className="h-10 text-sm bg-primary text-primary-foreground shadow-sm">
+                        <Shield size={16} className="mr-2" />
+                        Deploy Role
+                    </Button>
+                </div>
+            </div>
+
+            {/* Personnel Card */}
+            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="text-xs font-medium text-muted-foreground pl-6">ID</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground">Email</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Contact</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Department</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Role</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Hire Date</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Status</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[100px] text-left">ID</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Name</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Email</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Contact</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Department</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Role</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Hire Date</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Status</TableHead>
+                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -145,40 +134,39 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                             ) : (
                                 displayEmps.map((emp) => (
                                     <TableRow key={emp.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onEmployeeClick?.(emp)}>
-                                        <TableCell className="font-mono text-xs text-muted-foreground pl-6">{emp.id}</TableCell>
-                                        <TableCell>
+                                        <TableCell className="p-4 align-middle font-mono text-xs text-muted-foreground text-left">{emp.id}</TableCell>
+                                        <TableCell className="p-4 align-middle text-left">
                                             <span className="text-sm font-medium text-foreground">
                                                 {emp.firstName} {emp.middleName ? `${emp.middleName} ` : ""}{emp.lastName}
                                             </span>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="p-4 align-middle text-left">
                                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                 <Mail size={12} />
                                                 {emp.email}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                                        <TableCell className="p-4 align-middle text-left">
+                                            <div className="flex items-center justify-start gap-1.5 text-sm text-muted-foreground">
                                                 <Phone size={12} />
                                                 {emp.contactNumber}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="outline" className="text-[10px]">
-                                                <Building2 size={10} className="mr-1" />
+                                        <TableCell className="p-4 align-middle text-left">
+                                            <span className="text-xs text-muted-foreground">
                                                 {emp.department}
-                                            </Badge>
+                                            </span>
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="outline" className="text-[10px]">{emp.role}</Badge>
+                                        <TableCell className="p-4 align-middle text-left">
+                                            <span className="text-xs text-muted-foreground">{emp.role}</span>
                                         </TableCell>
-                                        <TableCell className="text-center text-sm">{emp.hireDate}</TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge className={`text-[10px] font-medium ${statusColor[emp.status] || ""}`}>
+                                        <TableCell className="p-4 align-middle text-left text-sm">{emp.hireDate}</TableCell>
+                                        <TableCell className="p-4 align-middle text-left">
+                                            <Badge variant="outline" className={`text-[10px] font-medium rounded-none border-0 bg-transparent ${statusColor[emp.status] || ""}`}>
                                                 {emp.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-center">
+                                        <TableCell className="p-4 align-middle text-center">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

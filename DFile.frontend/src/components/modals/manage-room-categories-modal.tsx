@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Layers, Plus, Edit3, Save, DoorOpen, Users, DollarSign, Archive, RotateCcw } from "lucide-react";
+import { useState, useRef } from "react";
+import { Layers, Plus, Edit3, Save, DoorOpen, Users, PhilippinePeso, Archive, RotateCcw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,17 +14,19 @@ const AMENITY_TIERS = ["Standard", "Premium", "Luxury"];
 interface RoomCategory {
     id: string;
     name: string;
+    subCategory: string; // Added subCategory
     description: string;
     baseRate: number;
     maxOccupancy?: number;
     status?: "Active" | "Archived";
+    archived?: boolean;
 }
 
 interface ManageRoomCategoriesModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     roomCategories: RoomCategory[];
-    onAddCategory: (data: { name: string; description: string; baseRate: number; maxOccupancy?: number }) => void;
+    onAddCategory: (data: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy?: number }) => void;
     onUpdateCategory: (id: string, data: Partial<RoomCategory>) => void;
     onArchiveCategory: (id: string) => void;
 }
@@ -33,12 +35,18 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
     const [mode, setMode] = useState<"list" | "add" | "edit">("list");
     const [view, setView] = useState<"active" | "archived">("active");
     const [editId, setEditId] = useState<string | null>(null);
-    const [formData, setFormData] = useState({ name: "", description: "", baseRate: 0, maxOccupancy: 2 });
+    const [formData, setFormData] = useState({ name: "", subCategory: "", description: "" });
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-    const resetForm = () => { setFormData({ name: "", description: "", baseRate: 0, maxOccupancy: 2 }); setMode("list"); setEditId(null); };
+    const resetForm = () => { setFormData({ name: "", subCategory: "", description: "" }); setMode("list"); setEditId(null); };
 
-    const handleAdd = (e: React.FormEvent) => { e.preventDefault(); onAddCategory(formData); resetForm(); };
-    const handleEdit = (cat: RoomCategory) => { setFormData({ name: cat.name, description: cat.description, baseRate: cat.baseRate, maxOccupancy: cat.maxOccupancy || 2 }); setEditId(cat.id); setMode("edit"); };
+    const handleAdd = (e: React.FormEvent) => { e.preventDefault(); onAddCategory({ ...formData, baseRate: 0, maxOccupancy: 0 }); resetForm(); };
+    const handleEdit = (cat: RoomCategory) => { 
+        setFormData({ name: cat.name, subCategory: cat.subCategory || "", description: cat.description }); 
+        setEditId(cat.id); 
+        setMode("edit"); 
+        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
     const handleUpdate = (e: React.FormEvent) => { e.preventDefault(); if (editId) onUpdateCategory(editId, formData); resetForm(); };
 
     const renderForm = (onSubmit: (e: React.FormEvent) => void, submitLabel: string) => (
@@ -48,17 +56,12 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                     <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><DoorOpen size={12} /> Category Name</Label>
                     <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Deluxe Suite" className="border-input bg-background" />
                 </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><DollarSign size={12} /> Base Rate</Label>
-                    <Input type="number" required value={formData.baseRate || ""} onChange={(e) => setFormData({ ...formData, baseRate: Number(e.target.value) })} placeholder="0.00" className="border-input bg-background" />
-                </div>
-                <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><Users size={12} /> Max Occupancy</Label>
-                    <Input type="number" required value={formData.maxOccupancy || ""} onChange={(e) => setFormData({ ...formData, maxOccupancy: Number(e.target.value) })} placeholder="2" className="border-input bg-background" />
+                    <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><Layers size={12} /> Sub-Category</Label>
+                    <Input required value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="e.g. Double Bed / Ocean View" className="border-input bg-background" />
                 </div>
             </div>
+            
             <div className="space-y-2">
                 <Label className="text-xs font-medium text-muted-foreground">Description</Label>
                 <Textarea rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Category description..." className="border-input bg-background resize-none" />
@@ -105,7 +108,7 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                     </div>
                 </DialogHeader>
 
-                <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                <div ref={scrollRef} className="p-6 overflow-y-auto flex-1 space-y-6">
                     {mode === "list" && (
                         <button onClick={() => setMode("add")} className="w-full py-6 border-2 border-dashed border-border rounded-2xl flex items-center justify-center gap-3 text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/5 transition-all group">
                             <Plus size={22} className="group-hover:rotate-90 transition-transform duration-300" />
@@ -121,15 +124,14 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                                 <div className="flex items-center gap-5">
                                     <div className="p-3 bg-primary/10 rounded-xl text-primary"><DoorOpen size={18} /></div>
                                     <div>
-                                        <h4 className="text-sm font-bold text-foreground">{cat.name}</h4>
+                                        <h4 className="text-sm font-bold text-foreground">
+                                            {cat.name}
+                                            {cat.subCategory && <span className="text-muted-foreground font-normal ml-1">• {cat.subCategory}</span>}
+                                        </h4>
                                         <p className="text-xs font-medium text-muted-foreground">{cat.description || "No description"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    <div className="text-right px-4 border-r border-border">
-                                        <p className="text-sm font-bold text-foreground">${cat.baseRate}</p>
-                                        <p className="text-[10px] font-medium text-muted-foreground">Base Rate</p>
-                                    </div>
                                     <div className="flex gap-1.5">
                                         <button onClick={() => handleEdit(cat)} disabled={cat.status === 'Archived'} className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all disabled:opacity-50"><Edit3 size={16} /></button>
                                         <button onClick={() => onArchiveCategory(cat.id)} className={`p-2.5 rounded-lg transition-all ${cat.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-destructive/70 hover:text-destructive hover:bg-destructive/10'}`}>

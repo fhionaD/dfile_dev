@@ -101,13 +101,13 @@ export default function TasksPage() {
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                            {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active Tasks</> : <><Archive size={14} className="mr-1.5" />Archived Tasks</>}
+                        <Button variant={showArchived ? "default" : "outline"} size="lg" className="text-sm font-medium h-10" onClick={() => setShowArchived(!showArchived)}>
+                            {showArchived ? <><RotateCcw size={16} className="mr-2" />Active Tasks</> : <><Archive size={16} className="mr-2" />Archived Tasks</>}
                         </Button>
                         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-sm">
-                                    <Plus size={14} className="mr-1.5" /> Create Task
+                                <Button size="lg" className="rounded-xl h-10 text-sm bg-primary text-primary-foreground shadow-sm">
+                                    <Plus size={16} className="mr-2" /> Create Task
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px]">
@@ -190,11 +190,11 @@ export default function TasksPage() {
                             placeholder="Search tasks..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm"
                         />
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[180px] h-9 bg-background">
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
                             <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
                             <SelectValue placeholder="Filter by Status" />
                         </SelectTrigger>
@@ -223,13 +223,12 @@ export default function TasksPage() {
                                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${task.priority === 'High' ? 'bg-red-500' :
                                             task.priority === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500'
                                             }`} />
-                                        <CardHeader className="pl-6 pb-2">
+                                        <CardHeader className="pl-6 pb-1 pt-4">
                                             <div className="flex justify-between items-start">
-                                                <Badge variant="outline" className={`mb-2 border-0 ${getPriorityColor(task.priority)}`}>
+                                                <Badge variant="outline" className={`mb-1 border-0 text-xs ${getPriorityColor(task.priority)}`}>
                                                     {task.priority} Priority
                                                 </Badge>
                                                 <div className="flex gap-1">
-                                                    {/* Status Actions */}
                                                     {!showArchived && task.status !== 'Completed' && (
                                                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleStatusUpdate(task, 'Completed')} title="Mark Complete">
                                                             <CheckCircle2 size={14} className="text-emerald-500" />
@@ -246,22 +245,22 @@ export default function TasksPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <CardTitle className="text-lg leading-tight">{task.title}</CardTitle>
-                                            <CardDescription className="line-clamp-2 mt-1">{task.description}</CardDescription>
+                                            <CardTitle className="text-sm font-semibold leading-snug truncate">{task.title}</CardTitle>
+                                            <CardDescription className="line-clamp-1 text-xs">{task.description}</CardDescription>
                                         </CardHeader>
-                                        <CardContent className="pl-6 pt-2 text-sm">
-                                            <div className="flex flex-col gap-2">
+                                        <CardContent className="pl-6 pt-1 pb-3 text-xs">
+                                            <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <Calendar size={14} />
-                                                    <span>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No date"}</span>
+                                                    <Calendar size={12} className="shrink-0" />
+                                                    <span className="truncate">Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "No date"}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <User size={14} />
-                                                    <span>{assignedEmployee ? `${assignedEmployee.firstName} ${assignedEmployee.lastName}` : "Unassigned"}</span>
+                                                    <User size={12} className="shrink-0" />
+                                                    <span className="truncate">{assignedEmployee ? `${assignedEmployee.firstName} ${assignedEmployee.lastName}` : "Unassigned"}</span>
                                                 </div>
-                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+                                                <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-border">
                                                     {getStatusIcon(task.status)}
-                                                    <span className="font-medium text-foreground">{task.status}</span>
+                                                    <span className="font-medium text-foreground text-sm">{task.status}</span>
                                                 </div>
                                             </div>
                                         </CardContent>

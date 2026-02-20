@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Clock, CheckCircle2, DollarSign, Plus, Package, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { ShoppingCart, Clock, CheckCircle2, DollarSign, Plus, Package, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, PhilippinePeso } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -83,10 +83,10 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
     };
 
     const summaryCards = [
-        { label: "Total Orders", value: totalOrders.toString(), icon: ShoppingCart, color: "bg-primary" },
-        { label: "Pending Approval", value: pendingOrders.toString(), icon: Clock, color: "bg-amber-500" },
-        { label: "Approved / Delivered", value: approvedOrders.toString(), icon: CheckCircle2, color: "bg-emerald-500" },
-        { label: "Total Spend", value: `₱${totalSpend.toLocaleString()}`, icon: DollarSign, color: "bg-blue-500" },
+        { label: "Total Orders", value: totalOrders.toString(), icon: ShoppingCart, iconBg: "bg-primary/10", iconText: "text-primary", valueColor: "text-primary" },
+        { label: "Pending Approval", value: pendingOrders.toString(), icon: Clock, iconBg: "bg-amber-500/10", iconText: "text-amber-600", valueColor: "text-amber-600" },
+        { label: "Approved / Delivered", value: approvedOrders.toString(), icon: CheckCircle2, iconBg: "bg-emerald-500/10", iconText: "text-emerald-600", valueColor: "text-emerald-600" },
+        { label: "Total Spend", value: `₱${totalSpend.toLocaleString()}`, icon: PhilippinePeso, iconBg: "bg-blue-500/10", iconText: "text-blue-600", valueColor: "text-blue-600" },
     ];
 
     if (isLoading) {
@@ -113,164 +113,165 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
 
     return (
         <div className="space-y-6">
+
+
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {summaryCards.map((stat) => (
-                    <Card key={stat.label} className="border-border">
-                        <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-lg font-semibold text-foreground tracking-tight">{stat.value}</p>
-                                    <p className="text-[11px] font-medium text-muted-foreground mt-0.5">{stat.label}</p>
-                                </div>
-                                <div className={`${stat.color} p-1.5 rounded-md`}>
-                                    <stat.icon size={14} className="text-white" />
-                                </div>
+                {summaryCards.map((stat, i) => (
+                    <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                         <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                         <div className="flex items-center gap-2">
+                            <h3 className={`text-2xl font-bold ${stat.valueColor}`}>{stat.value}</h3>
+                            <div className={`h-10 w-10 rounded-full ${stat.iconBg} flex items-center justify-center ${stat.iconText}`}>
+                                <stat.icon size={20} />
                             </div>
-                        </CardContent>
-                    </Card>
+                         </div>
+                    </div>
                 ))}
             </div>
 
-            {/* Orders Table */}
-            <Card className="border-border">
-                <div className="px-6 py-4 border-b border-border bg-muted/40">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <ShoppingCart size={18} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-foreground">Purchase Orders</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">{showArchived ? "Archived purchase orders" : "Track asset procurement from request to delivery"}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                                {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({activeOrders.length})</> : <><Archive size={14} className="mr-1.5" />Archived ({archivedOrders.length})</>}
-                            </Button>
-                            <Button onClick={onNewOrder} size="sm" className="rounded-xl h-8 text-xs bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
-                                <Plus size={14} className="mr-2" />
-                                New Procurement
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Search and Filters Toolbar */}
-                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
+            {/* Search and Filters Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search orders..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Status</SelectItem>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="Approved">Approved</SelectItem>
-                                <SelectItem value="Ordered">Ordered</SelectItem>
-                                <SelectItem value="Delivered">Delivered</SelectItem>
-                                <SelectItem value="Cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Status</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Approved">Approved</SelectItem>
+                            <SelectItem value="Ordered">Ordered</SelectItem>
+                            <SelectItem value="Delivered">Delivered</SelectItem>
+                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                        <Select value={dateFilter} onValueChange={setDateFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Period" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All Time">All Time</SelectItem>
-                                <SelectItem value="This Month">This Month</SelectItem>
-                                <SelectItem value="Last Month">Last Month</SelectItem>
-                                <SelectItem value="This Year">This Year</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All Time">All Time</SelectItem>
+                            <SelectItem value="This Month">This Month</SelectItem>
+                            <SelectItem value="Last Month">Last Month</SelectItem>
+                            <SelectItem value="This Year">This Year</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/30">
-                                <TableHead className="text-xs font-medium text-muted-foreground">Order ID</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground">Asset</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Category</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground">Vendor</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-right">Price</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Purchase Date</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Useful Life</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Status</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center">Asset ID</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredOrders.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={10} className="h-32 text-center">
-                                        <div className="flex flex-col items-center text-muted-foreground">
-                                            <Package size={32} className="mb-2 opacity-30" />
-                                            <p className="text-sm">No purchase orders found</p>
-                                            <p className="text-xs mt-1">Try adjusting your filters</p>
-                                        </div>
-                                    </TableCell>
+                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm" onClick={() => setShowArchived(!showArchived)}>
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active ({activeOrders.length})</> : <><Archive size={16} className="mr-2" />Archived ({archivedOrders.length})</>}
+                    </Button>
+                    <Button onClick={onNewOrder} size="sm" className="h-10 text-sm bg-primary text-primary-foreground shadow-sm">
+                        <Plus size={16} className="mr-2" />
+                        New Order
+                    </Button>
+                </div>
+            </div>
+
+            {/* Orders Table */}
+            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow className="hover:bg-muted/50 border-border">
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Order ID</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Asset</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Category</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Vendor</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Price</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Purchase Date</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Useful Life</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+                                    <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Asset ID</TableHead>
+                                    <TableHead className="h-10 px-4 text-center align-middle font-medium text-muted-foreground">{showArchived ? "Restore" : "Archive"}</TableHead>
                                 </TableRow>
-                            ) : (
-                                filteredOrders.map((order) => (
-                                    <TableRow key={order.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onOrderClick?.(order)}>
-                                        <TableCell className="font-mono text-xs text-muted-foreground">{order.id}</TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium text-foreground">{order.assetName}</span>
-                                                {order.manufacturer && (
-                                                    <span className="text-[10px] text-muted-foreground">{order.manufacturer} {order.model}</span>
-                                                )}
+                            </TableHeader>
+                            <TableBody>
+                                {filteredOrders.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                                            <div className="flex flex-col items-center justify-center">
+                                                <Package size={32} className="mb-2 opacity-30" />
+                                                <p className="text-sm">No purchase orders found</p>
+                                                <p className="text-xs mt-1">Try adjusting your filters</p>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="outline" className="text-[10px]">{order.category}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-sm">{order.vendor || "—"}</TableCell>
-                                        <TableCell className="text-right text-sm font-medium">₱{order.purchasePrice.toLocaleString()}</TableCell>
-                                        <TableCell className="text-center text-sm">{order.purchaseDate}</TableCell>
-                                        <TableCell className="text-center text-sm">{order.usefulLifeYears} yrs</TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge className={`text-[10px] font-medium ${statusColor[order.status] || ""}`}>
-                                                {order.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center font-mono text-xs text-muted-foreground">
-                                            {order.assetId || "—"}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    archiveOrderMutation.mutate(order.id);
-                                                }}
-                                                className={`p-1.5 rounded-md transition-colors ${order.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                title={order.archived ? 'Restore' : 'Archive'}
-                                            >
-                                                {order.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
-                                            </button>
-                                        </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                                ) : (
+                                    filteredOrders.map((order) => (
+                                        <TableRow key={order.id} className="border-border hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => onOrderClick?.(order)}>
+                                            <TableCell className="p-4 align-middle font-mono text-xs text-muted-foreground text-left">{order.id}</TableCell>
+                                            <TableCell className="p-4 align-middle text-left">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium text-foreground">{order.assetName}</span>
+                                                    {order.manufacturer && (
+                                                        <span className="text-[10px] text-muted-foreground">{order.manufacturer} {order.model}</span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="p-4 align-middle text-left">
+                                                <Badge variant="outline" className="text-[10px] h-5 inline-flex">{order.category}</Badge>
+                                            </TableCell>
+                                            <TableCell className="p-4 align-middle text-sm text-foreground text-left">{order.vendor || "—"}</TableCell>
+                                            <TableCell className="p-4 align-middle text-left text-sm font-medium">₱{order.purchasePrice.toLocaleString()}</TableCell>
+                                            <TableCell className="p-4 align-middle text-left text-sm text-muted-foreground">{order.purchaseDate}</TableCell>
+                                            <TableCell className="p-4 align-middle text-left text-sm text-muted-foreground">{order.usefulLifeYears} yrs</TableCell>
+                                            <TableCell className="p-4 align-middle text-left">
+                                                <Badge variant="outline" className={`text-[10px] border-0 px-2 py-0.5 font-medium rounded-none bg-transparent inline-flex ${
+                                                    order.status === "Approved" ? "text-blue-700" :
+                                                    order.status === "Delivered" ? "text-emerald-700" :
+                                                    order.status === "Pending" ? "text-amber-700" :
+                                                    "text-red-700"
+                                                }`}>
+                                                    {order.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="p-4 align-middle text-left font-mono text-xs text-muted-foreground">
+                                                {order.assetId || "—"}
+                                            </TableCell>
+                                            <TableCell className="p-4 align-middle text-center">
+                                                <div className="flex items-center justify-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            archiveOrderMutation.mutate(order.id);
+                                                        }}
+                                                        className={`h-7 w-7 rounded-md transition-colors ${order.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
+                                                        title={order.archived ? 'Restore' : 'Archive'}
+                                                    >
+                                                        {order.archived ? <RotateCcw size={14} /> : <Archive size={14} />}
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                     <div className="p-4 border-t border-border bg-muted/5 flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground font-medium">
+                            Showing {filteredOrders.length} orders
+                        </div>
+                    </div>
+                </CardContent>
             </Card>
         </div>
     );

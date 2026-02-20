@@ -58,7 +58,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
         const model = formData.get("model") as string;
         const serialNumber = formData.get("serialNumber") as string;
         const vendor = formData.get("vendor") as string;
-        const category = categories.find(c => c.name === selectedCategory);
+        const category = categories.find(c => c.id === selectedCategory);
 
         const assetId = `AST-${Date.now().toString().slice(-6)}`;
         const orderId = `PO-${Date.now().toString().slice(-6)}`;
@@ -98,106 +98,109 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
             vendor,
             manufacturer,
             model,
-            serialNumber,
+            serialNumber: "",
             purchasePrice,
-            purchaseDate,
-            usefulLifeYears,
-            status: "Approved",
-            requestedBy: "Alex Thompson",
-            createdAt: new Date().toISOString().split("T")[0],
-            assetId,
+            status: "Pending",
+            requestedBy: "USR-001",
+            createdAt: new Date().toISOString(),
+            usefulLifeYears: usefulLifeYears > 0 ? usefulLifeYears : 0,
+            purchaseDate: purchaseDate || new Date().toISOString()
         };
 
-        await createOrderMutation.mutateAsync({ order: newOrder, asset: newAsset });
-
-        setDepreciationResult(null);
-        setSelectedCategory("");
+        createOrderMutation.mutate({ order: newOrder, asset: newAsset });
         onOpenChange(false);
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
-                    <DialogTitle className="flex items-center gap-2">
-                        <ShoppingCart className="h-5 w-5" />
-                        {replacementAsset ? `Request Replacement for ${replacementAsset.desc}` : "New Asset Acquisition"}
-                    </DialogTitle>
-                    <DialogDescription className="text-muted-foreground text-xs mt-1">
-                        Create a purchase order for {replacementAsset ? "a replacement" : "new"} equipment.
-                    </DialogDescription>
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><ShoppingCart size={20} /></div>
+                        <div>
+                            <DialogTitle className="text-lg font-semibold text-foreground">Create Purchase Order</DialogTitle>
+                            <DialogDescription className="text-muted-foreground text-xs mt-1">Initiate new asset acquisition request</DialogDescription>
+                        </div>
+                    </div>
                 </DialogHeader>
 
-                <form id="acquisition-form" onSubmit={handleSubmit} onChange={(e) => handleFieldChange(e.currentTarget)} className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <Upload size={32} className="mx-auto text-muted-foreground mb-2" />
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Click to upload asset image</p>
-                    </div>
+                <form id="acquisition-form" onSubmit={handleSubmit} onChange={(e) => handleFieldChange(e.currentTarget)} className="p-6 space-y-6 flex-1 overflow-y-auto">
+                    
+                    <div className="flex flex-col space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                <Tag size={12} /> Asset Name / Model
+                            </Label>
+                            <Input name="assetName" required placeholder="e.g. MacBook Pro M3" className="h-10 bg-background text-sm" />
+                        </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={12} /> Asset Name
-                            </Label>
-                            <Input name="assetName" required placeholder="e.g. Industrial Washer Unit" className="border-input bg-background" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Layers size={12} /> Category
+                                </Label>
+                                <Select name="category" value={selectedCategory} onValueChange={setSelectedCategory} required>
+                                    <SelectTrigger className="w-full h-10 bg-background px-3 text-sm truncate">
+                                        <SelectValue placeholder="Select Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categories.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Layers size={12} /> Classification
-                            </Label>
-                            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                                <SelectTrigger className="border-input bg-background">
-                                    <SelectValue placeholder="Select Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map((c) => (
-                                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Vendor</Label>
-                            <Input name="vendor" placeholder="e.g. TechSupply Co." className="border-input bg-background" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <FileText size={12} /> Vendor
+                                </Label>
+                                <Input name="vendor" placeholder="e.g. TechSupply Co." className="h-10 bg-background text-sm" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Tag size={12} /> Manufacturer
+                                </Label>
+                                <Input name="manufacturer" placeholder="e.g. Samsung" className="h-10 bg-background text-sm" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Tag size={12} /> Model
+                                </Label>
+                                <Input name="model" placeholder="e.g. QN90C" className="h-10 bg-background text-sm" />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Manufacturer</Label>
-                            <Input name="manufacturer" placeholder="e.g. Samsung" className="border-input bg-background" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Model</Label>
-                            <Input name="model" placeholder="e.g. QN90C" className="border-input bg-background" />
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Serial Number</Label>
-                            <Input name="serialNumber" placeholder="e.g. SN-123456789" className="border-input bg-background" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Tag size={12} /> Serial Number
+                                </Label>
+                                <Input name="serialNumber" placeholder="e.g. SN-123456789" className="h-10 bg-background text-sm" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <DollarSign size={12} /> Purchase Price
+                                </Label>
+                                <Input name="purchasePrice" type="number" step="0.01" required placeholder="0.00" className="h-10 bg-background text-sm" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Calendar size={12} /> Purchase Date
+                                </Label>
+                                <Input name="purchaseDate" type="date" required className="h-10 bg-background text-sm" />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <DollarSign size={12} /> Purchase Price
-                            </Label>
-                            <Input name="purchasePrice" type="number" step="0.01" required placeholder="0.00" className="border-input bg-background" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Calendar size={12} /> Purchase Date
-                            </Label>
-                            <Input name="purchaseDate" type="date" required className="border-input bg-background" />
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <FileText size={12} /> Useful Life (Years)
-                            </Label>
-                            <Input name="usefulLife" type="number" required placeholder="5" className="border-input bg-background" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <FileText size={12} /> Useful Life (Years)
+                                </Label>
+                                <Input name="usefulLife" type="number" required placeholder="5" className="h-10 bg-background text-sm" />
+                            </div>
                         </div>
                     </div>
 
@@ -218,11 +221,11 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                     )}
                 </form>
 
-                <DialogFooter className="gap-3 p-6 bg-muted/40 border-t border-border shrink-0">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3 w-full">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
                         Cancel
                     </Button>
-                    <Button type="submit" form="acquisition-form" className="flex-2 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button type="submit" form="acquisition-form" className="rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Initiate Procurement
                     </Button>
                 </DialogFooter>

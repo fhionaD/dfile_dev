@@ -41,7 +41,7 @@ export function CreateTenantAdminModal({ open, onOpenChange }: CreateTenantAdmin
                             {["First Name", "Middle Name", "Surname"].map((label) => (
                                 <div key={label} className="space-y-2">
                                     <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-                                    <Input required={label !== "Middle Name"} placeholder={label === "Middle Name" ? "Optional" : `e.g. ${label === "First Name" ? "John" : "Smith"}`} className="border-input bg-background" />
+                                    <Input required={label !== "Middle Name"} placeholder={label === "Middle Name" ? "Optional" : `e.g. ${label === "First Name" ? "John" : "Smith"}`} className="h-10 bg-background text-sm" />
                                 </div>
                             ))}
                         </div>
@@ -56,13 +56,13 @@ export function CreateTenantAdminModal({ open, onOpenChange }: CreateTenantAdmin
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground">Email Address</Label>
-                                <Input type="email" required placeholder="admin@tenant.com" className="border-input bg-background" />
+                                <Input type="email" required placeholder="admin@tenant.com" className="h-10 bg-background text-sm" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground">Contact Number</Label>
                                 <div className="relative">
                                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                    <Input type="tel" required placeholder="+1 (555) 000-0000" className="pl-10 border-input bg-background" />
+                                    <Input type="tel" required placeholder="+1 (555) 000-0000" className="pl-10 h-10 bg-background text-sm" />
                                 </div>
                             </div>
                         </div>
@@ -78,7 +78,7 @@ export function CreateTenantAdminModal({ open, onOpenChange }: CreateTenantAdmin
                             <Label className="text-xs font-medium text-muted-foreground">System Access Password</Label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                <Input type="password" required placeholder="••••••••••••" className="pl-10 border-input bg-background" />
+                                <Input type="password" required placeholder="••••••••••••" className="pl-10 h-10 bg-background text-sm" />
                             </div>
                             <p className="text-[10px] text-muted-foreground font-medium ml-1">Super Admin must assign a secure initial password.</p>
                         </div>

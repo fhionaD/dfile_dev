@@ -15,10 +15,10 @@ import { useAssets, useArchiveAsset } from "@/hooks/use-assets";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<string, string> = {
-    "In Use": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
-    "Available": "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
-    "Maintenance": "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-    "Disposed": "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
+    "In Use": "text-emerald-700 dark:text-emerald-400",
+    "Available": "text-sky-700 dark:text-sky-400",
+    "Maintenance": "text-amber-700 dark:text-amber-400",
+    "Disposed": "text-red-700 dark:text-red-400",
 };
 
 type SortKey = keyof Asset;
@@ -160,94 +160,79 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                 asset={selectedAssetForQR}
             />
 
-            <Card className="border-border">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-border bg-muted/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Package size={18} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-foreground">Fleet Registry</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">Manage and track all company assets</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-xs font-medium h-8" onClick={() => setShowArchived(!showArchived)}>
-                            {showArchived ? <><RotateCcw size={14} className="mr-1.5" />Active ({assets.filter(a => a.status !== "Archived").length})</> : <><Archive size={14} className="mr-1.5" />Archived ({assets.filter(a => a.status === "Archived").length})</>}
-                        </Button>
-                        <Button variant="outline" size="sm" className="text-xs font-medium h-8" onClick={handleExportCSV}>
-                            <FileBarChart size={14} className="mr-1.5" />
-                            Export
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="p-4 border-b border-border bg-muted/20 flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1 max-w-sm">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
+                <div className="flex flex-1 gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 items-center">
+                    <div className="relative flex-1 max-w-sm min-w-[200px]">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search assets..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 bg-background"
+                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[180px] h-9 bg-background">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Status</SelectItem>
-                                <SelectItem value="In Use">In Use</SelectItem>
-                                <SelectItem value="Available">Available</SelectItem>
-                                <SelectItem value="Maintenance">Maintenance</SelectItem>
-                                <SelectItem value="Disposed">Disposed</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-[200px] h-9 bg-background">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Categories</SelectItem>
-                                {uniqueCategories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Status</SelectItem>
+                            {Object.keys(statusColors).map(status => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <SelectTrigger className="w-[180px] h-10 bg-background text-sm">
+                            <Package className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Categories</SelectItem>
+                            {uniqueCategories.map(cat => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-sm h-10" onClick={() => setShowArchived(!showArchived)}>
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active ({assets.filter(a => a.status !== "Archived").length})</> : <><Archive size={16} className="mr-2" />Archived ({assets.filter(a => a.status === "Archived").length})</>}
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-sm h-10" onClick={handleExportCSV}>
+                        <FileBarChart size={16} className="mr-2" />
+                        Export
+                    </Button>
+                </div>
+            </div>
 
+            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
                 {/* Table */}
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead onClick={() => handleSort("id")} className="cursor-pointer hover:bg-muted/50 transition-colors text-center text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center justify-center">Asset ID {getSortIcon("id")}</div>
+                                <TableHead onClick={() => handleSort("id")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center gap-1">Asset ID {getSortIcon("id")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("desc")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center">Asset Name {getSortIcon("desc")}</div>
+                                <TableHead onClick={() => handleSort("desc")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center justify-start gap-1">Asset Name {getSortIcon("desc")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("cat")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center">Category {getSortIcon("cat")}</div>
+                                <TableHead onClick={() => handleSort("cat")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center justify-start gap-1">Category {getSortIcon("cat")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("status")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center">Status {getSortIcon("status")}</div>
+                                <TableHead onClick={() => handleSort("status")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center justify-start gap-1">Status {getSortIcon("status")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("room")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center">Room {getSortIcon("room")}</div>
+                                <TableHead onClick={() => handleSort("room")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center justify-start gap-1">Room {getSortIcon("room")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("value")} className="cursor-pointer hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground">
-                                    <div className="flex items-center">Value {getSortIcon("value")}</div>
+                                <TableHead onClick={() => handleSort("value")} className="h-10 px-4 text-right align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                    <div className="flex items-center justify-end gap-1">Value {getSortIcon("value")}</div>
                                 </TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground">QR</TableHead>
-                                <TableHead className="text-xs font-medium text-muted-foreground text-center w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
+                                <TableHead className="h-10 px-4 text-center align-middle font-medium text-muted-foreground">QR</TableHead>
+                                <TableHead className="h-10 px-4 text-center align-middle font-medium text-muted-foreground">{showArchived ? "Restore" : "Archive"}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -257,34 +242,34 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                                     className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
                                     onClick={() => onAssetClick?.(asset)}
                                 >
-                                    <TableCell className="font-mono text-xs font-medium text-foreground text-center">{asset.id}</TableCell>
-                                    <TableCell className="text-sm text-foreground font-medium">{asset.desc}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">{asset.cat}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className={`${statusColors[asset.status]} rounded-md text-xs font-medium`}>
+                                    <TableCell className="p-4 align-middle font-mono text-xs font-medium text-foreground text-left">{asset.id}</TableCell>
+                                    <TableCell className="p-4 align-middle text-sm text-foreground font-medium text-left">{asset.desc}</TableCell>
+                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{asset.cat}</TableCell>
+                                    <TableCell className="p-4 align-middle text-left">
+                                        <Badge variant="outline" className={`${statusColors[asset.status]} rounded-none border-0 bg-transparent text-xs font-medium whitespace-nowrap`}>
                                             {asset.status}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">{asset.room}</TableCell>
-                                    <TableCell className="text-sm font-medium text-foreground">{formatCurrency(asset.value)}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{asset.room}</TableCell>
+                                    <TableCell className="p-4 align-middle text-sm font-medium text-foreground text-right">{formatCurrency(asset.value)}</TableCell>
+                                    <TableCell className="p-4 align-middle text-center">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedAssetForQR(asset);
                                             }}
-                                            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                                            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors inline-flex items-center justify-center"
                                         >
                                             <QrCode size={16} />
                                         </button>
                                     </TableCell>
-                                    <TableCell className="text-center">
+                                    <TableCell className="p-4 align-middle text-center">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 archiveAssetMutation.mutate(asset.id);
                                             }}
-                                            className={`p-1.5 rounded-md transition-colors ${asset.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
+                                            className={`p-1.5 rounded-md transition-colors inline-flex items-center justify-center ${asset.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
                                             title={asset.status === 'Archived' ? 'Restore' : 'Archive'}
                                         >
                                             {asset.status === 'Archived' ? <RotateCcw size={16} /> : <Archive size={16} />}
@@ -305,7 +290,7 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                         <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 text-xs font-medium"
+                            className="h-10 text-sm font-medium"
                             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                             disabled={currentPage === 1}
                         >
@@ -314,7 +299,7 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                         <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 text-xs font-medium"
+                            className="h-10 text-sm font-medium"
                             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                             disabled={currentPage === totalPages}
                         >

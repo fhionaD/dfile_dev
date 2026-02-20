@@ -22,5 +22,6 @@ namespace DFile.backend.Models
 
         public bool Archived { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public int? TenantId { get; set; }
     }
 }

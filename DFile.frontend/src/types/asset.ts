@@ -44,11 +44,14 @@ export interface Category {
 
 export interface Room {
     id: string;
-    unitId: string;
+    unitId: string; // The Room Number/ID (e.g. 101)
+    name: string;   // The Room Name (e.g. Master Bedroom)
     categoryId: string;
+    categoryName?: string; // Optional for display
+    subCategoryName?: string; // Optional for display
     floor: string;
     maxOccupancy: number;
-    status: "Available" | "Occupied" | "Maintenance";
+    status: "Available" | "Occupied" | "Maintenance" | "Deactivated";
     archived?: boolean;
 }
 
@@ -101,11 +104,13 @@ export interface Employee {
 
 export interface RoomCategory {
     id: string;
-    name: string;
+    name: string; // The Main Category (e.g. Deluxe)
+    subCategory: string; // The Sub Category (e.g. Double Bed)
     description: string;
     baseRate: number;
-    maxOccupancy?: number;
+    maxOccupancy: number; // Keep existing but maybe optional? User didn't say to remove but focused on inputting cat/subcat.
     status: "Active" | "Archived";
+    archived?: boolean; // For archive logic
 }
 
 export interface Role {
@@ -129,3 +134,5 @@ export interface Department {
     itemCount: number;
     status: "Active" | "Archived";
 }
+
+

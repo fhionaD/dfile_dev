@@ -3,8 +3,11 @@ import axios from 'axios';
 import { getApiBaseUrl } from '@/lib/api-base-url';
 
 // Create a centralized Axios instance
+const baseURL = getApiBaseUrl();
+console.log('API Base URL:', baseURL || "Using relative path (potential issue if backend is on different port)");
+
 const api = axios.create({
-    baseURL: getApiBaseUrl(),
+    baseURL: baseURL || "http://localhost:5090/api", // Fallback for debugging
     headers: {
         'Content-Type': 'application/json',
     },

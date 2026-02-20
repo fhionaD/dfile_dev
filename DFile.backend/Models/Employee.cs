@@ -15,5 +15,6 @@ namespace DFile.backend.Models
         public string Role { get; set; } = string.Empty;
         public DateTime HireDate { get; set; }
         public string Status { get; set; } = "Active";
+        public int? TenantId { get; set; }
     }
 }

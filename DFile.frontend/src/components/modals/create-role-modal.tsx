@@ -43,13 +43,13 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <Briefcase size={12} /> Role Designation
                             </Label>
-                            <Input required value={roleData.designation} onChange={(e) => setRoleData({ ...roleData, designation: e.target.value })} placeholder="e.g. Senior Fleet Technician" className="border-input bg-background" />
+                            <Input required value={roleData.designation} onChange={(e) => setRoleData({ ...roleData, designation: e.target.value })} placeholder="e.g. Senior Fleet Technician" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <Layers size={12} /> Department
                             </Label>
-                            <Input required value={roleData.department} onChange={(e) => setRoleData({ ...roleData, department: e.target.value })} placeholder="e.g. Logistics & Supply" className="border-input bg-background" />
+                            <Input required value={roleData.department} onChange={(e) => setRoleData({ ...roleData, department: e.target.value })} placeholder="e.g. Logistics & Supply" className="h-10 bg-background text-sm" />
                         </div>
                     </div>
 
@@ -57,7 +57,7 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
                         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                             <FileText size={12} /> Scope of Responsibility
                         </Label>
-                        <Textarea rows={4} value={roleData.scope} onChange={(e) => setRoleData({ ...roleData, scope: e.target.value })} placeholder="Describe the primary duties..." className="border-input bg-background resize-none" />
+                        <Textarea rows={4} value={roleData.scope} onChange={(e) => setRoleData({ ...roleData, scope: e.target.value })} placeholder="Describe the primary duties..." className="bg-background text-sm resize-none" />
                     </div>
                 </form>
 

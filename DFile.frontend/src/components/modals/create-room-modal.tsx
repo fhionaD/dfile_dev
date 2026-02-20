@@ -13,7 +13,10 @@ import { Room } from "@/types/asset";
 interface RoomCategory {
     id: string;
     name: string;
+    subCategory?: string; // Added subCategory
     maxOccupancy?: number;
+    status?: "Active" | "Archived";
+    archived?: boolean;
 }
 
 interface RoomModalProps {
@@ -22,23 +25,24 @@ interface RoomModalProps {
     roomCategories: RoomCategory[];
     onSave: (room: Room) => void;
     initialData?: Room | null;
+    defaultEditing?: boolean; // Added prop
 }
 
-export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialData }: RoomModalProps) {
-    const [formData, setFormData] = useState<Partial<Room>>({ unitId: "", categoryId: "", floor: "", maxOccupancy: 0, status: "Available" });
+export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialData, defaultEditing = false }: RoomModalProps) {
+    const [formData, setFormData] = useState<Partial<Room>>({ unitId: "", name: "", categoryId: "", floor: "", maxOccupancy: 0, status: "Available" });
     const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
         if (open) {
             if (initialData) {
                 setFormData({ ...initialData });
-                setIsEditing(false); // Default to View mode for existing rooms
+                setIsEditing(defaultEditing); // Use prop
             } else {
-                setFormData({ unitId: "", categoryId: "", floor: "", maxOccupancy: 0, status: "Available" });
-                setIsEditing(true); // Default to Edit mode for new rooms
+                setFormData({ unitId: "", name: "", categoryId: "", floor: "", maxOccupancy: 0, status: "Available" });
+                setIsEditing(true); 
             }
         }
-    }, [open, initialData]);
+    }, [open, initialData, defaultEditing]);
 
     const handleCategoryChange = (value: string) => {
         const category = roomCategories.find((c) => c.id === value);
@@ -50,13 +54,17 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
 
         const roomToSave: Room = {
             id: initialData?.id || `rm_${Date.now()}`,
-            unitId: formData.unitId || "",
+            unitId: formData.unitId || `U-${Date.now().toString().slice(-4)}`, // Auto-generate if not provided
+            name: formData.name || "",     // Room Name
             categoryId: formData.categoryId || "",
+            // Find category and attach subCategory name if needed, though strictly Room object only needs ID.
+            // But if we want to store plain text for display... Room interface has categoryName/subCategoryName optional.
+            // Let's keep it simple for now, standardizing on retrieving from joined data or just storing IDs.
             floor: formData.floor || "",
-            maxOccupancy: Number(formData.maxOccupancy),
-            status: (formData.status as "Available" | "Occupied" | "Maintenance") || "Available"
+            maxOccupancy: 0, // Default to 0 as requested to remove input
+            status: (formData.status as "Available" | "Occupied" | "Maintenance" | "Deactivated") || "Available"
         };
-
+        
         onSave(roomToSave);
         if (!initialData) {
             onOpenChange(false);
@@ -66,6 +74,12 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
     };
 
     const handleCancel = () => {
+        // If we opened in edit mode by default, cancel should close the modal
+        if (defaultEditing) {
+             onOpenChange(false);
+             return;
+        }
+
         if (initialData && isEditing) {
             setIsEditing(false); // Revert to view mode
             setFormData({ ...initialData }); // Reset changes
@@ -94,79 +108,90 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
                 </DialogHeader>
 
                 <form id="room-form" onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <DoorOpen size={12} /> Unit Identification
-                            </Label>
-                            {isEditing ? (
-                                <Input required value={formData.unitId} onChange={(e) => setFormData({ ...formData, unitId: e.target.value })} placeholder="e.g. R-101" className="border-input bg-background" />
-                            ) : (
-                                <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.unitId || "—"}</div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Layers size={12} /> Unit Classification
-                            </Label>
-                            {isEditing ? (
-                                <Select value={formData.categoryId} onValueChange={handleCategoryChange}>
-                                    <SelectTrigger className="border-input bg-background"><SelectValue placeholder="Select Category..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {roomCategories.map((cat) => (
-                                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{getCategoryName(formData.categoryId)}</div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Building2 size={12} /> Floor / Level
-                            </Label>
-                            {isEditing ? (
-                                <Input required value={formData.floor} onChange={(e) => setFormData({ ...formData, floor: e.target.value })} placeholder="e.g. 1st Floor" className="border-input bg-background" />
-                            ) : (
-                                <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.floor || "—"}</div>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Users size={12} /> Max Occupancy
-                            </Label>
-                            {isEditing ? (
-                                <Input type="number" required value={formData.maxOccupancy} onChange={(e) => setFormData({ ...formData, maxOccupancy: Number(e.target.value) })} placeholder="e.g. 2" className="border-input bg-background" />
-                            ) : (
-                                <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.maxOccupancy} Person(s)</div>
-                            )}
-                        </div>
-                    </div>
-
                     <div className="space-y-2">
-                        <Label className="text-xs font-medium text-muted-foreground">Status</Label>
-                        {isEditing ? (
-                            <Select value={formData.status} onValueChange={(val: "Available" | "Occupied" | "Maintenance") => setFormData({ ...formData, status: val })}>
-                                <SelectTrigger className="border-input bg-background"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Available">Available</SelectItem>
-                                    <SelectItem value="Occupied">Occupied</SelectItem>
-                                    <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <Building2 size={12} /> Room Number
+                        </Label>
+                            {isEditing ? (
+                            <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Room 12" className="h-10 bg-background text-sm" />
+                        ) : (
+                            <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.name || "—"}</div>
+                        )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <Layers size={12} /> Category / Classification
+                        </Label>
+                            {isEditing ? (
+                            <Select value={formData.categoryId} onValueChange={handleCategoryChange}>
+                                <SelectTrigger className="w-full h-10 bg-background px-3 text-sm truncate [&>span]:truncate">
+                                    <SelectValue placeholder="Select Category..." />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-[200px]">
+                                    {roomCategories.filter(cat => !cat.archived || cat.id === formData.categoryId).map((cat) => (
+                                        <SelectItem key={cat.id} value={cat.id} className="cursor-pointer">
+                                            <span className="font-medium text-foreground">{cat.name}</span>
+                                            {cat.subCategory && <span className="text-muted-foreground ml-1 font-normal">— {cat.subCategory}</span>}
+                                            {cat.archived && <span className="ml-2 text-xs text-destructive">(Archived)</span>}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         ) : (
-                            <div className={`text-sm font-medium p-2 rounded-md border border-transparent inline-block px-3 py-1 ${formData.status === "Available" ? "bg-emerald-500/10 text-emerald-700" :
-                                    formData.status === "Maintenance" ? "bg-amber-500/10 text-amber-700" :
-                                        "bg-muted text-muted-foreground"
-                                }`}>
-                                {formData.status || "Unknown"}
+                            <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">
+                                {(() => {
+                                    const cat = roomCategories.find(c => c.id === formData.categoryId);
+                                    return cat ? `${cat.name} ${cat.subCategory ? `— ${cat.subCategory}` : ''}` : formData.categoryId || "—";
+                                })()}
                             </div>
                         )}
                     </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <Building2 size={12} /> Floor / Level
+                        </Label>
+                        {isEditing ? (
+                            <Input 
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                required 
+                                value={formData.floor} 
+                                onChange={(e) => {
+                                    // Only allow digits
+                                    const value = e.target.value.replace(/[^0-9]/g, '');
+                                    setFormData({ ...formData, floor: value });
+                                }}
+                                placeholder="e.g. 2" 
+                                className="h-10 bg-background text-sm" 
+                            />
+                        ) : (
+                            <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.floor || "—"}</div>
+                        )}
+                    </div>
+
+                    {/* Status, Max Occupancy, and Unit ID removed from inputs as per request */}
+                    {!isEditing && (
+                         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Status</Label>
+                                <div className={`text-sm font-medium inline-block px-2 py-0.5 rounded ${
+                                    formData.status === "Available" ? "bg-emerald-500/10 text-emerald-700" :
+                                    formData.status === "Maintenance" ? "bg-amber-500/10 text-amber-700" :
+                                    formData.status === "Deactivated" ? "bg-red-500/10 text-red-700" :
+                                    "bg-muted text-muted-foreground"
+                                }`}>
+                                    {formData.status || "Unknown"}
+                                </div>
+                            </div>
+                             <div className="space-y-1">
+                                <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">ID</Label>
+                                <div className="text-sm font-mono text-foreground">{formData.unitId || "—"}</div>
+                            </div>
+                        </div>
+                    )}
                 </form>
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-between items-center w-full sm:justify-between">

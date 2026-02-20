@@ -17,5 +17,6 @@ namespace DFile.backend.Models
         public string Role { get; set; } = "Employee"; // Admin, Maintenance, Procurement, Finance, Super Admin
         public string RoleLabel { get; set; } = string.Empty;
         public string? Avatar { get; set; }
+        public int? TenantId { get; set; }
     }
 }

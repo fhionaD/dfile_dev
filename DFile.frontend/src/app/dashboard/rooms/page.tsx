@@ -49,7 +49,12 @@ export default function RoomsPage() {
                 }}
                 onManageCategories={() => setIsCategoryModalOpen(true)}
                 onRoomClick={handleRoomClick}
-                onArchiveRoom={async (id) => await archiveRoomMutation.mutateAsync(id)}
+                onArchiveRoom={async (id) => {
+                    const room = rooms.find(r => r.id === id);
+                    if (room) {
+                        await archiveRoomMutation.mutateAsync(room);
+                    }
+                }}
             />
 
             <RoomModal
@@ -61,15 +66,21 @@ export default function RoomsPage() {
                 roomCategories={roomCategories}
                 onSave={handleSaveRoom}
                 initialData={selectedRoom}
+                defaultEditing={true}
             />
 
             <ManageRoomCategoriesModal
                 open={isCategoryModalOpen}
                 onOpenChange={setIsCategoryModalOpen}
                 roomCategories={roomCategories}
-                onAddCategory={async (category) => await addCategoryMutation.mutateAsync({ ...category, status: 'Active' })}
+                onAddCategory={async (category) => await addCategoryMutation.mutateAsync({ ...category, status: 'Active', maxOccupancy: category.maxOccupancy ?? 0 })}
                 onUpdateCategory={async (id, data) => await updateCategoryMutation.mutateAsync({ ...data, id } as any)}
-                onArchiveCategory={async (id) => await archiveCategoryMutation.mutateAsync(id)}
+                onArchiveCategory={async (id) => {
+                     const cat = roomCategories.find(c => c.id === id);
+                     if (cat) {
+                         await archiveCategoryMutation.mutateAsync(cat);
+                     }
+                }}
             />
         </>
     );

@@ -18,46 +18,116 @@ namespace DFile.backend.Data
                 // Fallback for dev environments where migrations might be messed up, but for prod we want Migrate
             }
 
-            // Look for the super admin specifically
-            if (context.Users.Any(u => u.Email == "superadmin@dfile.com"))
+            // Ensure Default Tenant Exists
+            var tenant = context.Tenants.FirstOrDefault(t => t.Name == "Acme Corp");
+            if (tenant == null)
             {
-                Console.WriteLine("Super Admin already exists. Skipping seed.");
-                return;   // DB has been seeded
+                tenant = new Tenant
+                {
+                    Name = "Acme Corp",
+                    Status = "Active",
+                    SubscriptionPlan = SubscriptionPlanType.Pro,
+                    CreatedAt = DateTime.UtcNow,
+                    MaxRooms = 500,
+                    MaxPersonnel = 100,
+                    MaintenanceModule = true,
+                    ReportsLevel = "Able"
+                };
+                context.Tenants.Add(tenant);
+                context.SaveChanges();
+                Console.WriteLine("Created default tenant 'Acme Corp'.");
             }
 
-            Console.WriteLine("Seeding users...");
-
-            var users = new User[]
+            // Define all standard users to seed
+            var seedUsers = new List<User>
             {
+                // 1. Super Admin (Platform Level)
                 new User
                 {
-                    Name = "Super Admin",
+                    Name = "System Super Admin",
                     Email = "superadmin@dfile.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("superadmin123"),
                     Role = "Super Admin",
-                    RoleLabel = "System Administrator"
+                    RoleLabel = "System Super Admin",
+                    TenantId = null // Platform level
                 },
+                // 2. Tenant Admin (Company Level Admin)
                 new User
                 {
-                    Name = "Admin User",
-                    Email = "admin@dfile.com",
+                    Name = "Tenant Admin",
+                    Email = "tenantadmin@dfile.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
                     Role = "Admin",
-                    RoleLabel = "Administrator"
+                    RoleLabel = "Tenant Administrator",
+                    TenantId = tenant.Id,
+                    Avatar = "https://github.com/shadcn.png"
                 },
+                // 3. Maintenance Manager
+                new User
+                {
+                    Name = "Maintenance Manager",
+                    Email = "maintenance@dfile.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("maintenance123"),
+                    Role = "Maintenance",
+                    RoleLabel = "Maintenance Manager",
+                    TenantId = tenant.Id,
+                    Avatar = "https://github.com/shadcn.png"
+                },
+                // 4. Finance Manager
+                new User
+                {
+                    Name = "Finance Manager",
+                    Email = "finance@dfile.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("finance123"),
+                    Role = "Finance",
+                    RoleLabel = "Finance Manager",
+                    TenantId = tenant.Id,
+                    Avatar = "https://github.com/shadcn.png"
+                },
+                // 5. Procurement Manager
+                new User
+                {
+                    Name = "Procurement Manager",
+                    Email = "procurement@dfile.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("procurement123"),
+                    Role = "Procurement",
+                    RoleLabel = "Procurement Manager",
+                    TenantId = tenant.Id,
+                    Avatar = "https://github.com/shadcn.png"
+                },
+                // 6. Regular Employee
                 new User
                 {
                     Name = "John Doe",
                     Email = "employee@dfile.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("employee123"),
                     Role = "Employee",
-                    RoleLabel = "Standard Employee"
+                    RoleLabel = "Staff Member",
+                    TenantId = tenant.Id,
+                    Avatar = "https://github.com/shadcn.png"
                 }
             };
 
-            context.Users.AddRange(users);
-            context.SaveChanges();
-            Console.WriteLine("Users seeded successfully.");
+            bool usersAdded = false;
+            foreach (var user in seedUsers)
+            {
+                if (!context.Users.Any(u => u.Email == user.Email))
+                {
+                    context.Users.Add(user);
+                    usersAdded = true;
+                    Console.WriteLine($"Seeding user: {user.Email}");
+                }
+            }
+
+            if (usersAdded)
+            {
+                context.SaveChanges();
+                Console.WriteLine("All missing users seeded successfully.");
+            }
+            else
+            {
+                Console.WriteLine("All users already exist.");
+            }
         }
     }
 }

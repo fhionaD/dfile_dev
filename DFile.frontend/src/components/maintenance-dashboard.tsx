@@ -75,81 +75,61 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
     return (
         <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                <Card className="border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full text-red-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Open Requests</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-red-600">{openRequests}</h3>
+                        <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-600">
                             <AlertTriangle size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Open Requests</p>
-                            <h3 className="text-2xl font-bold">{openRequests}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-full text-orange-600">
+                    </div>
+                </div>
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-orange-600">{overdueRequests}</h3>
+                        <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600">
                             <Clock size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Overdue</p>
-                            <h3 className="text-2xl font-bold">{overdueRequests}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                 <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-full text-blue-600">
+                    </div>
+                </div>
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">In Repair</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-blue-600">{inRepair}</h3>
+                        <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600">
                             <Wrench size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">In Repair</p>
-                            <h3 className="text-2xl font-bold">{inRepair}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-yellow-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-full text-yellow-600">
+                    </div>
+                </div>
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Attention Needed</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-yellow-600">{immediateAttention}</h3>
+                        <div className="h-10 w-10 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600">
                             <AlertTriangle size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Attention Needed</p>
-                            <h3 className="text-2xl font-bold">{immediateAttention}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-full text-emerald-600">
+                    </div>
+                </div>
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Scheduled (Week)</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-emerald-600">{scheduledThisWeek}</h3>
+                        <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
                             <CalendarIcon size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Scheduled (Week)</p>
-                            <h3 className="text-2xl font-bold">{scheduledThisWeek}</h3>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center gap-4">
-                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/20 rounded-full text-indigo-600">
+                    </div>
+                </div>
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-bold text-indigo-600">{mttrDays} <span className="text-sm font-medium text-muted-foreground">days</span></h3>
+                        <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600">
                             <TrendingDown size={20} />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Avg MTTR</p>
-                            <div className="flex items-baseline gap-1">
-                                <h3 className="text-2xl font-bold">{mttrDays}</h3>
-                                <span className="text-xs text-muted-foreground">days</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
 
             {/* Secondary Dashboard Grid */}
