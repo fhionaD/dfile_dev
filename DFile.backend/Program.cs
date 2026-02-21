@@ -87,15 +87,22 @@ app.MapGet("/api/db-test", (AppDbContext db) =>
     }
 });
 
+// Serve static frontend files from wwwroot BEFORE mapping controllers.
+// UseDefaultFiles serves index.html for "/"; UseStaticFiles serves all other static assets.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // Map controllers (API routes from AuthController, etc.)
 app.MapControllers();
 
-// app.UseHttpsRedirection(); // Disabled for troubleshooting 404s on HTTP host
-// Only then serve static files and fallback for SPA
-app.UseDefaultFiles(); // Serve index.html for /
-app.UseStaticFiles(); // Serve frontend files from wwwroot
+// Explicitly return 404 for any /api/* route that wasn't matched by a controller.
+// This prevents the SPA fallback from silently swallowing unmatched API calls
+// and returning index.html with HTTP 200, which masks real routing errors.
+app.Map("/api/{**rest}", (HttpContext context) =>
+    Results.NotFound(new { error = "API endpoint not found", path = context.Request.Path.Value }));
 
-// Map fallback only for non-API, non-swagger routes (SPA routing)
+// SPA fallback: serve index.html for all non-API, non-swagger, non-static routes
+// so that client-side routing (e.g. /dashboard, /login) works on hard-refresh.
 app.MapFallbackToFile("index.html");
 
 // Seed Database

@@ -199,3 +199,4 @@ C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\refint\
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.backend.pdb
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.backend.genruntimeconfig.cache
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\ref\dfile.backend.dll
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\web.config
