@@ -11,9 +11,9 @@ using System;
 using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("dfile.backend")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb466d7076f625003e67603e242f986b08729bc8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5bd508ee833c2c2bed2992651f630d9f431cfa35")]
 [assembly: System.Reflection.AssemblyProductAttribute("dfile.backend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("dfile.backend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
