@@ -11,6 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Ensure web.config and wwwroot are always included in publish output -->
+    <Content Update="web.config" CopyToPublishDirectory="Always" />
+    <Content Update="wwwroot\**" CopyToPublishDirectory="Always" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.14" />
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.9" />

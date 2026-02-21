@@ -40,38 +40,36 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Publish Backend
-      # Self-contained: bundles .NET 8 runtime into the exe.
-      # No 'dotnet' in server PATH needed. Works regardless of server .NET installation.
-      # Output: dfile.backend.exe (+ all runtime dlls) in ./publish/
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish -r win-x64 --self-contained true
+      # Framework-dependent publish — relies on the server's installed .NET 8 runtime.
+      # MonsterASP.NET FreeSite plan has .NET 8 LTS installed.
+      # Produces dfile.backend.dll + web.config in ./publish/ (no bundled runtime = smaller upload).
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish
 
     # 4. Correctly Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
       run: |
-        # Ensure wwwroot and logs directories exist
+        # Ensure wwwroot directory exists (the backend serves static files from here)
         mkdir -p ./publish/wwwroot
-        mkdir -p ./publish/logs
 
-        # IMPORTANT: Force-copy our custom web.config AFTER dotnet publish.
-        # dotnet publish may generate its own web.config even with
-        # IsTransformWebConfigDisabled=true on some SDK versions.
-        # This ensures our processPath/hostingModel settings always win.
+        # Force-copy our custom web.config AFTER dotnet publish.
+        # Even with IsTransformWebConfigDisabled=true, some SDK versions still
+        # generate a default web.config. This guarantees our settings always win.
         cp DFile.backend/web.config ./publish/web.config
-        echo "--- deployed web.config contents ---"
+        echo "--- deployed web.config (verify processPath=dotnet, inprocess) ---"
         cat ./publish/web.config
 
-        # Copy Next.js static export (out folder) to wwwroot
+        # Copy Next.js static export into the backend's wwwroot
         cp -r DFile.frontend/out/* ./publish/wwwroot/
 
-        # Add a diagnostic marker so we can confirm FTP path is correct
+        # Diagnostic marker to confirm FTP upload path is correct
         echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
         echo "Deployed: $(date -u)" > ./publish/wwwroot/deploy-check.txt
 
-        # Verify key files exist
+        # Verify key files exist before upload
         echo "--- publish root ---"
-        ls ./publish/*.dll ./publish/*.json ./publish/web.config
+        ls ./publish/*.dll ./publish/web.config
         echo "--- publish/wwwroot ---"
-        ls ./publish/wwwroot/index.html ./publish/wwwroot/deploy-check.txt
+        ls ./publish/wwwroot/index.html
 
     # 5. Deploy via FTP
     - name: Deploy to MonsterAsp.net via FTP

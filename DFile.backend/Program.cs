@@ -54,18 +54,24 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-// Enable Swagger in all environments for debugging
+
+// 1. Static files FIRST — lets IIS/Kestrel short-circuit for .js/.css/etc.
+//    without passing through auth or CORS middleware on every asset request.
+//    Do NOT call UseDefaultFiles() — MapFallbackToFile handles the root redirect.
+app.UseStaticFiles();
+
+// 2. Swagger (before auth so it's always accessible for debugging)
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// CORS must be before controllers
+// 3. CORS before auth/controllers
 app.UseCors("AllowAll");
 
-// Authentication & Authorization must come before MapControllers
+// 4. Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map all API routes and health checks FIRST (before static files)
+// 5. Diagnostic endpoints
 app.MapGet("/debug", () => Results.Ok($"App Running. Env: {app.Environment.EnvironmentName}"));
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 app.MapGet("/api/db-test", (AppDbContext db) => 
@@ -87,12 +93,7 @@ app.MapGet("/api/db-test", (AppDbContext db) =>
     }
 });
 
-// Serve static frontend files from wwwroot BEFORE mapping controllers.
-// UseDefaultFiles serves index.html for "/"; UseStaticFiles serves all other static assets.
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
-// Map controllers (API routes from AuthController, etc.)
+// 6. Map controllers (all /api/* routes)
 app.MapControllers();
 
 // Explicitly return 404 for any /api/* route that wasn't matched by a controller.
