@@ -11,8 +11,13 @@ export const getApiBaseUrl = (): string => {
 
 export const buildApiUrl = (path: string): string => {
   const apiBase = getApiBaseUrl();
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
-  return `${apiBase}${normalizedPath}`;
+  if (apiBase) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${apiBase}${normalizedPath}`;
+  }
+
+  // If apiBase is empty, return path as-is to allow relative paths
+  return path;
 };
 

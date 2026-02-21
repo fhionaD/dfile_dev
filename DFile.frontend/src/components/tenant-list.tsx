@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { EditTenantModal } from "./modals/edit-tenant-modal";
 import { TenantDetailsModal } from "./modals/tenant-details-modal";
+import api from "@/lib/api";
 
 // Define local interface if not yet in types
 interface TenantDto {
@@ -45,11 +46,8 @@ export function TenantList() {
 
     const fetchTenants = async () => {
         try {
-            const res = await fetch('/api/tenants');
-            if (res.ok) {
-                const data = await res.json();
-                setTenants(data);
-            }
+            const { data } = await api.get<TenantDto[]>('/api/tenants');
+            setTenants(data);
         } catch (error) {
             console.error("Failed to fetch tenants", error);
         } finally {
@@ -64,20 +62,9 @@ export function TenantList() {
     // Placeholder for status update API call
     const updateTenantStatus = async (id: number, status: string) => {
         try {
-            const res = await fetch(`/api/tenants/${id}/status`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ status })
-            });
-
-            if (res.ok) {
-                // Update local state
-                setTenants(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-            } else {
-                const errorText = await res.text();
-            }
+            await api.put(`/api/tenants/${id}/status`, { status });
+            // Update local state
+            setTenants(prev => prev.map(t => t.id === id ? { ...t, status } : t));
         } catch (error) {
             // console.error("Error updating status:", error);
         }
