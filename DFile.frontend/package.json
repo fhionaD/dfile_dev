@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && robocopy out ..\\DFile.backend\\wwwroot /E /PURGE /XD ..\\DFile.backend\\wwwroot\\dev & exit 0",
+    "build": "next build",
+    "postbuild": "node -e \"const fs = require('fs'); const path = require('path'); const dest = path.join('..', 'DFile.backend', 'wwwroot'); if (process.platform === 'win32') { require('child_process').execSync(`robocopy out ${dest} /E /PURGE /XD dev`, { stdio: 'inherit' }); }\"",
     "start": "next start",
     "lint": "eslint"
   },

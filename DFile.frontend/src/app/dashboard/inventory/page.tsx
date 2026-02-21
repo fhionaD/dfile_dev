@@ -92,7 +92,7 @@ export default function InventoryPage() {
                 onAddCategory={async (category) => {
                     await addCategoryMutation.mutateAsync({
                         ...category,
-                        items: 0,
+                        //items: 0,
                         status: "Active"
                     });
                 }}
