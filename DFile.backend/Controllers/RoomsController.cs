@@ -20,16 +20,53 @@ namespace DFile.backend.Controllers
 
         // GET: api/Rooms
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Room>>> GetRooms()
+        public async Task<ActionResult<IEnumerable<Room>>> GetRooms(
+            [FromQuery] string? search = null, 
+            [FromQuery] string? categoryId = null,
+            [FromQuery] string? status = null)
         {
-            return await _context.Rooms.ToListAsync();
+            var query = _context.Rooms
+                .Include(r => r.RoomCategory)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(categoryId))
+            {
+                query = query.Where(r => r.CategoryId == categoryId);
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                // Handle multiple statuses if comma-separated
+                if (status.Contains(","))
+                {
+                    var statuses = status.Split(',').Select(s => s.Trim()).ToList();
+                    query = query.Where(r => statuses.Contains(r.Status)); 
+                }
+                else
+                {
+                    query = query.Where(r => r.Status == status);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                search = search.ToLower();
+                query = query.Where(r => 
+                    r.Name.ToLower().Contains(search) || 
+                    r.UnitId.ToLower().Contains(search) ||
+                    (r.Floor != null && r.Floor.ToLower().Contains(search)));
+            }
+
+            return await query.ToListAsync();
         }
 
         // GET: api/Rooms/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Room>> GetRoom(string id)
         {
-            var room = await _context.Rooms.FindAsync(id);
+            var room = await _context.Rooms
+                .Include(r => r.RoomCategory)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (room == null)
             {
@@ -46,6 +83,12 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrEmpty(room.Id))
             {
                 room.Id = Guid.NewGuid().ToString();
+            }
+
+            // Handle empty category ID
+            if (string.IsNullOrEmpty(room.CategoryId))
+            {
+                room.CategoryId = null;
             }
             
             _context.Rooms.Add(room);
@@ -117,6 +160,24 @@ namespace DFile.backend.Controllers
         private bool RoomExists(string id)
         {
             return _context.Rooms.Any(e => e.Id == id);
+        }
+
+        // GET: api/Rooms/Stats
+        [HttpGet("stats")]
+        public async Task<ActionResult<object>> GetRoomStats()
+        {
+            var totalRooms = await _context.Rooms.CountAsync();
+            var occupied = await _context.Rooms.CountAsync(r => r.Status == "Occupied");
+            var available = await _context.Rooms.CountAsync(r => r.Status == "Available");
+            var maintenance = await _context.Rooms.CountAsync(r => r.Status == "Maintenance");
+
+            return new
+            {
+                Total = totalRooms,
+                Occupied = occupied,
+                Available = available,
+                Maintenance = maintenance
+            };
         }
     }
 }

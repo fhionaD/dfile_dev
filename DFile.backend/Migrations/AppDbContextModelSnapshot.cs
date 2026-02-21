@@ -84,6 +84,32 @@ namespace dfile.backend.Migrations
                     b.ToTable("Assets");
                 });
 
+            modelBuilder.Entity("DFile.backend.Models.AssetCategory", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AssetCategories");
+                });
+
             modelBuilder.Entity("DFile.backend.Models.Employee", b =>
                 {
                     b.Property<string>("Id")
@@ -197,8 +223,7 @@ namespace dfile.backend.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("CategoryId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Floor")
                         .IsRequired()
@@ -223,6 +248,8 @@ namespace dfile.backend.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
 
                     b.ToTable("Rooms");
                 });
@@ -389,6 +416,15 @@ namespace dfile.backend.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.Room", b =>
+                {
+                    b.HasOne("DFile.backend.Models.RoomCategory", "RoomCategory")
+                        .WithMany()
+                        .HasForeignKey("CategoryId");
+
+                    b.Navigation("RoomCategory");
                 });
 #pragma warning restore 612, 618
         }

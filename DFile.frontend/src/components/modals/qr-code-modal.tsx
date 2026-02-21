@@ -34,7 +34,7 @@ export function QRCodeModal({ open, onOpenChange, asset }: QRCodeModalProps) {
                 <div className="flex flex-row bg-white overflow-hidden printable-sticker w-full">
                     {/* Left Side: QR Code */}
                     <div className="shrink-0 p-6 flex flex-col items-center justify-center bg-white border-r border-border/50 w-[240px]">
-                        <div className="p-3 bg-white rounded-xl shadow-sm border border-border/50">
+                        <div className="p-3 bg-white  shadow-sm border border-border/50">
                             <QRCodeSVG
                                 id="asset-qr-code"
                                 value={qrData}
@@ -90,8 +90,8 @@ export function QRCodeModal({ open, onOpenChange, asset }: QRCodeModalProps) {
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border flex justify-end print:hidden">
-                    <Button onClick={() => window.print()} className="rounded-xl bg-primary text-primary-foreground px-8 shadow-sm">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3 print:hidden">
+                    <Button onClick={() => window.print()} className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         <Printer size={16} className="mr-2" /> Print
                     </Button>
                 </DialogFooter>

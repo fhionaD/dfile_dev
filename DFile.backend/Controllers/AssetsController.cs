@@ -19,8 +19,17 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Asset>>> GetAssets()
+        public async Task<ActionResult<IEnumerable<Asset>>> GetAssets([FromQuery] bool? showArchived = null)
         {
+            if (showArchived == true)
+            {
+                 return await _context.Assets.Where(a => a.Status == "Archived").ToListAsync();
+            }
+            else if (showArchived == false)
+            {
+                return await _context.Assets.Where(a => a.Status != "Archived").ToListAsync();
+            }
+            
             return await _context.Assets.ToListAsync();
         }
 
@@ -68,6 +77,68 @@ namespace DFile.backend.Controllers
                 return BadRequest();
             }
 
+            _context.Entry(asset).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!AssetExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        [HttpPut("archive/{id}")]
+        public async Task<IActionResult> ArchiveAsset(string id)
+        {
+            var asset = await _context.Assets.FindAsync(id);
+            if (asset == null)
+            {
+                return NotFound();
+            }
+
+            asset.Status = "Archived";
+            _context.Entry(asset).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!AssetExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        [HttpPut("restore/{id}")]
+        public async Task<IActionResult> RestoreAsset(string id)
+        {
+            var asset = await _context.Assets.FindAsync(id);
+            if (asset == null)
+            {
+                return NotFound();
+            }
+
+            asset.Status = "Active"; // Or previous status? Default to Active.
             _context.Entry(asset).State = EntityState.Modified;
 
             try

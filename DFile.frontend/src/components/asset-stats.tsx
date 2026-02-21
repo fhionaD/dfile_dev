@@ -6,12 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function AssetStats() {
     const { data: assets = [], isLoading } = useAssets();
+    const activeAssets = assets.filter(a => a.status !== 'Archived');
 
     if (isLoading) {
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                    <div key={i} className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                         <div className="space-y-2">
                             <Skeleton className="h-4 w-24" />
                             <Skeleton className="h-8 w-16" />
@@ -23,10 +24,10 @@ export function AssetStats() {
         );
     }
 
-    const totalAssets = assets.length;
+    const totalAssets = activeAssets.length;
 
     // "Pending Review" proxy
-    const pendingReviewCount = assets.filter(a => a.status === "Available" && (a.room === "—" || !a.room)).length;
+    const pendingReviewCount = activeAssets.filter(a => a.status === "Available" && (a.room === "—" || !a.room)).length;
 
     // Calculate Values
     const originalValue = assets.reduce((sum, a) => sum + (a.purchasePrice || a.value || 0), 0);
@@ -40,7 +41,7 @@ export function AssetStats() {
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+            <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Total Assets</p>
                 <div className="flex items-center gap-2">
                     <h3 className="text-2xl font-bold text-primary">{totalAssets.toLocaleString()}</h3>
@@ -50,7 +51,7 @@ export function AssetStats() {
                 </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+            <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Unallocated / Pending</p>
                 <div className="flex items-center gap-2">
                     <h3 className="text-2xl font-bold text-amber-600">{pendingReviewCount}</h3>
@@ -60,7 +61,7 @@ export function AssetStats() {
                 </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+            <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Original Portfolio Value</p>
                 <div className="flex items-center gap-2">
                     <h3 className="text-2xl font-bold text-blue-600">{formatCurrency(originalValue)}</h3>
@@ -70,7 +71,7 @@ export function AssetStats() {
                 </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+            <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Current Book Value</p>
                 <div className="flex items-center gap-2">
                     <h3 className="text-2xl font-bold text-emerald-600">{formatCurrency(bookValue)}</h3>

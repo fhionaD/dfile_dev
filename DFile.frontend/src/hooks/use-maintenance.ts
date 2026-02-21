@@ -4,46 +4,17 @@ import api from '@/lib/api';
 import { MaintenanceRecord } from '@/types/asset';
 import { toast } from 'sonner';
 
-// In-memory store for session
-let MOCK_MAINTENANCE: MaintenanceRecord[] = [
-    {
-        id: "M-2024-001",
-        assetId: "A-101",
-        description: "HVAC System not cooling properly",
-        status: "In Progress",
-        priority: "High",
-        type: "Corrective",
-        dateReported: new Date().toISOString(),
-    },
-    {
-        id: "M-2024-002",
-        assetId: "A-102",
-        description: "Monthly Generator Inspection",
-        status: "Scheduled",
-        priority: "Medium",
-        type: "Preventive",
-        frequency: "Monthly",
-        dateReported: new Date(Date.now() - 86400000 * 2).toISOString(),
-        startDate: new Date(Date.now() + 86400000 * 5).toISOString(),
-    },
-    {
-        id: "M-2024-003",
-        assetId: "A-105",
-        description: "Projector bulb replacement",
-        status: "Pending",
-        priority: "Low",
-        type: "Corrective",
-        dateReported: new Date(Date.now() - 86400000).toISOString(),
-    }
-];
+// In-memory store for session (REMOVED - CONNECTED TO API)
+// let MOCK_MAINTENANCE: MaintenanceRecord[] = ...
 
-export function useMaintenanceRecords() {
+export function useMaintenanceRecords(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['maintenance'],
+        queryKey: ['maintenance', showArchived],
         queryFn: async () => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            return [...MOCK_MAINTENANCE];
+            const { data } = await api.get<MaintenanceRecord[]>('/api/maintenance', {
+                params: { showArchived }
+            });
+            return data;
         },
     });
 }
@@ -53,15 +24,12 @@ export function useAddMaintenanceRecord() {
 
     return useMutation({
         mutationFn: async (record: Omit<MaintenanceRecord, 'id'>) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const newRecord = { ...record, id: `M-MOCK-${Date.now()}`, dateReported: new Date().toISOString() } as MaintenanceRecord;
-            MOCK_MAINTENANCE.push(newRecord);
-            return newRecord;
+            const { data } = await api.post<MaintenanceRecord>('/api/maintenance', record);
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-            toast.success('Maintenance request created (Mock)');
+            toast.success('Maintenance request submitted');
         },
         onError: (error) => {
             console.error('Failed to create maintenance record:', error);
@@ -75,14 +43,12 @@ export function useUpdateMaintenanceRecord() {
 
     return useMutation({
         mutationFn: async (record: MaintenanceRecord) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            MOCK_MAINTENANCE = MOCK_MAINTENANCE.map(r => r.id === record.id ? record : r);
+            await api.put(`/api/maintenance/${record.id}`, record);
             return record;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-            toast.success('Maintenance record updated (Mock)');
+            toast.success('Maintenance record updated');
         },
         onError: (error) => {
             console.error('Failed to update record:', error);
@@ -96,13 +62,10 @@ export function useUpdateMaintenanceStatus() {
 
     return useMutation({
         mutationFn: async ({ id, status }: { id: string; status: any }) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const record = MOCK_MAINTENANCE.find(r => r.id === id);
-            if (record) {
-                record.status = status;
-            }
-            return record;
+             const { data: record } = await api.get<MaintenanceRecord>(`/api/maintenance/${id}`);
+             const updatedRecord = { ...record, status };
+             await api.put(`/api/maintenance/${id}`, updatedRecord);
+             return updatedRecord;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
@@ -120,7 +83,7 @@ export function useArchiveMaintenanceRecord() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.delete(`/api/maintenance/${id}`);
+            await api.put(`/api/maintenance/archive/${id}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
@@ -129,6 +92,24 @@ export function useArchiveMaintenanceRecord() {
         onError: (error) => {
             console.error('Failed to archive record:', error);
             toast.error('Failed to archive record');
+        },
+    });
+}
+
+export function useRestoreMaintenanceRecord() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.put(`/api/maintenance/restore/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            toast.success('Maintenance record restored');
+        },
+        onError: (error) => {
+            console.error('Failed to restore record:', error);
+            toast.error('Failed to restore record');
         },
     });
 }

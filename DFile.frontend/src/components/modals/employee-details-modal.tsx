@@ -26,7 +26,7 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
             <DialogContent className="max-w-lg rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[85vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <div className="h-12 w-12  bg-primary/10 flex items-center justify-center text-primary">
                             <User size={24} />
                         </div>
                         <div>
@@ -48,7 +48,7 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Mail size={16} className="text-primary" /> Contact Information
                         </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Email Address</p>
                                 <p className="font-medium">{employee.email}</p>
@@ -67,7 +67,7 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Building2 size={16} className="text-primary" /> Assignment Details
                         </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Department</p>
                                 <p className="font-medium">{employee.department}</p>
@@ -84,14 +84,14 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border gap-2 shrink-0">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl flex-1">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} className="">
                         Close
                     </Button>
                     {onEdit && (
                         <Button
                             onClick={() => onEdit(employee)}
-                            className="rounded-xl flex-1 bg-primary text-primary-foreground shadow-sm"
+                            className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
                         >
                             <Edit size={14} className="mr-2" /> Edit Details
                         </Button>

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, DollarSign, Calendar, Building2, User, Package, TrendingDown } from "lucide-react";
+import { ShoppingCart, PhilippinePeso, Calendar, Building2, User, Package, TrendingDown } from "lucide-react";
 import { PurchaseOrder } from "@/types/asset";
 
 interface OrderDetailsModalProps {
@@ -32,7 +32,7 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
             <DialogContent className="max-w-lg rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[85vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <div className="h-12 w-12  bg-primary/10 flex items-center justify-center text-primary">
                             <ShoppingCart size={24} />
                         </div>
                         <div>
@@ -51,16 +51,16 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                     {/* Financial */}
                     <div>
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                            <DollarSign size={16} className="text-primary" /> Financial Details
+                            <PhilippinePeso size={16} className="text-primary" /> Financial Details
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Purchase Price</p>
-                                <p className="font-semibold text-lg">${order.purchasePrice.toLocaleString()}</p>
+                                <p className="font-semibold text-lg">₱{order.purchasePrice.toLocaleString()}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Monthly Depreciation</p>
-                                <p className="font-medium flex items-center gap-1.5"><TrendingDown size={12} />${monthlyDep.toFixed(2)}</p>
+                                <p className="font-medium flex items-center gap-1.5"><TrendingDown size={12} />₱{monthlyDep.toFixed(2)}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Useful Life</p>
@@ -80,7 +80,7 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Package size={16} className="text-primary" /> Asset & Vendor Info
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Vendor</p>
                                 <p className="font-medium flex items-center gap-1.5"><Building2 size={12} />{order.vendor || "—"}</p>
@@ -107,7 +107,7 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <User size={16} className="text-primary" /> Request Details
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Requested By</p>
                                 <p className="font-medium">{order.requestedBy}</p>
@@ -126,8 +126,8 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button onClick={() => onOpenChange(false)} className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Close
                     </Button>
                 </DialogFooter>

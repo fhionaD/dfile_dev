@@ -194,7 +194,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate }: AssetAllocati
                                 <div
                                     key={room.id}
                                     onClick={() => setSelectedRoomId(room.unitId)}
-                                    className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedRoomId === room.unitId ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:border-primary/50"}`}
+                                    className={`p-3  border cursor-pointer transition-all ${selectedRoomId === room.unitId ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:border-primary/50"}`}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate }: AssetAllocati
 
                         <div className="pt-2">
                             <Button
-                                className="w-full rounded-xl"
+                                className="w-full "
                                 size="lg"
                                 disabled={!selectedAssetId || !selectedRoomId}
                                 onClick={handleConfirmAllocation}

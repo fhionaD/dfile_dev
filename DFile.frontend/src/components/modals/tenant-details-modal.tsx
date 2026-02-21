@@ -40,7 +40,7 @@ export function TenantDetailsModal({ open, onOpenChange, tenant, onEdit }: Tenan
             <DialogContent className="max-w-md rounded-2xl border-border p-0 overflow-hidden flex flex-col">
                 <DialogHeader className="p-6 bg-muted/30 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-secondary/50 rounded-xl text-foreground">
+                        <div className="p-3 bg-secondary/50  text-foreground">
                             <Building2 size={24} strokeWidth={1.5} />
                         </div>
                         <div>
@@ -115,8 +115,8 @@ export function TenantDetailsModal({ open, onOpenChange, tenant, onEdit }: Tenan
                     </div>
                 </div>
 
-                <DialogFooter className="gap-3 p-6 bg-muted/30 border-t border-border shrink-0 sm:justify-between">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+                <DialogFooter className="p-6 bg-muted/30 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                         Close
                     </Button>
                     <Button 
@@ -124,7 +124,7 @@ export function TenantDetailsModal({ open, onOpenChange, tenant, onEdit }: Tenan
                             onOpenChange(false);
                             onEdit();
                         }} 
-                        className="rounded-xl bg-primary text-primary-foreground shadow-sm"
+                        className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
                     >
                         <Edit className="mr-2 h-3.5 w-3.5" />
                         Edit Details

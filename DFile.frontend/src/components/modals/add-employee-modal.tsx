@@ -33,7 +33,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [error, setError] = useState("");
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Effect to populate form when editing
     useEffect(() => {
@@ -69,29 +69,51 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                 });
             }
             setConfirmPassword("");
-            setError("");
+            setErrors({});
         }
     }, [open, initialData, departments, roles]);
 
     const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        if (value === "" || (/^\d+$/.test(value) && value.length <= 11)) {
+        if (value === "") {
+            setFormData({ ...formData, contactNumber: value });
+            return;
+        }
+
+        // Only allow digits
+        if (!/^\d+$/.test(value)) return;
+
+        // Strict prefix check: must start with 09
+        if (value.length >= 1 && value[0] !== '0') return;
+        if (value.length >= 2 && value[1] !== '9') return;
+
+        if (value.length <= 11) {
             setFormData({ ...formData, contactNumber: value });
         }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setError("");
+        setErrors({});
+
+        const newErrors: Record<string, string> = {};
+
+        // Contact Number Validation
+        if (formData.contactNumber && formData.contactNumber.length !== 11) {
+            newErrors.contactNumber = "Contact number must be exactly 11 digits (e.g., 09123456789)";
+        }
 
         // Password validation only for new users or if password field is touched
         if (!initialData && !formData.password) {
-            setError("Password is required for new users");
-            return;
+            newErrors.password = "Password is required for new users";
         }
 
         if (formData.password && formData.password !== confirmPassword) {
-            setError("Passwords do not match");
+            newErrors.confirmPassword = "Passwords do not match";
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
 
@@ -125,7 +147,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
             <DialogContent className="max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary">
+                        <div className="p-3 bg-primary/10  text-primary">
                             {isEditMode ? <UserPlus size={20} /> : <UserPlus size={20} />}
                         </div>
                         <div>
@@ -143,7 +165,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                     {/* Name */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">First Name</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">First Name <span className="text-destructive">*</span></Label>
                             <Input required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="e.g. John" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
@@ -151,8 +173,8 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                             <Input value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} placeholder="Optional" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-medium text-muted-foreground">Last Name</Label>
-                            <Input required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Smith" className="h-10 bg-background text-sm" />
+                            <Label className="text-xs font-medium text-muted-foreground">Last Name <span className="text-destructive">*</span></Label>
+                            <Input required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Doe" className="h-10 bg-background text-sm" />
                         </div>
                     </div>
 
@@ -160,11 +182,11 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Mail size={12} /> Email
+                                <Mail size={12} /> Email <span className="text-destructive">*</span>
                             </Label>
                             <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="employee@company.com" className="h-10 bg-background text-sm" />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 relative">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <Phone size={12} /> Contact Number
                             </Label>
@@ -173,10 +195,11 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                 inputMode="numeric"
                                 value={formData.contactNumber}
                                 onChange={handleContactChange}
-                                placeholder="Optional (11 digits max)"
-                                className="h-10 bg-background text-sm"
+                                placeholder="(Optional) 0912-345-6789"
+                                className={`h-10 bg-background text-sm ${errors.contactNumber ? "border-destructive focus-visible:ring-destructive" : ""}`}
                             />
                             <p className="text-[10px] text-muted-foreground text-right">{formData.contactNumber.length}/11</p>
+                            {errors.contactNumber && <p className="text-[10px] text-destructive font-medium absolute -bottom-2 left-0">{errors.contactNumber}</p>}
                         </div>
                     </div>
 
@@ -214,14 +237,14 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <CalendarClock size={12} /> Hire Date
+                                <CalendarClock size={12} /> Hire Date <span className="text-destructive">*</span>
                             </Label>
                             <Input type="date" required value={formData.hireDate} onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })} className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-4">
-                            <div className="space-y-2">
+                            <div className="space-y-2 relative">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <Lock size={12} /> {isEditMode ? "Reset Password (Optional)" : "Initial Password"}
+                                    <Lock size={12} /> {isEditMode ? "Reset Password (Optional)" : "Initial Password"} <span className="text-destructive">*</span>
                                 </Label>
                                 <div className="relative">
                                     <Input
@@ -230,7 +253,7 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                         placeholder="••••••••"
-                                        className="h-10 bg-background pr-9 text-sm"
+                                        className={`h-10 bg-background pr-9 text-sm ${errors.password ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                     />
                                     <button
                                         type="button"
@@ -240,41 +263,41 @@ export function AddEmployeeModal({ open, onOpenChange, departments, roles, onAdd
                                         {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                                     </button>
                                 </div>
+                                {errors.password && <p className="text-[10px] text-destructive font-medium absolute -bottom-4 left-0">{errors.password}</p>}
                             </div>
-                            {formData.password && (
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                        <Lock size={12} /> Confirm Password
-                                    </Label>
-                                    <div className="relative">
-                                        <Input
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            required
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="••••••••"
-                                            className={`h-10 bg-background pr-9 text-sm ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        >
-                                            {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
-                                    </div>
-                                    {error && <p className="text-[10px] text-destructive font-medium">{error}</p>}
+                            
+                            <div className="space-y-2 relative">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                    <Lock size={12} /> Confirm Password <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="relative">
+                                    <Input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className={`h-10 bg-background pr-9 text-sm ${errors.confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
                                 </div>
-                            )}
+                                {errors.confirmPassword && <p className="text-[10px] text-destructive font-medium absolute -bottom-4 left-0">{errors.confirmPassword}</p>}
+                            </div>
                         </div>
                     </div>
                 </form>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 gap-3">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="">
                         Cancel
                     </Button>
-                    <Button type="submit" form="employee-form" className="flex-2 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button type="submit" form="employee-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         {isEditMode ? (
                             <>
                                 <Save size={16} className="mr-2" /> Save Changes

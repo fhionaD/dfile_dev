@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wrench, AlertTriangle, FileText, Calendar, DollarSign, Layers } from "lucide-react";
+import { Wrench, AlertTriangle, FileText, Calendar, PhilippinePeso, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,7 +105,7 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
             <DialogContent className="max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><Wrench size={20} /></div>
+                        <div className="p-3 bg-primary/10  text-primary"><Wrench size={20} /></div>
                         <div>
                             <DialogTitle className="text-lg font-semibold text-foreground">
                                 {initialData ? "Edit Maintenance Record" : "New Maintenance Record"}
@@ -122,7 +122,7 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
                     <div className="flex flex-col space-y-4">
                         <div className="space-y-2">
                              <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Layers size={12} /> Asset to Maintain
+                                <Layers size={12} /> Asset to Maintain <span className="text-destructive">*</span>
                             </Label>
                             <Select value={formData.assetId || ""} onValueChange={(v) => setFormData({ ...formData, assetId: v })}>
                                 <SelectTrigger className="w-full h-10 bg-background px-3 text-sm"><SelectValue placeholder="Select asset..." /></SelectTrigger>
@@ -179,7 +179,7 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <DollarSign size={12} /> Expected Cost
+                                    <PhilippinePeso size={12} /> Expected Cost
                                 </Label>
                                 <Input type="number" placeholder="0.00" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })} className="h-10 bg-background text-sm" />
                             </div>
@@ -215,10 +215,10 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
                 </form>
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3 w-full">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                         Cancel
                     </Button>
-                    <Button type="submit" form="maintenance-form" className="rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button type="submit" form="maintenance-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         {initialData ? "Save Changes" : "Submit Record"}
                     </Button>
                 </DialogFooter>

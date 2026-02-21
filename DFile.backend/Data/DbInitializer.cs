@@ -111,11 +111,25 @@ namespace DFile.backend.Data
             bool usersAdded = false;
             foreach (var user in seedUsers)
             {
-                if (!context.Users.Any(u => u.Email == user.Email))
+                var existingUser = context.Users.FirstOrDefault(u => u.Email == user.Email);
+                if (existingUser == null)
                 {
                     context.Users.Add(user);
                     usersAdded = true;
                     Console.WriteLine($"Seeding user: {user.Email}");
+                }
+                else
+                {
+                    // Force update password for dev/test convenience
+                    existingUser.PasswordHash = user.PasswordHash;
+                    // Also ensure TenantId is correct if null? (Optional)
+                    if (existingUser.TenantId == null && user.TenantId != null)
+                    {
+                         existingUser.TenantId = user.TenantId;
+                    }
+                    context.Entry(existingUser).State = EntityState.Modified;
+                    usersAdded = true; // Mark as modified to trigger SaveChanges
+                    Console.WriteLine($"Updated password for existing user: {user.Email}");
                 }
             }
 

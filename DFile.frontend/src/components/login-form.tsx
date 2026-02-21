@@ -118,7 +118,7 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
         <div className="pt-4">
           <Button
             type="submit"
-            className="w-full h-12 rounded-xl bg-gradient-to-r from-[#182350] to-[#243575] text-white hover:to-[#182350] hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide shadow-md shadow-[#182350]/20 transition-all duration-300 active:scale-[0.98]"
+            className="w-full h-12  bg-gradient-to-r from-[#182350] to-[#243575] text-white hover:to-[#182350] hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide shadow-md shadow-[#182350]/20 transition-all duration-300 active:scale-[0.98]"
             disabled={isLoading}
           >
             {isLoading ? (

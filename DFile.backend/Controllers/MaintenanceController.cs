@@ -20,9 +20,9 @@ namespace DFile.backend.Controllers
 
         // GET: api/maintenance
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintenanceRecord>>> GetMaintenanceRecords()
+        public async Task<ActionResult<IEnumerable<MaintenanceRecord>>> GetMaintenanceRecords([FromQuery] bool showArchived = false)
         {
-            return await _context.MaintenanceRecords.Where(r => !r.Archived).OrderByDescending(r => r.CreatedAt).ToListAsync();
+            return await _context.MaintenanceRecords.Where(r => r.Archived == showArchived).OrderByDescending(r => r.CreatedAt).ToListAsync();
         }
 
         // GET: api/maintenance/5
@@ -62,6 +62,70 @@ namespace DFile.backend.Controllers
                 return BadRequest();
             }
 
+            _context.Entry(record).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!MaintenanceRecordExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // PUT: api/maintenance/archive/5
+        [HttpPut("archive/{id}")]
+        public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
+        {
+            var record = await _context.MaintenanceRecords.FindAsync(id);
+            if (record == null)
+            {
+                return NotFound();
+            }
+
+            record.Archived = true;
+            _context.Entry(record).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!MaintenanceRecordExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // PUT: api/maintenance/restore/5
+        [HttpPut("restore/{id}")]
+        public async Task<IActionResult> RestoreMaintenanceRecord(string id)
+        {
+            var record = await _context.MaintenanceRecords.FindAsync(id);
+            if (record == null)
+            {
+                return NotFound();
+            }
+
+            record.Archived = false;
             _context.Entry(record).State = EntityState.Modified;
 
             try

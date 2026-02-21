@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Package, DollarSign, Tag, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
+import { useState, useRef } from "react";
+import { Package, Tag, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,16 +18,20 @@ interface AddAssetFormProps {
     onSuccess?: () => void;
     onAddAsset?: (asset: Asset) => void;
     isModal?: boolean;
+    initialData?: Asset;
 }
 
-export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isModal = false }: AddAssetFormProps) {
-    const [depreciationResult, setDepreciationResult] = useState<{ bookValue: number; monthlyDep: number } | null>(null);
-    const [isCalculating, setIsCalculating] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [selectedType, setSelectedType] = useState<string>("Tangible");
+export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
+    const [selectedType, setSelectedType] = useState<string>(initialData ? 
+        (categories.find(c => c.name === initialData.cat)?.type || "Tangible") 
+        : "Tangible");
+    const [isManufacturerOpen, setIsManufacturerOpen] = useState(!!initialData?.manufacturer);
+    
+    // Using refs for file inputs to programmatically click them
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Section visibility states
-    const [isManufacturerOpen, setIsManufacturerOpen] = useState(true);
+    const initialCategoryId = initialData ? categories.find(c => c.name === initialData.cat)?.id : undefined;
 
     const handleCalculate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -36,12 +40,11 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
         const catId = formData.get("category") as string;
         const category = categories.find(c => c.id === catId);
 
-        // If simple registration (no API call needed for basic demo unless strictly required)
         if (onAddAsset) {
             const purchasePrice = Number(formData.get("purchasePrice")) || 0;
             const usefulLifeYears = Number(formData.get("usefulLifeYears")) || 0;
             const newAsset: Asset = {
-                id: formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`,
+                id: initialData?.id || (formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`),
                 desc: formData.get("name") as string,
                 cat: category?.name || "Unknown",
                 status: formData.get("status") as string || "Available",
@@ -61,53 +64,46 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
             };
             onAddAsset(newAsset);
             if (onSuccess) onSuccess();
-            return;
         }
-
-        // Fallback to calculation if standalone
-        setIsCalculating(true);
-        // ... calculation logic ...
-        setIsCalculating(false);
     };
 
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const url = URL.createObjectURL(file);
-            setPreviewUrl(url);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
     };
 
     return (
-        <form onSubmit={handleCalculate} className={isModal ? "flex flex-col h-[80vh]" : "space-y-6"}>
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                {/* Top Section: Details & Image */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Asset Details */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-semibold border-b border-border/50 pb-2 w-full">Asset details</h3>
+        <form onSubmit={handleCalculate} className={isModal ? "flex flex-col flex-1 min-h-0 bg-background/50" : "space-y-8"}>
+            <div className="flex-1 overflow-y-auto px-1">
+                <div className="p-6 space-y-10">
+                    
+                    {/* Section 1: General Details */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b">
+                            <Layers className="w-4 h-4 text-primary" />
+                            <h3 className="font-semibold text-sm tracking-wide text-foreground uppercase">General Information</h3>
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                            <div className="space-y-1.5 align-top">
-                                <Label className="text-xs font-semibold text-foreground">Asset Name *</Label>
-                                <Input name="name" required placeholder="e.g. Executive Desk" className="h-10 text-sm" />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Name <span className="text-destructive">*</span></Label>
+                                <Input name="name" defaultValue={initialData?.desc} required placeholder="e.g. Executive Desk" className="h-10" />
                             </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Category *</Label>
-                                <Select name="category" onValueChange={(val) => {
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category <span className="text-destructive">*</span></Label>
+                                <Select name="category" defaultValue={initialCategoryId} onValueChange={(val) => {
                                     const cat = categories.find(c => c.id === val);
-                                    if (cat) {
-                                        // Auto-select type based on category
-                                        const typeSelect = document.querySelector('button[name="type"]') as HTMLButtonElement; // Hacky if not controlled
-                                        // Better: Control the Type state
-                                        setSelectedType(cat.type);
-                                    }
+                                    if (cat) setSelectedType(cat.type);
                                 }}>
-                                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                                    <SelectContent>
+                                    <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select Category..." /></SelectTrigger>
+                                    <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
                                         {categories.map((c) => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
@@ -115,12 +111,11 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 </Select>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Asset Type *</Label>
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Type</Label>
                                 <Select name="type" value={selectedType} onValueChange={setSelectedType}>
-                                    <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        {/* Dynamic types from categories + defaults */}
+                                    <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+                                    <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
                                         {Array.from(new Set([...categories.map(c => c.type), "Tangible", "Intangible"])).map(t => (
                                             <SelectItem key={t} value={t}>{t}</SelectItem>
                                         ))}
@@ -128,116 +123,167 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 </Select>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Status *</Label>
-                                <Select name="status" defaultValue="Available">
-                                    <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Available">Available</SelectItem>
-                                        <SelectItem value="In Use">In Use</SelectItem>
-                                        <SelectItem value="Maintenance">Maintenance</SelectItem>
-                                        <SelectItem value="Disposed">Disposed</SelectItem>
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
+                                <Select name="status" defaultValue={initialData?.status || "Available"}>
+                                    <SelectTrigger className="h-10 border-input w-full"><SelectValue /></SelectTrigger>
+                                    <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
+                                        <SelectItem value="Available"><span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"/>Available</span></SelectItem>
+                                        <SelectItem value="In Use"><span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"/>In Use</span></SelectItem>
+                                        <SelectItem value="Maintenance"><span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-500"/>Maintenance</span></SelectItem>
+                                        <SelectItem value="Disposed"><span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-500"/>Disposed</span></SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Serial Number</Label>
-                                <Input name="serialNumber" className="h-10 text-sm" />
+                            
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Serial Number</Label>
+                                <Input name="serialNumber" defaultValue={initialData?.serialNumber} placeholder="SN-12345678" className="h-10 font-mono text-sm" />
                             </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Purchase Date</Label>
-                                <Input name="purchaseDate" type="date" className="h-10 text-sm" />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Cost</Label>
-                                <Input name="purchasePrice" type="number" placeholder="0.00" className="h-10 text-sm" />
+                            
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Purchase Date</Label>
+                                <Input name="purchaseDate" defaultValue={initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : ''} type="date" className="h-10" />
                             </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Useful Life (Years)</Label>
-                                <Input name="usefulLifeYears" type="number" placeholder="e.g. 5" className="h-10 text-sm" />
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₱</span>
+                                    <Input name="purchasePrice" defaultValue={initialData?.purchasePrice} type="number" placeholder="0.00" className="pl-7 h-10 font-mono" />
+                                </div>
                             </div>
 
-                            <div className="col-span-1 md:col-span-2 space-y-1.5">
-                                <Label className="text-xs font-semibold text-foreground">Notes</Label>
-                                <Textarea name="notes" placeholder="Additional details..." className="resize-none h-20 text-sm" />
+                            <div className="space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years)</Label>
+                                <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10" />
+                            </div>
+                        </div>
+                    </div>
+{/* Section 2: Image & Notes */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b mt-2">
+                             <FileText className="w-4 h-4 text-primary" />
+                             <h3 className="font-semibold text-sm tracking-wide text-foreground uppercase">Documentation & Visuals</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="md:col-span-1 space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Image</Label>
+                                <div 
+                                    className="group relative border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50  h-[200px] flex flex-col items-center justify-center p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-background"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    {previewUrl ? (
+                                        <>
+                                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg shadow-sm" />
+                                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-[2px]">
+                                                <Camera className="w-8 h-8 text-white mb-2" />
+                                                <p className="text-white text-xs font-medium tracking-wide uppercase">Change Image</p>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center text-center p-2">
+                                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                                                <Upload className="h-6 w-6 text-primary" />
+                                            </div>
+                                            <p className="text-sm font-medium text-foreground">Click to upload image</p>
+                                            <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 5MB</p>
+                                        </div>
+                                    )}
+                                    <input 
+                                        ref={fileInputRef}
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        onChange={handleImageSelect} 
+                                    />
+                                </div>
+                                {previewUrl && (
+                                    <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="w-full mt-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPreviewUrl(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = "";
+                                        }}
+                                    >
+                                        <Trash2 size={14} className="mr-2" /> Remove Image
+                                    </Button>
+                                )}
+                            </div>
+
+                            <div className="md:col-span-2 space-y-2.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes & Description</Label>
+                                <Textarea 
+                                    name="notes"
+                                    defaultValue={initialData?.notes}
+                                    placeholder="Enter detailed description, condition notes, or location specifics..." 
+                                    className="resize-none h-[200px] font-sans leading-relaxed" 
+                                />
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column: Image */}
-                    <div className="space-y-4">
-                        <div className="border rounded-xl overflow-hidden bg-muted/20 h-56 relative flex items-center justify-center group">
-                            {previewUrl ? (
-                                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="text-center text-muted-foreground p-4">
-                                    <Camera size={48} className="mx-auto mb-2 opacity-20" />
-                                    <p className="text-xs">No image selected</p>
+                    {/* Section 3: Manufacturer Details */}
+                    <div className="border rounded-lg bg-card shadow-sm">
+                        <Collapsible open={isManufacturerOpen} onOpenChange={setIsManufacturerOpen}>
+                            <CollapsibleTrigger asChild>
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
+                                    <div className="flex items-center gap-2">
+                                        <Package className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <h3 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground group-hover:text-foreground transition-colors">Manufacturer & Warranty</h3>
+                                    </div>
+                                    <div className={`p-1 rounded-full transition-colors ${isManufacturerOpen ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                        {isManufacturerOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    </div>
                                 </div>
-                            )}
-                            <div className="absolute inset-x-0 bottom-0 p-2 bg-black/60 flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20" type="button" onClick={() => document.getElementById('image-upload')?.click()}>
-                                    <Camera size={16} />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/20 hover:text-red-400" type="button" onClick={() => setPreviewUrl(null)}>
-                                    <Trash2 size={16} />
-                                </Button>
-                            </div>
-                            <input id="image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-                        </div>
-
-                        <div className="border rounded-xl p-4 bg-muted/10 border-dashed">
-                            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                                <Plus size={16} />
-                                <span className="text-xs font-medium">Attachments</span>
-                            </div>
-                            <div className="text-center p-4 border border-dashed rounded-lg bg-card/50 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
-                                Drag and drop files to upload
-                            </div>
-                        </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <Separator />
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/10">
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Manufacturer">Manufacturer</Label>
+                                        <Input name="manufacturer" defaultValue={initialData?.manufacturer} placeholder="e.g. Herman Miller" className="h-9 bg-background" />
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Model Number">Model Number</Label>
+                                        <Input name="model" defaultValue={initialData?.model} placeholder="Model X" className="h-9 bg-background" />
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Vendor">Vendor</Label>
+                                        <Input name="vendor" defaultValue={initialData?.vendor} placeholder="Vendor Inc." className="h-9 bg-background" />
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Warranty Expiry">Warranty Expiry</Label>
+                                        <Input name="warrantyExpiry" defaultValue={initialData?.warrantyExpiry ? new Date(initialData.warrantyExpiry).toISOString().split('T')[0] : ''} type="date" className="h-9 bg-background" />
+                                    </div>
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Next Maintenance">Next Maintenance</Label>
+                                        <Input name="nextMaintenance" defaultValue={initialData?.nextMaintenance ? new Date(initialData.nextMaintenance).toISOString().split('T')[0] : ''} type="date" className="h-9 bg-background" />
+                                    </div>
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
                     </div>
                 </div>
-
-                {/* Collapsible Section: Manufacturer */}
-                <Collapsible open={isManufacturerOpen} onOpenChange={setIsManufacturerOpen} className="border rounded-xl overflow-hidden bg-white dark:bg-card">
-                    <div className="flex items-center justify-between p-4 bg-muted/10 cursor-pointer" onClick={() => setIsManufacturerOpen(!isManufacturerOpen)}>
-                        <h4 className="font-semibold text-sm">Asset Manufacturer Details</h4>
-                        {isManufacturerOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </div>
-                    <CollapsibleContent>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-border/50">
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground">Manufacturer</Label>
-                                <Input name="manufacturer" className="h-10 text-sm" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground">Model</Label>
-                                <Input name="model" className="h-10 text-sm" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground">Vendor Name</Label>
-                                <Input name="vendor" className="h-10 text-sm" />
-                            </div>
-                            <div className="col-span-1 md:col-span-3 space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground">Warranty Terms / Remarks</Label>
-                                <Input name="warranty" className="h-10 text-sm" />
-                            </div>
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
             </div>
 
-            <div className={`p-6 border-t bg-muted/40 flex items-center gap-3 ${isModal ? "sticky bottom-0 z-10" : ""}`}>
-                {onCancel && (
-                    <Button type="button" variant="outline" onClick={onCancel} className="flex-1 rounded-xl">
-                        Cancel
+            <div className="p-4 px-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between mt-auto z-10">
+                <div />
+                <div className="flex items-center gap-3">
+                    {onCancel && (
+                        <Button type="button" variant="outline" onClick={onCancel}>
+                            Cancel
+                        </Button>
+                    )}
+                    <Button type="submit" className="h-10 text-sm px-8 shadow-sm">
+                        {initialData ? "Update Asset" : "Register Asset"}
                     </Button>
-                )}
-                <Button type="submit" className="flex-[2] rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
-                    Register Asset
-                </Button>
+                </div>
             </div>
         </form>
     );

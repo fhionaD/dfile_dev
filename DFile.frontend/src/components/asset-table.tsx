@@ -9,9 +9,11 @@ import { QRCodeModal } from "@/components/modals/qr-code-modal";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
+import { CurrencyCell } from "@/components/ui/currency-cell";
+import { CurrencyHeader } from "@/components/ui/currency-header";
 
 import { Asset } from "@/types/asset";
-import { useAssets, useArchiveAsset } from "@/hooks/use-assets";
+import { useAssets, useArchiveAsset, useRestoreAsset } from "@/hooks/use-assets";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<string, string> = {
@@ -29,11 +31,13 @@ interface AssetTableProps {
 }
 
 export function AssetTable({ onAssetClick }: AssetTableProps) {
+    const [showArchived, setShowArchived] = useState(false);
+    // Fetch all assets so we can calculate counts correctly
     const { data: assets = [], isLoading } = useAssets();
     const archiveAssetMutation = useArchiveAsset();
+    const restoreAssetMutation = useRestoreAsset();
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
-    const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
     const [categoryFilter, setCategoryFilter] = useState("All");
@@ -45,7 +49,7 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
 
     const filteredAssets = useMemo(() => {
         return assets.filter(asset => {
-            // Archive Status
+            // Archive Status - Handled by client-side filter
             if (showArchived ? asset.status !== "Archived" : asset.status === "Archived") return false;
 
             // Text Search
@@ -95,7 +99,7 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
     };
 
     const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(value);
+        return new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
     };
 
     // Pagination Logic
@@ -133,7 +137,7 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
 
     if (isLoading) {
         return (
-            <div className="rounded-xl border border-border overflow-hidden bg-card p-6 space-y-4">
+            <div className=" border border-border overflow-hidden bg-card p-6 space-y-4">
                 <div className="flex justify-between items-center mb-6">
                     <Skeleton className="h-8 w-48" />
                     <Skeleton className="h-8 w-32" />
@@ -197,62 +201,77 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                     </Select>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-sm h-10" onClick={() => setShowArchived(!showArchived)}>
-                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active ({assets.filter(a => a.status !== "Archived").length})</> : <><Archive size={16} className="mr-2" />Archived ({assets.filter(a => a.status === "Archived").length})</>}
-                    </Button>
                     <Button variant="outline" size="sm" className="text-sm h-10" onClick={handleExportCSV}>
                         <FileBarChart size={16} className="mr-2" />
                         Export
                     </Button>
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="text-sm h-10 w-[160px] justify-start" onClick={() => setShowArchived(!showArchived)}>
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Show Active ({assets.filter(a => a.status !== "Archived").length})</> : <><Archive size={16} className="mr-2" />Show Archive ({assets.filter(a => a.status === "Archived").length})</>}
+                    </Button>
                 </div>
             </div>
 
-            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+            <Card className="border-border shadow-sm  overflow-hidden">
                 {/* Table */}
                 <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="w-full table-fixed">
                         <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead onClick={() => handleSort("id")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
+                                <TableHead onClick={() => handleSort("id")} className="px-4 py-3 text-left align-middle text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors w-[100px]">
                                     <div className="flex items-center gap-1">Asset ID {getSortIcon("id")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("desc")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                <TableHead onClick={() => handleSort("desc")} className="px-4 py-3 text-left align-middle text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors w-[250px]">
                                     <div className="flex items-center justify-start gap-1">Asset Name {getSortIcon("desc")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("cat")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                <TableHead onClick={() => handleSort("cat")} className="px-4 py-3 text-left align-middle text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors w-[150px]">
                                     <div className="flex items-center justify-start gap-1">Category {getSortIcon("cat")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("status")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                <TableHead onClick={() => handleSort("status")} className="px-4 py-3 text-left align-middle text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors w-[120px]">
                                     <div className="flex items-center justify-start gap-1">Status {getSortIcon("status")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("room")} className="h-10 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
+                                <TableHead onClick={() => handleSort("room")} className="px-4 py-3 text-left align-middle text-xs font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors w-[120px]">
                                     <div className="flex items-center justify-start gap-1">Room {getSortIcon("room")}</div>
                                 </TableHead>
-                                <TableHead onClick={() => handleSort("value")} className="h-10 px-4 text-right align-middle font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors">
-                                    <div className="flex items-center justify-end gap-1">Value {getSortIcon("value")}</div>
-                                </TableHead>
-                                <TableHead className="h-10 px-4 text-center align-middle font-medium text-muted-foreground">QR</TableHead>
-                                <TableHead className="h-10 px-4 text-center align-middle font-medium text-muted-foreground">{showArchived ? "Restore" : "Archive"}</TableHead>
+                                <CurrencyHeader 
+                                    className="w-[120px]"
+                                    sortKey="value"
+                                    sortedBy={sortConfig?.key}
+                                    sortDirection={sortConfig?.direction}
+                                    onClick={() => handleSort("value")}
+                                >
+                                    Value
+                                </CurrencyHeader>
+                                <TableHead className="px-4 py-3 text-center align-middle text-xs font-medium text-muted-foreground w-[80px]">QR</TableHead>
+                                <TableHead className="px-4 py-3 text-center align-middle text-xs font-medium text-muted-foreground w-[80px]">{showArchived ? "Restore" : "Archive"}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {paginatedAssets.filter(a => showArchived ? a.status === "Archived" : a.status !== "Archived").map((asset) => (
+                            {paginatedAssets.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground text-sm">
+                                        {showArchived ? "No archived assets yet" : "No assets match your search"}
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedAssets.map((asset) => (
                                 <TableRow
                                     key={asset.id}
-                                    className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
+                                    className="cursor-pointer hover:bg-muted/5 transition-colors border-b border-border last:border-0"
                                     onClick={() => onAssetClick?.(asset)}
                                 >
-                                    <TableCell className="p-4 align-middle font-mono text-xs font-medium text-foreground text-left">{asset.id}</TableCell>
-                                    <TableCell className="p-4 align-middle text-sm text-foreground font-medium text-left">{asset.desc}</TableCell>
-                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{asset.cat}</TableCell>
-                                    <TableCell className="p-4 align-middle text-left">
-                                        <Badge variant="outline" className={`${statusColors[asset.status]} rounded-none border-0 bg-transparent text-xs font-medium whitespace-nowrap`}>
+                                    <TableCell className="px-4 py-3 align-middle font-mono text-xs font-normal text-muted-foreground text-left">{asset.id}</TableCell>
+                                    <TableCell className="px-4 py-3 align-middle text-sm text-foreground font-normal text-left">{asset.desc}</TableCell>
+                                    <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-left">{asset.cat}</TableCell>
+                                    <TableCell className="px-4 py-3 align-middle text-left">
+                                        <span className={`${statusColors[asset.status]} text-sm font-normal whitespace-nowrap inline-flex`}>
                                             {asset.status}
-                                        </Badge>
+                                        </span>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{asset.room}</TableCell>
-                                    <TableCell className="p-4 align-middle text-sm font-medium text-foreground text-right">{formatCurrency(asset.value)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-center">
+                                    <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-left">{asset.room}</TableCell>
+                                    <TableCell className="px-4 py-3 align-middle text-sm font-normal text-foreground">
+                                        <CurrencyCell value={asset.value} />
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3 align-middle text-center">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -263,11 +282,15 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                                             <QrCode size={16} />
                                         </button>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-center">
+                                    <TableCell className="px-4 py-3 align-middle text-center">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                archiveAssetMutation.mutate(asset.id);
+                                                if (asset.status === 'Archived') {
+                                                    restoreAssetMutation.mutate(asset.id);
+                                                } else {
+                                                    archiveAssetMutation.mutate(asset.id);
+                                                }
                                             }}
                                             className={`p-1.5 rounded-md transition-colors inline-flex items-center justify-center ${asset.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
                                             title={asset.status === 'Archived' ? 'Restore' : 'Archive'}
@@ -276,14 +299,15 @@ export function AssetTable({ onAssetClick }: AssetTableProps) {
                                         </button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                            )}
                         </TableBody>
                     </Table>
                 </div>
 
                 {/* Pagination Footer */}
                 <div className="p-4 border-t border-border flex items-center justify-between bg-muted/20">
-                    <div className="text-xs text-muted-foreground font-medium">
+                    <div className="text-xs text-muted-foreground font-normal">
                         Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedAssets.length)} of {sortedAssets.length}
                     </div>
                     <div className="flex gap-2">

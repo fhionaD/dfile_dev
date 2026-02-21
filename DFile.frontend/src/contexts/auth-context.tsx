@@ -36,10 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setIsLoggedIn(true);
 
                     // 2. Validate with Backend
-                    let apiBase = process.env.NEXT_PUBLIC_API_URL;
-                    if (apiBase === undefined) {
-                        apiBase = 'http://localhost:5090';
-                    }
+                    let apiBase = process.env.NEXT_PUBLIC_API_URL || '';
                     const res = await fetch(`${apiBase}/api/auth/me`, {
                         headers: { Authorization: `Bearer ${storedToken}` }
                     });
@@ -64,13 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = async (email: string, password: string) => {
-        // Ensure strictly no trailing slash issues or double slashes
-        // For local development, fallback to localhost:5090.
-        // For Production (where env var is empty string), use relative path.
+        // Use relative paths when API_URL is empty (backend serves frontend and API)
+        // For separate deployment, set NEXT_PUBLIC_API_URL to backend origin
+        // Fallback for local development if environment variable is missing
         let apiBase = process.env.NEXT_PUBLIC_API_URL;
-        if (apiBase === undefined) {
-             apiBase = 'http://localhost:5090';
+        if (!apiBase && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+             apiBase = 'http://localhost:5090'; // Default backend port
         }
+        apiBase = apiBase || '';
         
         const targetUrl = `${apiBase}/api/auth/login`.replace(/([^:]\/)\/+/g, "$1"); // Remove double slashes
 

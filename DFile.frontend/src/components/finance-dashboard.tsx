@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TrendingDown, TrendingUp, AlertTriangle, Building2, Calendar, DollarSign, Package, PieChart, Info, Download, ArrowUpRight } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, Building2, Calendar, PhilippinePeso, Package, PieChart, Info, Download, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -124,13 +124,19 @@ export function FinanceDashboard() {
 
     return (
         <div className="space-y-6">
+            <div className="mb-4">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                    Dashboard
+                </h1>
+            </div>
+
             {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
+                <div className="bg-card  border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
                     <div className="flex justify-between items-start">
                         <p className="text-sm font-medium text-muted-foreground">Portfolio Value</p>
                         <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-600">
-                             <DollarSign size={18} />
+                             <PhilippinePeso size={18} />
                         </div>
                     </div>
                     <div>
@@ -141,7 +147,7 @@ export function FinanceDashboard() {
                     </div>
                 </div>
 
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
+                <div className="bg-card  border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
                     <div className="flex justify-between items-start">
                         <p className="text-sm font-medium text-muted-foreground">Monthly Depreciation</p>
                         <div className="p-2 bg-amber-500/10 rounded-lg text-amber-600">
@@ -156,7 +162,7 @@ export function FinanceDashboard() {
                     </div>
                 </div>
                  
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
+                <div className="bg-card  border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
                     <div className="flex justify-between items-start">
                         <p className="text-sm font-medium text-muted-foreground">YTD Spend</p>
                         <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
@@ -171,7 +177,7 @@ export function FinanceDashboard() {
                     </div>
                 </div>
 
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
+                <div className="bg-card  border border-border p-4 shadow-sm flex flex-col justify-between space-y-2">
                     <div className="flex justify-between items-start">
                         <p className="text-sm font-medium text-muted-foreground">Top Cost Center</p>
                         <div className="p-2 bg-purple-500/10 rounded-lg text-purple-600">
@@ -189,7 +195,7 @@ export function FinanceDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Cost Distribution */}
-                <Card className="border-border rounded-xl shadow-sm">
+                <Card className="border-border  shadow-sm">
                     <CardHeader className="border-b border-border bg-muted/40 py-4 px-6 rounded-t-xl">
                         <CardTitle className="text-base font-semibold">Cost by Room / Location</CardTitle>
                     </CardHeader>
@@ -209,7 +215,7 @@ export function FinanceDashboard() {
                 </Card>
 
                  {/* Vendor Spend */}
-                <Card className="border-border rounded-xl shadow-sm">
+                <Card className="border-border  shadow-sm">
                     <CardHeader className="border-b border-border bg-muted/40 py-4 px-6 rounded-t-xl">
                          <CardTitle className="text-base font-semibold">Top Vendor Spend</CardTitle>
                     </CardHeader>

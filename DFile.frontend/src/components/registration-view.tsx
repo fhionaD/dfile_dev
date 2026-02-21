@@ -41,12 +41,12 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
 
                         <div className="flex gap-2 w-full sm:w-auto">
                             {onManageCategories && (
-                                <Button variant="outline" onClick={onManageCategories} className="h-10 text-sm flex-1 sm:flex-none">
+                                <Button variant="outline" onClick={onManageCategories} className="h-10 text-sm flex-1 sm:flex-none rounded-md">
                                     <LayoutGrid size={16} className="mr-2" />
                                     Manage Categories
                                 </Button>
                             )}
-                            <Button onClick={onRegister} className="h-10 text-sm bg-primary text-primary-foreground shadow-sm flex-1 sm:flex-none">
+                            <Button onClick={onRegister} className="h-10 text-sm bg-primary text-primary-foreground shadow-sm flex-1 sm:flex-none rounded-md">
                                 <Plus size={16} className="mr-2" />
                                 Register Asset
                             </Button>
@@ -61,7 +61,7 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
                     <TabsContent value="tagging" className="mt-0">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="md:col-span-2">
-                                <Card className="border-border rounded-xl shadow-sm h-full">
+                                <Card className="border-border  shadow-sm h-full">
                                     <CardHeader className="border-b border-border bg-muted/40 px-6 py-4 rounded-t-xl">
                                         <div className="flex items-center gap-2">
                                             <div className="p-2 bg-primary/10 rounded-lg">
@@ -96,7 +96,7 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
                                             </div>
 
                                             {selectedAsset && (
-                                                <div className="p-4 bg-muted/20 rounded-xl border border-border/50 space-y-4">
+                                                <div className="p-4 bg-muted/20  border border-border/50 space-y-4">
                                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                                         <div>
                                                             <span className="text-muted-foreground block text-xs uppercase tracking-wider mb-1">Category</span>
@@ -120,14 +120,14 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
 
                             {/* Preview Panel */}
                             <div className="md:col-span-1">
-                                <Card className="border-border rounded-xl shadow-sm h-full flex flex-col">
+                                <Card className="border-border  shadow-sm h-full flex flex-col">
                                     <CardHeader className="border-b border-border bg-muted/40 px-6 py-4 rounded-t-xl">
                                          <CardTitle className="text-base font-semibold">Tag Preview</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-6">
                                         {selectedAsset ? (
                                             <>
-                                                <div className="bg-white p-4 rounded-xl border shadow-sm">
+                                                <div className="bg-white p-4  border shadow-sm">
                                                     <QRCodeSVG
                                                         value={JSON.stringify({ id: selectedAsset.id, name: selectedAsset.desc })}
                                                         size={160}

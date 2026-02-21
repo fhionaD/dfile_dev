@@ -95,7 +95,7 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
             <DialogContent className="max-w-xl rounded-2xl border-border p-0 overflow-hidden flex flex-col">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><DoorOpen size={20} /></div>
+                        <div className="p-3 bg-primary/10  text-primary"><DoorOpen size={20} /></div>
                         <div>
                             <DialogTitle className="text-lg font-semibold text-foreground">
                                 {isEditing ? (initialData ? "Edit Room Details" : "Create Room Unit") : "Room Details"}
@@ -110,7 +110,7 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
                 <form id="room-form" onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
                     <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                            <Building2 size={12} /> Room Number
+                            <Building2 size={12} /> Room Number <span className="text-destructive">*</span>
                         </Label>
                             {isEditing ? (
                             <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Room 12" className="h-10 bg-background text-sm" />
@@ -121,7 +121,7 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
                     
                     <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                            <Layers size={12} /> Category / Classification
+                            <Layers size={12} /> Category / Classification <span className="text-destructive">*</span>
                         </Label>
                             {isEditing ? (
                             <Select value={formData.categoryId} onValueChange={handleCategoryChange}>
@@ -150,7 +150,7 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
 
                     <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                            <Building2 size={12} /> Floor / Level
+                            <Building2 size={12} /> Floor / Level <span className="text-destructive">*</span>
                         </Label>
                         {isEditing ? (
                             <Input 
@@ -199,19 +199,19 @@ export function RoomModal({ open, onOpenChange, roomCategories, onSave, initialD
                     <div className="flex gap-3">
                         {isEditing ? (
                             <>
-                                <Button type="button" variant="outline" onClick={handleCancel} className="rounded-xl">
+                                <Button type="button" variant="outline" onClick={handleCancel} className="h-10 text-sm">
                                     Cancel
                                 </Button>
-                                <Button type="submit" form="room-form" className="rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                                <Button type="submit" form="room-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                                     {initialData ? "Save Changes" : "Initialize Unit"}
                                 </Button>
                             </>
                         ) : (
                             <>
-                                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+                                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                                     Close
                                 </Button>
-                                <Button type="button" onClick={() => setIsEditing(true)} className="rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                                <Button type="button" onClick={() => setIsEditing(true)} className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                                     Edit Details
                                 </Button>
                             </>

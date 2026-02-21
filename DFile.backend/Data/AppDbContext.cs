@@ -15,5 +15,6 @@ namespace DFile.backend.Data
         public DbSet<Tenant> Tenants { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<RoomCategory> RoomCategories { get; set; }
+        public DbSet<AssetCategory> AssetCategories { get; set; }
     }
 }

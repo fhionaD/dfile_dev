@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DFile.backend.Models
 {
@@ -14,7 +15,11 @@ namespace DFile.backend.Models
         
         public string Floor { get; set; } = string.Empty;
         
-        public string CategoryId { get; set; } = string.Empty;
+        // Navigation property
+        [ForeignKey("CategoryId")]
+        public RoomCategory? RoomCategory { get; set; }
+        
+        public string? CategoryId { get; set; }
         
         public string Status { get; set; } = "Available"; // Available, Occupied, Maintenance
         

@@ -29,7 +29,7 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
             <DialogContent className="max-w-xl rounded-2xl border-border p-0 overflow-hidden flex flex-col">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><ShieldAlert size={20} /></div>
+                        <div className="p-3 bg-primary/10  text-primary"><ShieldAlert size={20} /></div>
                         <div>
                             <DialogTitle className="text-lg font-semibold text-foreground">Define Personnel Role</DialogTitle>
                             <DialogDescription className="text-muted-foreground text-xs mt-1">Permission Hierarchy Configuration</DialogDescription>
@@ -41,13 +41,13 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Briefcase size={12} /> Role Designation
+                                <Briefcase size={12} /> Role Designation <span className="text-destructive">*</span>
                             </Label>
                             <Input required value={roleData.designation} onChange={(e) => setRoleData({ ...roleData, designation: e.target.value })} placeholder="e.g. Senior Fleet Technician" className="h-10 bg-background text-sm" />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Layers size={12} /> Department
+                                <Layers size={12} /> Department <span className="text-destructive">*</span>
                             </Label>
                             <Input required value={roleData.department} onChange={(e) => setRoleData({ ...roleData, department: e.target.value })} placeholder="e.g. Logistics & Supply" className="h-10 bg-background text-sm" />
                         </div>
@@ -61,11 +61,11 @@ export function CreateRoleModal({ open, onOpenChange, onSave }: CreateRoleModalP
                     </div>
                 </form>
 
-                <DialogFooter className="gap-3 p-6 bg-muted/40 border-t border-border shrink-0">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                         Cancel
                     </Button>
-                    <Button type="submit" form="role-form" className="flex-2 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button type="submit" form="role-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Deploy Role
                     </Button>
                 </DialogFooter>

@@ -54,24 +54,20 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-// Configure the HTTP request pipeline.
 // Enable Swagger in all environments for debugging
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// app.UseHttpsRedirection(); // Disabled for troubleshooting 404s on HTTP host
-app.UseDefaultFiles(); // Serve index.html for /
-app.UseStaticFiles(); // Serve frontend files from wwwroot
+// CORS must be before controllers
 app.UseCors("AllowAll");
 
-app.MapGet("/debug", () => Results.Ok($"App Running. Env: {app.Environment.EnvironmentName}"));
-
-
+// Authentication & Authorization must come before MapControllers
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Map all API routes and health checks FIRST (before static files)
+app.MapGet("/debug", () => Results.Ok($"App Running. Env: {app.Environment.EnvironmentName}"));
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
-
 app.MapGet("/api/db-test", (AppDbContext db) => 
 {
     try
@@ -91,9 +87,15 @@ app.MapGet("/api/db-test", (AppDbContext db) =>
     }
 });
 
+// Map controllers (API routes from AuthController, etc.)
 app.MapControllers();
 
-// Add this immediately after MapControllers
+// app.UseHttpsRedirection(); // Disabled for troubleshooting 404s on HTTP host
+// Only then serve static files and fallback for SPA
+app.UseDefaultFiles(); // Serve index.html for /
+app.UseStaticFiles(); // Serve frontend files from wwwroot
+
+// Map fallback only for non-API, non-swagger routes (SPA routing)
 app.MapFallbackToFile("index.html");
 
 // Seed Database

@@ -7,7 +7,7 @@ export function useRooms() {
     return useQuery({
         queryKey: ['rooms'],
         queryFn: async () => {
-            const { data } = await api.get<Room[]>('/Rooms');
+            const { data } = await api.get<Room[]>('/api/Rooms');
             return data;
         },
     });
@@ -15,9 +15,10 @@ export function useRooms() {
 
 export function useRoomCategories() {
     return useQuery({
-        queryKey: ['room-categories'],
+        queryKey: ['room-categories', 'all'],
         queryFn: async () => {
-            const { data } = await api.get<RoomCategory[]>('/RoomCategories');
+            // Fetch all categories including archived ones so management modal works correctly
+            const { data } = await api.get<RoomCategory[]>('/api/RoomCategories?includeArchived=true');
             return data;
         },
     });
@@ -28,7 +29,7 @@ export function useAddRoom() {
 
     return useMutation({
         mutationFn: async (room: Partial<Room>) => {
-            const { data } = await api.post<Room>('/Rooms', room);
+            const { data } = await api.post<Room>('/api/Rooms', room);
             return data;
         },
         onSuccess: () => {
@@ -47,7 +48,7 @@ export function useUpdateRoom() {
 
     return useMutation({
         mutationFn: async (room: Room) => {
-            const { data } = await api.put<Room>(`/Rooms/${room.id}`, room);
+            const { data } = await api.put<Room>(`/api/Rooms/${room.id}`, room);
             return data;
         },
         onSuccess: () => {
@@ -71,7 +72,7 @@ export function useArchiveRoom() {
                 archived: !room.archived, 
                 status: !room.archived ? "Deactivated" : "Available" 
             };
-            const { data } = await api.put<Room>(`/Rooms/${room.id}`, updatedRoom);
+            const { data } = await api.put<Room>(`/api/Rooms/${room.id}`, updatedRoom);
             return data;
         },
         onSuccess: () => {
@@ -90,7 +91,7 @@ export function useAddRoomCategory() {
 
     return useMutation({
         mutationFn: async (category: Partial<RoomCategory>) => {
-            const { data } = await api.post<RoomCategory>('/RoomCategories', category);
+            const { data } = await api.post<RoomCategory>('/api/RoomCategories', category);
             return data;
         },
         onSuccess: () => {
@@ -109,7 +110,7 @@ export function useUpdateRoomCategory() {
 
     return useMutation({
         mutationFn: async (category: RoomCategory) => {
-            const { data } = await api.put<RoomCategory>(`/RoomCategories/${category.id}`, category);
+            const { data } = await api.put<RoomCategory>(`/api/RoomCategories/${category.id}`, category);
             return data;
         },
         onSuccess: () => {
@@ -133,7 +134,7 @@ export function useArchiveRoomCategory() {
                 archived: !category.archived, 
                 status: !category.archived ? "Archived" : "Active" 
             };
-            const { data } = await api.put<RoomCategory>(`/RoomCategories/${category.id}`, updatedCategory);
+            const { data } = await api.put<RoomCategory>(`/api/RoomCategories/${category.id}`, updatedCategory);
             return data;
         },
         onSuccess: () => {

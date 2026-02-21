@@ -114,42 +114,44 @@ export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCate
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <Button 
-                        variant="outline" 
-                        onClick={() => setShowArchived(!showArchived)}
-                        size="sm"
-                        className="h-10 text-sm"
-                    >
-                         {showArchived ? (
-                            <><RotateCcw size={16} className="mr-2" /> Show Active ({activeRoomsCount})</>
-                        ) : (
-                            <><Archive size={16} className="mr-2" /> Show Archived ({archivedRoomsCount})</>
-                        )}
-                    </Button>
-                    <Button variant="outline" onClick={onManageCategories} size="sm" className="hidden sm:flex h-10 text-sm">
-                        <Layers size={16} className="mr-2" />
-                        Manage Categories
-                    </Button>
+                    {!showArchived && (
+                        <Button variant="outline" onClick={onManageCategories} size="sm" className="hidden sm:flex h-10 text-sm">
+                            <Layers size={16} className="mr-2" />
+                            Manage Categories
+                        </Button>
+                    )}
                     {!showArchived && (
                         <Button onClick={onCreateRoom} size="sm" className="h-10 text-sm bg-primary text-primary-foreground shadow-sm">
                             <Plus size={16} className="mr-2" />
                             Create Unit
                         </Button>
                     )}
+                    <Button
+                        variant={showArchived ? "default" : "outline"}
+                        onClick={() => setShowArchived(!showArchived)}
+                        size="sm"
+                        className="h-10 text-sm w-[160px] justify-start"
+                    >
+                         {showArchived ? (
+                            <><RotateCcw size={16} className="mr-2" />Show Active ({activeRoomsCount})</>
+                        ) : (
+                            <><Archive size={16} className="mr-2" />Show Archive ({archivedRoomsCount})</>
+                        )}
+                    </Button>
                 </div>
             </div>
 
-            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+            <Card className="border-border shadow-sm  overflow-hidden">
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow className="hover:bg-muted/50 border-border">
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[20%] text-left">Room Number</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[20%] text-left">Category</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[20%] text-left">Sub-category</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[20%] text-left">Floor</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[20%] text-center">Actions</TableHead>
+                        <Table className="w-full table-fixed">
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
+                                    <TableHead className="px-4 py-3 align-middle font-medium text-muted-foreground w-[20%] text-left">Room Number</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle font-medium text-muted-foreground w-[20%] text-left">Category</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle font-medium text-muted-foreground w-[20%] text-left">Sub-category</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle font-medium text-muted-foreground w-[20%] text-left">Floor</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle font-medium text-muted-foreground w-[20%] text-center">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -165,29 +167,29 @@ export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCate
                                         return (
                                             <TableRow
                                                 key={room.id}
-                                                className="border-border hover:bg-muted/5 transition-colors cursor-pointer"
+                                                className="hover:bg-muted/5 transition-colors cursor-pointer border-b border-border last:border-0"
                                                 onClick={() => handleRowClick(room)}
                                             >
-                                                <TableCell className="p-4 align-middle text-sm font-medium text-foreground text-left w-[20%]">
+                                                <TableCell className="px-4 py-3 align-middle text-sm font-medium text-foreground text-left w-[20%]">
                                                     <div className="flex flex-col">
                                                         <span>{room.name || "—"}</span>
                                                         <span className="text-xs text-muted-foreground font-normal">#{room.unitId}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-left text-sm text-foreground w-[20%]">
+                                                <TableCell className="px-4 py-3 align-middle text-left text-sm text-foreground w-[20%]">
                                                     <div className="flex items-center justify-start gap-2">
                                                         {category?.name || "—"}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-left text-sm text-muted-foreground w-[20%]">
+                                                <TableCell className="px-4 py-3 align-middle text-left text-sm text-muted-foreground w-[20%]">
                                                     {category?.subCategory || "—"}
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-left text-sm text-muted-foreground w-[20%]">
+                                                <TableCell className="px-4 py-3 align-middle text-left text-sm text-muted-foreground w-[20%]">
                                                     <div className="flex items-center justify-start gap-2">
                                                         {room.floor}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-center w-[20%]">
+                                                <TableCell className="px-4 py-3 align-middle text-center w-[20%]">
                                                     <div className="flex items-center justify-center">
                                                         <Button
                                                             variant="ghost"

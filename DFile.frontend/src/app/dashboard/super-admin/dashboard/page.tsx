@@ -26,138 +26,74 @@ export default function SuperAdminDashboard() {
     }
 
     return (
-        <div className="space-y-8">
-            {/* TOP BAR */}
-            <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                            <ShieldAlert className="h-4 w-4" />
-                        </span>
-                        Super Admin Control Panel
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Configure tenants, roles, and global settings across the entire platform.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="gap-2 px-3 py-1">
-                        <Shield className="h-3 w-3" />
-                        <span className="text-xs font-medium uppercase tracking-wide">
-                            {user.role}
-                        </span>
-                    </Badge>
-                    <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Signed in as</p>
-                        <p className="text-sm font-medium truncate max-w-[180px]">
-                            {(user as any).email ?? user.name ?? "Root Account"}
-                        </p>
-                    </div>
-                </div>
-            </header>
-
+        <div className="space-y-6">
+            
             {/* QUICK ACTIONS / STATS */}
             <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* Create Tenant CTA */}
                 <Card
-                    className="relative overflow-hidden cursor-pointer border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background hover:shadow-md transition-all"
+                    className="relative overflow-hidden cursor-pointer border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background hover:shadow-md transition-all pt-2"
                     onClick={() => router.push("/dashboard/super-admin/create-tenant")}
                 >
                     <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/10" />
-                    <CardHeader className="relative z-10 flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="relative z-10 flex flex-row items-center justify-between space-y-0 pb-2 px-6">
                         <CardTitle className="text-sm font-medium">Create Tenant</CardTitle>
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shrink-0">
                             <Building2 className="h-4 w-4" />
                         </span>
                     </CardHeader>
-                    <CardContent className="relative z-10 space-y-1">
+                    <CardContent className="relative z-10 space-y-1 px-6 pb-6">
                         <div className="text-2xl font-bold text-primary">+ New Organization</div>
-                        <p className="text-xs text-muted-foreground">
-                            Onboard a new tenant and assign a subscription plan.
-                        </p>
                     </CardContent>
                 </Card>
 
                 {/* Roles */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="space-y-1">
-                            <CardTitle className="text-sm font-medium">System Role Management</CardTitle>
-                            <CardDescription className="text-xs">
-                                Define what each role can see and do across modules.
-                            </CardDescription>
-                        </div>
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                <Card className="pt-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6">
+                        <CardTitle className="text-sm font-medium">System Role Management</CardTitle>
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                             <Users className="h-4 w-4 text-muted-foreground" />
                         </span>
                     </CardHeader>
-                    <CardContent className="space-y-1">
+                    <CardContent className="space-y-1 px-6 pb-6">
                         <div className="text-2xl font-bold">4 Roles</div>
-                        <p className="text-xs text-muted-foreground">
-                            Super Admin, Tenant Admin, Finance, Maintenance.
-                        </p>
                     </CardContent>
                 </Card>
 
                 {/* System Health */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="space-y-1">
-                            <CardTitle className="text-sm font-medium">System Health</CardTitle>
-                            <CardDescription className="text-xs">
-                                Overall uptime and service availability.
-                            </CardDescription>
-                        </div>
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                <Card className="pt-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6">
+                        <CardTitle className="text-sm font-medium">System Health</CardTitle>
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                             <Activity className="h-4 w-4 text-emerald-500" />
                         </span>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 px-6 pb-6">
                         <div className="text-2xl font-bold text-emerald-500">98.2%</div>
                         <div className="h-1.5 w-full rounded-full bg-muted">
                             <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: "98%" }} />
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Last 30 days of monitored uptime.
-                        </p>
                     </CardContent>
                 </Card>
 
                 {/* Global Settings */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <div className="space-y-1">
-                            <CardTitle className="text-sm font-medium">Global Settings</CardTitle>
-                            <CardDescription className="text-xs">
-                                High-level parameters affecting all tenants.
-                            </CardDescription>
-                        </div>
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                <Card className="pt-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6">
+                        <CardTitle className="text-sm font-medium">Global Settings</CardTitle>
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                             <Settings className="h-4 w-4 text-muted-foreground" />
                         </span>
                     </CardHeader>
-                    <CardContent className="space-y-2">
+                    <CardContent className="space-y-2 px-6 pb-6">
                         <div className="text-2xl font-bold">Config</div>
-                        <div className="flex flex-wrap gap-1">
-                            <Badge variant="outline" className="text-[10px] font-normal">
-                                Billing & Plans
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px] font-normal">
-                                Security
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px] font-normal">
-                                Branding
-                            </Badge>
-                        </div>
                     </CardContent>
                 </Card>
             </section>
 
-            {/* LOWER GRID: AUDIT LOGS + SECURITY SNAPSHOT */}
+            {/* LOWER GRID: AUDIT LOGS */}
             <section className="grid gap-4 lg:grid-cols-3">
                 {/* Audit Logs */}
-                <Card className="lg:col-span-2">
+                <Card className="lg:col-span-3">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                         <div>
                             <CardTitle className="text-base font-semibold">Recent Audit Logs</CardTitle>
@@ -199,43 +135,6 @@ export default function SuperAdminDashboard() {
                                     2 hours ago
                                 </span>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Security / Governance Snapshot */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base font-semibold">Security & Governance</CardTitle>
-                        <CardDescription className="text-xs">
-                            High-level policies enforced by the Super Admin layer.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-xs text-muted-foreground">
-                        <div className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                            <p>
-                                Role-based access control with clearly separated Super Admin and tenant-level
-                                permissions.
-                            </p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                            <p>
-                                Centralized configuration for subscription plans, tenant limits, and feature toggles.
-                            </p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                            <p>
-                                Regular backups and change tracking through audit logs for compliance and recovery.
-                            </p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                            <p>
-                                Scoped access for Finance and Maintenance managers within each tenant boundary.
-                            </p>
                         </div>
                     </CardContent>
                 </Card>

@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
+import { CurrencyCell } from "@/components/ui/currency-cell";
+import { CurrencyHeader } from "@/components/ui/currency-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Asset } from "@/types/asset";
 import { cn } from "@/lib/utils";
@@ -149,7 +151,7 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
     const uniqueCategories = useMemo(() => Array.from(new Set(assets.map(a => a.cat).filter(Boolean))), [assets]);
 
     // Format Currency
-    const fmt = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(val);
+    const fmt = (val: number) => new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 
 
     if (isLoading) return (
@@ -231,24 +233,24 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                 </div>
             </div>
 
-            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+            <Card className="border-border shadow-sm  overflow-hidden">
                 <CardContent className="p-0">
                 {/* Content View */}
                 {viewMode === "assets" ? (
                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow className="hover:bg-muted/50 border-border">
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[200px] text-left">Asset Details</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Purchased</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Cost Basis</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Life (Yrs)</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Monthly Depr.</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Accum. Depr.</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-bold text-emerald-600 text-right">Book Value</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Remaining</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">End Date</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Status</TableHead>
+                        <Table className="w-full table-fixed">
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-left w-[20%]">Asset Details</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">Purchased</TableHead>
+                                    <CurrencyHeader className="w-[100px]">Cost Basis</CurrencyHeader>
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Life (Yrs)</TableHead>
+                                    <CurrencyHeader className="w-[120px]">Monthly Depr.</CurrencyHeader>
+                                    <CurrencyHeader className="w-[120px]">Accum. Depr.</CurrencyHeader>
+                                    <CurrencyHeader className="w-[120px]">Book Value</CurrencyHeader>
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Remaining</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">End Date</TableHead>
+                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[140px]">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -260,34 +262,42 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                                     </TableRow>
                                 ) : (
                                     filteredAssets.map(asset => (
-                                        <TableRow key={asset.id} className="hover:bg-muted/5 cursor-pointer border-border" onClick={() => onAssetClick?.(asset)}>
-                                            <TableCell className="p-4 align-middle text-left">
-                                                <div className="font-medium text-sm text-foreground">{asset.desc}</div>
+                                        <TableRow key={asset.id} className="hover:bg-muted/5 transition-colors cursor-pointer border-b border-border last:border-0" onClick={() => onAssetClick?.(asset)}>
+                                            <TableCell className="px-4 py-3 align-middle text-left">
+                                                <div className="font-normal text-sm text-foreground truncate max-w-[200px]" title={asset.desc}>{asset.desc}</div>
                                                 <div className="text-xs text-muted-foreground flex items-center gap-1">
                                                     <span className="font-mono">{asset.id}</span> • {asset.room || "Unassigned"}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="p-4 align-middle text-sm text-muted-foreground text-left">{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "—"}</TableCell>
-                                            <TableCell className="p-4 align-middle text-right text-sm font-medium">{fmt(asset.cost)}</TableCell>
-                                            <TableCell className="p-4 align-middle text-left text-sm text-muted-foreground">{asset.usefulLifeYears}</TableCell>
-                                            <TableCell className="p-4 align-middle text-right text-sm">{fmt(asset.monthlyDepreciation)}</TableCell>
-                                            <TableCell className="p-4 align-middle text-right text-sm text-muted-foreground">{fmt(asset.accumulatedDepreciation)}</TableCell>
-                                            <TableCell className="p-4 align-middle text-right text-sm font-bold text-foreground">{fmt(asset.currentBookValue)}</TableCell>
-                                            <TableCell className="p-4 align-middle text-left text-sm">
-                                                 <Badge variant="outline" className={cn("font-mono font-normal text-xs rounded-none bg-transparent", asset.isNearEndOfLife ? "text-red-600 border-red-200" : "")}>
-                                                    {asset.remainingYears}
-                                                </Badge>
+                                            <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-center whitespace-nowrap">{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "—"}</TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal">
+                                                <CurrencyCell value={asset.cost} />
                                             </TableCell>
-                                            <TableCell className="p-4 align-middle text-left text-xs text-muted-foreground">
+                                            <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground">{asset.usefulLifeYears}</TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-right text-sm">
+                                                <CurrencyCell value={asset.monthlyDepreciation} />
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-right text-sm text-muted-foreground">
+                                                <CurrencyCell value={asset.accumulatedDepreciation} className="text-muted-foreground" />
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal text-foreground">
+                                                <CurrencyCell value={asset.currentBookValue} />
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-center text-sm">
+                                                 <span className={cn("font-mono font-normal text-xs inline-flex", asset.isNearEndOfLife ? "text-red-600" : "text-muted-foreground")}>
+                                                    {asset.remainingYears}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground whitespace-nowrap">
                                                 {asset.endDate.toLocaleDateString()}
                                             </TableCell>
-                                            <TableCell className="p-4 align-middle text-left">
+                                            <TableCell className="px-4 py-3 align-middle text-center">
                                                 {asset.isFullyDepreciated ? (
-                                                    <Badge variant="outline" className="text-muted-foreground text-[10px] rounded-none border-0 bg-transparent">Fully Depreciated</Badge>
+                                                    <span className="text-muted-foreground text-sm whitespace-nowrap inline-flex">Fully Depreciated</span>
                                                 ) : asset.isNearEndOfLife ? (
-                                                    <Badge variant="outline" className="text-[10px] text-destructive border-0 rounded-none bg-transparent">Expiring Soon</Badge>
+                                                    <span className="text-sm text-destructive whitespace-nowrap inline-flex">Expiring Soon</span>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-emerald-600 border-0 text-[10px] rounded-none bg-transparent">Depreciating</Badge>
+                                                    <span className="text-emerald-600 text-sm whitespace-nowrap inline-flex">Depreciating</span>
                                                 )}
                                             </TableCell>
                                         </TableRow>
@@ -296,7 +306,7 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                             </TableBody>
                         </Table>
                          <div className="p-4 border-t border-border bg-muted/5 flex items-center justify-between">
-                            <div className="text-xs text-muted-foreground font-medium">
+                            <div className="text-xs text-muted-foreground font-normal">
                                 Showing {filteredAssets.length} assets
                             </div>
                         </div>
@@ -305,42 +315,42 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                     <div className="overflow-x-auto">
                      <Table>
                         <TableHeader className="bg-muted/50">
-                            <TableRow className="hover:bg-muted/50 border-border">
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[200px] text-left">Room / Location</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Total Assets</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Total Initial Cost</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-bold text-emerald-600 text-right">Current Book Value</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Monthly Depreciation Exposure</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-left">Fully Depreciated Assets</TableHead>
-                                <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Value Retention</TableHead>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[20%] text-left">Room / Location</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Total Assets</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Total Initial Cost</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Current Book Value</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Monthly Exposure</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Fully Depreciated</TableHead>
+                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Value Retention</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                              {roomDepreciationData.map(room => (
-                                <TableRow key={room.name} className="hover:bg-muted/5 border-border">
-                                    <TableCell className="p-4 align-middle font-medium text-left">
+                                <TableRow key={room.name} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="p-4 align-middle text-left">
                                         <div className="flex items-center gap-2">
                                             <Building2 className="w-4 h-4 text-muted-foreground" />
-                                            {room.name}
+                                            <span className="truncate max-w-[150px] font-normal text-sm text-foreground" title={room.name}>{room.name}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-left text-sm">{room.totalAssets}</TableCell>
-                                    <TableCell className="p-4 align-middle text-right text-sm">{fmt(room.totalCost)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-right text-sm font-bold text-foreground">{fmt(room.totalBookValue)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-right text-sm text-red-600 font-medium">-{fmt(room.monthlyDepreciation)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-left text-sm">
+                                    <TableCell className="p-4 align-middle text-center text-sm font-normal">{room.totalAssets}</TableCell>
+                                    <TableCell className="p-4 align-middle text-left text-sm font-normal">{fmt(room.totalCost)}</TableCell>
+                                    <TableCell className="p-4 align-middle text-left text-sm font-normal text-foreground">{fmt(room.totalBookValue)}</TableCell>
+                                    <TableCell className="p-4 align-middle text-left text-sm text-red-600 font-normal">-{fmt(room.monthlyDepreciation)}</TableCell>
+                                    <TableCell className="p-4 align-middle text-center text-sm">
                                         {room.fullyDepreciatedCount > 0 ? (
-                                             <Badge variant="secondary">{room.fullyDepreciatedCount}</Badge>
+                                             <span className="text-sm font-normal text-foreground">{room.fullyDepreciatedCount}</span>
                                         ) : (
                                             <span className="text-muted-foreground">-</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-right text-sm">
-                                        <div className="flex items-center justify-end gap-2">
-                                             <span className="text-xs text-muted-foreground">
-                                                {room.totalCost > 0 ? ((room.totalBookValue / room.totalCost) * 100).toFixed(1) : 0}%
+                                    <TableCell className="p-4 align-middle text-left text-sm">
+                                        <div className="flex items-center justify-start gap-3">
+                                             <span className="text-xs text-muted-foreground w-12 text-left">
+                                                {room.totalCost > 0 ? ((room.totalBookValue / room.totalCost) * 100).toFixed(1) : "0.0"}%
                                             </span>
-                                            <Progress value={room.totalCost > 0 ? (room.totalBookValue / room.totalCost) * 100 : 0} className="w-16 h-1.5" />
+                                            <Progress value={room.totalCost > 0 ? (room.totalBookValue / room.totalCost) * 100 : 0} className="w-20 h-2" />
                                         </div>
                                     </TableCell>
                                 </TableRow>

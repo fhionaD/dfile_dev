@@ -54,7 +54,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
             <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                        <div key={i} className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                             <div className="space-y-2">
                                 <Skeleton className="h-4 w-24" />
                                 <Skeleton className="h-8 w-12" />
@@ -63,7 +63,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </div>
                     ))}
                 </div>
-                <div className="rounded-xl border border-border overflow-hidden bg-card p-6 space-y-4">
+                <div className=" border border-border overflow-hidden bg-card p-6 space-y-4">
                     <Skeleton className="h-8 w-48" />
                     <Skeleton className="h-10 w-full" />
                     <div className="space-y-2">
@@ -173,7 +173,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         <div className="space-y-6">
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Open Requests</p>
@@ -185,7 +185,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </CardContent>
                 </Card>
                 
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Overdue</p>
@@ -197,7 +197,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">In Repair</p>
@@ -209,7 +209,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Attention Needed</p>
@@ -221,7 +221,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Scheduled (Week)</p>
@@ -233,7 +233,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-xl border-border shadow-sm">
+                <Card className=" border-border shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
@@ -302,14 +302,6 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <Button 
-                        variant={showArchived ? "default" : "outline"} 
-                        size="sm" 
-                        className="text-sm h-10" 
-                        onClick={() => setShowArchived(!showArchived)}
-                    >
-                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active View</> : <><Archive size={16} className="mr-2" />Archived</>}
-                    </Button>
-                    <Button 
                         onClick={() => setIsCreateModalOpen(true)} 
                         size="sm" 
                         className="text-sm h-10 bg-primary text-primary-foreground shadow-sm"
@@ -317,22 +309,30 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         <Plus size={16} className="mr-2" />
                         Create Request
                     </Button>
+                    <Button 
+                        variant={showArchived ? "default" : "outline"} 
+                        size="sm" 
+                        className="text-sm h-10" 
+                        onClick={() => setShowArchived(!showArchived)}
+                    >
+                        {showArchived ? <><RotateCcw size={16} className="mr-2" />Active View</> : <><Archive size={16} className="mr-2" />Archived</>}
+                    </Button>
                 </div>
             </div>
 
             {/* Main Content Card */}
-            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+            <Card className="border-border shadow-sm  overflow-hidden">
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
 
-                    <Table>
+                    <Table className="w-full table-fixed">
                         <TableHeader>
-                            <TableRow className="hover:bg-muted/50 bg-muted/50 border-b border-border">
-                                        <TableHead className="w-[100px] h-10 px-4 text-center align-middle font-medium text-muted-foreground">ID</TableHead>
-                                        <TableHead className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Asset / Description</TableHead>
-                                        <TableHead className="text-center w-[100px] h-10 px-4 align-middle font-medium text-muted-foreground">Status</TableHead>
-                                        <TableHead className="text-center w-[100px] h-10 px-4 align-middle font-medium text-muted-foreground">Priority</TableHead>
-                                        <TableHead className="text-center w-[120px] h-10 px-4 align-middle font-medium text-muted-foreground">Date</TableHead>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
+                                        <TableHead className="w-[100px] px-4 py-3 text-left align-middle font-medium text-muted-foreground">ID</TableHead>
+                                        <TableHead className="px-4 py-3 text-left align-middle font-medium text-muted-foreground">Asset / Description</TableHead>
+                                        <TableHead className="text-center w-[100px] px-4 py-3 align-middle font-medium text-muted-foreground">Status</TableHead>
+                                        <TableHead className="text-center w-[100px] px-4 py-3 align-middle font-medium text-muted-foreground">Priority</TableHead>
+                                        <TableHead className="text-center w-[120px] px-4 py-3 align-middle font-medium text-muted-foreground">Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -349,27 +349,27 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                         filteredRecords.map((record) => (
                                             <TableRow 
                                                 key={record.id} 
-                                                className="cursor-pointer hover:bg-muted/40 transition-colors group border-b border-border/40 last:border-0"
+                                                className="cursor-pointer hover:bg-muted/5 transition-colors group border-b border-border/40 last:border-0"
                                                 onClick={() => {
                                                     // TODO: Open details modal
                                                     // This needs callback prop
                                                 }}
                                             >
-                                                <TableCell className="p-4 align-middle font-mono text-[11px] text-muted-foreground text-center font-medium group-hover:text-primary transition-colors">
+                                                <TableCell className="px-4 py-3 align-middle font-mono text-[11px] text-muted-foreground text-left font-medium group-hover:text-primary transition-colors">
                                                     {record.id}
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle">
+                                                <TableCell className="px-4 py-3 align-middle text-left">
                                                     <div className="space-y-0.5">
                                                         <span className="text-sm font-medium text-foreground block line-clamp-1">{getAssetName(record.assetId)}</span>
                                                         <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-center">
-                                                     <Badge variant="outline" className={`text-[10px] px-2 py-0.5 h-5 font-medium border rounded-none bg-transparent ${getStatusColor(record.status)}`}>
+                                                <TableCell className="px-4 py-3 align-middle text-center">
+                                                     <Badge variant="outline" className={`text-[10px] px-2 py-0.5 h-5 font-medium border rounded-none bg-transparent inline-flex ${getStatusColor(record.status)}`}>
                                                         {record.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-center">
+                                                <TableCell className="px-4 py-3 align-middle text-center">
                                                     <div className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-medium border ${
                                                         record.priority === 'High' ? 'bg-red-500/10 text-red-700 border-red-500/20' :
                                                         record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700 border-orange-500/20' :
@@ -378,7 +378,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                                        {record.priority!.charAt(0)}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-4 align-middle text-center text-xs text-muted-foreground tabular-nums">
+                                                <TableCell className="px-4 py-3 align-middle text-center text-xs text-muted-foreground tabular-nums">
                                                     {new Date(record.dateReported).toLocaleDateString()}
                                                 </TableCell>
                                             </TableRow>

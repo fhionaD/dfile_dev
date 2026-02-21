@@ -45,7 +45,7 @@ export function TenantList() {
 
     const fetchTenants = async () => {
         try {
-            const res = await fetch('http://localhost:5090/api/tenants');
+            const res = await fetch('/api/tenants');
             if (res.ok) {
                 const data = await res.json();
                 setTenants(data);
@@ -64,7 +64,7 @@ export function TenantList() {
     // Placeholder for status update API call
     const updateTenantStatus = async (id: number, status: string) => {
         try {
-            const res = await fetch(`http://localhost:5090/api/tenants/${id}/status`, {
+            const res = await fetch(`/api/tenants/${id}/status`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -109,8 +109,14 @@ export function TenantList() {
         // Status Filter
         if (statusFilter !== "All" && t.status !== statusFilter) return false;
         
-        // Archive Filter - Hide archived/inactive by default, show if toggled
-        if (!showArchived && (t.status === "Archived" || t.status === "Inactive")) return false;
+        // Archive Filter - Toggle between Active and Archived/Inactive
+        if (showArchived) {
+            // Show ONLY Archived/Inactive
+            if (t.status !== "Archived" && t.status !== "Inactive") return false;
+        } else {
+            // Show ONLY Active (Hide Archived/Inactive)
+            if (t.status === "Archived" || t.status === "Inactive") return false;
+        }
         
         return true;
     });
@@ -162,30 +168,30 @@ export function TenantList() {
                     <Button 
                         variant={showArchived ? "default" : "outline"}
                         size="sm" 
-                        className="text-sm font-medium h-10" 
+                        className="h-10 px-4 text-sm w-[160px] justify-start"
                         onClick={() => setShowArchived(!showArchived)}
                     >
                         {showArchived ? (
-                            <><RotateCcw size={16} className="mr-2" />Active View ({tenants.filter(t => t.status !== "Inactive" && t.status !== "Archived").length})</>
+                            <><RotateCcw size={16} className="mr-2" />Show Active ({tenants.filter(t => t.status !== "Inactive" && t.status !== "Archived").length})</>
                         ) : (
-                            <><Archive size={16} className="mr-2" />Archived ({tenants.filter(t => t.status === "Inactive" || t.status === "Archived").length})</>
+                            <><Archive size={16} className="mr-2" />Show Archive ({tenants.filter(t => t.status === "Inactive" || t.status === "Archived").length})</>
                         )}
                     </Button>
                 </div>
             </div>
 
-            <Card className="border-border shadow-sm rounded-xl overflow-hidden">
+            <Card className="border-border shadow-sm  overflow-hidden">
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <Table>
+                        <Table className="w-full table-fixed">
                     <TableHeader>
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground w-[250px]">Organization</TableHead>
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground">Subscription</TableHead>
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground">Limits (Rooms/Staff)</TableHead>
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground">Created</TableHead>
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground">Status</TableHead>
-                            <TableHead className="h-10 px-4 align-middle font-medium text-muted-foreground text-right">Actions</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground w-[250px] text-left">Organization</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-left w-[20%]">Subscription</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-right w-[15%]">Limits (Rooms/Staff)</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[120px]">Created</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">Status</TableHead>
+                            <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -198,58 +204,57 @@ export function TenantList() {
                         ) : filteredTenants.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="h-24 text-center py-8 text-muted-foreground">
-                                    No tenants found matching your filters.
+                                    {showArchived ? "No archived organizations yet" : "No organizations match your search"}
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredTenants.map((tenant) => (
                                 <TableRow 
                                     key={tenant.id} 
-                                    className="hover:bg-muted/5 border-border cursor-pointer transition-colors"
+                                    className="hover:bg-muted/30 transition-colors cursor-pointer border-b border-border last:border-0"
                                     onClick={() => handleRowClick(tenant)}
                                 >
-                                    <TableCell className="p-4 align-middle font-medium">
+                                    <TableCell className="px-4 py-3 align-middle font-normal">
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-semibold text-foreground">{tenant.name}</span>
+                                            <span className="text-sm font-normal text-foreground">{tenant.name}</span>
                                             <span className="text-xs text-muted-foreground">ID: {tenant.id}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle">
-                                        <Badge variant="outline" className="font-normal border-muted-foreground/20">
+                                    <TableCell className="px-4 py-3 align-middle text-left">
+                                        <span className="text-sm font-normal text-muted-foreground">
                                             {getPlanName(tenant.subscriptionPlan)}
-                                        </Badge>
+                                        </span>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground">
+                                    <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-right">
                                         {tenant.maxRooms} / {tenant.maxPersonnel}
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-sm text-muted-foreground">
+                                    <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-center">
                                         {new Date(tenant.createdAt).toLocaleDateString()}
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle">
-                                        <Badge 
-                                            variant="secondary"
-                                            className={`rounded-none bg-transparent border-0
+                                    <TableCell className="px-4 py-3 align-middle text-center">
+                                        <span 
+                                            className={`text-sm font-normal inline-block
                                                 ${tenant.status === 'Active' ? 'text-emerald-700 dark:text-emerald-400' : 
                                                   tenant.status === 'Inactive' ? 'text-amber-700 dark:text-amber-400' :
                                                   'text-gray-700 dark:text-gray-400'}
                                             `}
                                         >
                                             {tenant.status || 'Active'}
-                                        </Badge>
+                                        </span>
                                     </TableCell>
-                                    <TableCell className="p-4 align-middle text-right" onClick={(e) => e.stopPropagation()}>
+                                    <TableCell className="px-4 py-3 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                                         <Button 
                                             variant="ghost" 
                                             size="icon" 
                                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const newStatus = tenant.status === 'Archived' ? 'Active' : 'Archived';
+                                                const newStatus = (tenant.status === 'Archived' || tenant.status === 'Inactive') ? 'Active' : 'Archived';
                                                 updateTenantStatus(tenant.id, newStatus);
                                             }}
-                                            title={tenant.status === 'Archived' ? "Recall / Restore" : "Archive Association"}
+                                            title={(tenant.status === 'Archived' || tenant.status === 'Inactive') ? "Recall / Restore" : "Archive Association"}
                                         >
-                                            {tenant.status === 'Archived' ? (
+                                            {(tenant.status === 'Archived' || tenant.status === 'Inactive') ? (
                                                 <RotateCcw className="h-4 w-4" />
                                             ) : (
                                                 <Archive className="h-4 w-4" />
@@ -264,7 +269,7 @@ export function TenantList() {
             </div>
             {/* Simple Pagination Mock - To match AssetTable look */}
             <div className="p-4 border-t border-border flex items-center justify-between bg-muted/20">
-                <div className="text-xs text-muted-foreground font-medium">
+                <div className="text-xs text-muted-foreground font-normal">
                     Showing {filteredTenants.length} tenants
                 </div>
             </div>

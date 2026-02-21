@@ -18,7 +18,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[...Array(4)].map((_, i) => (
-                    <Skeleton key={i} className="h-32 rounded-xl" />
+                    <Skeleton key={i} className="h-32 " />
                 ))}
             </div>
         );
@@ -76,7 +76,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
         <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">Open Requests</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-red-600">{openRequests}</h3>
@@ -85,7 +85,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
                         </div>
                     </div>
                 </div>
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">Overdue</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-orange-600">{overdueRequests}</h3>
@@ -94,7 +94,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
                         </div>
                     </div>
                 </div>
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">In Repair</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-blue-600">{inRepair}</h3>
@@ -103,7 +103,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
                         </div>
                     </div>
                 </div>
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">Attention Needed</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-yellow-600">{immediateAttention}</h3>
@@ -112,7 +112,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
                         </div>
                     </div>
                 </div>
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">Scheduled (Week)</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-emerald-600">{scheduledThisWeek}</h3>
@@ -121,7 +121,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
                         </div>
                     </div>
                 </div>
-                <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
                     <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
                     <div className="flex items-center gap-2">
                         <h3 className="text-2xl font-bold text-indigo-600">{mttrDays} <span className="text-sm font-medium text-muted-foreground">days</span></h3>

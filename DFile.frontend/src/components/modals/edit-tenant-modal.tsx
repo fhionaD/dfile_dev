@@ -71,7 +71,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onSave }: EditTena
             <DialogContent className="max-w-xl rounded-2xl border-border p-0 overflow-hidden flex flex-col">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><Building2 size={20} /></div>
+                        <div className="p-3 bg-primary/10  text-primary"><Building2 size={20} /></div>
                         <div>
                             <DialogTitle className="text-lg font-semibold text-foreground">Edit Organization</DialogTitle>
                             <DialogDescription className="text-muted-foreground text-xs mt-1">Update tenant details and subscription</DialogDescription>
@@ -88,7 +88,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onSave }: EditTena
                         </div>
                         <div className="grid grid-cols-1 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-medium text-muted-foreground">Organization Name</Label>
+                                <Label className="text-xs font-medium text-muted-foreground">Organization Name <span className="text-destructive">*</span></Label>
                                 <Input 
                                     value={formData.name || ''} 
                                     onChange={(e) => handleChange('name', e.target.value)}
@@ -107,7 +107,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onSave }: EditTena
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-medium text-muted-foreground">Subscription Plan</Label>
+                                <Label className="text-xs font-medium text-muted-foreground">Subscription Plan <span className="text-destructive">*</span></Label>
                                 <Select 
                                     value={formData.subscriptionPlan?.toString()} 
                                     onValueChange={(val) => handleChange('subscriptionPlan', parseInt(val))}
@@ -162,15 +162,15 @@ export function EditTenantModal({ open, onOpenChange, tenant, onSave }: EditTena
                     </div>
                 </form>
 
-                <DialogFooter className="gap-3 p-6 bg-muted/40 border-t border-border shrink-0">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                         Cancel
                     </Button>
                     <Button 
                         type="submit" 
                         form="edit-tenant-form" 
                         disabled={isLoading}
-                        className="flex-2 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
+                        className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
                     >
                         {isLoading ? "Saving..." : "Save Changes"}
                     </Button>

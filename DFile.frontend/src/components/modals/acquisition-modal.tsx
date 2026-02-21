@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, DollarSign, Tag, Calendar, Upload, Layers, FileText } from "lucide-react";
+import { ShoppingCart, PhilippinePeso, Tag, Calendar, Upload, Layers, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,7 +116,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
             <DialogContent className="max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-xl text-primary"><ShoppingCart size={20} /></div>
+                        <div className="p-3 bg-primary/10  text-primary"><ShoppingCart size={20} /></div>
                         <div>
                             <DialogTitle className="text-lg font-semibold text-foreground">Create Purchase Order</DialogTitle>
                             <DialogDescription className="text-muted-foreground text-xs mt-1">Initiate new asset acquisition request</DialogDescription>
@@ -129,7 +129,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                     <div className="flex flex-col space-y-4">
                         <div className="space-y-2">
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={12} /> Asset Name / Model
+                                <Tag size={12} /> Asset Name / Model <span className="text-destructive">*</span>
                             </Label>
                             <Input name="assetName" required placeholder="e.g. MacBook Pro M3" className="h-10 bg-background text-sm" />
                         </div>
@@ -137,7 +137,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <Layers size={12} /> Category
+                                    <Layers size={12} /> Category <span className="text-destructive">*</span>
                                 </Label>
                                 <Select name="category" value={selectedCategory} onValueChange={setSelectedCategory} required>
                                     <SelectTrigger className="w-full h-10 bg-background px-3 text-sm truncate">
@@ -182,13 +182,13 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <DollarSign size={12} /> Purchase Price
+                                    <PhilippinePeso size={12} /> Purchase Price <span className="text-destructive">*</span>
                                 </Label>
                                 <Input name="purchasePrice" type="number" step="0.01" required placeholder="0.00" className="h-10 bg-background text-sm" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <Calendar size={12} /> Purchase Date
+                                    <Calendar size={12} /> Purchase Date <span className="text-destructive">*</span>
                                 </Label>
                                 <Input name="purchaseDate" type="date" required className="h-10 bg-background text-sm" />
                             </div>
@@ -197,7 +197,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                                    <FileText size={12} /> Useful Life (Years)
+                                    <FileText size={12} /> Useful Life (Years) <span className="text-destructive">*</span>
                                 </Label>
                                 <Input name="usefulLife" type="number" required placeholder="5" className="h-10 bg-background text-sm" />
                             </div>
@@ -205,15 +205,15 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                     </div>
 
                     {depreciationResult && (
-                        <div className="bg-muted/50 rounded-xl p-5 border border-border">
+                        <div className="bg-muted/50  p-5 border border-border">
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Depreciation Preview (Straight-Line)</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-xl font-semibold text-foreground">${depreciationResult.bookValue.toFixed(2)}</p>
+                                    <p className="text-xl font-semibold text-foreground">₱{depreciationResult.bookValue.toFixed(2)}</p>
                                     <p className="text-xs text-muted-foreground">Current Book Value</p>
                                 </div>
                                 <div>
-                                    <p className="text-xl font-semibold text-foreground">${depreciationResult.monthlyDep.toFixed(2)}</p>
+                                    <p className="text-xl font-semibold text-foreground">₱{depreciationResult.monthlyDep.toFixed(2)}</p>
                                     <p className="text-xs text-muted-foreground">Monthly Depreciation</p>
                                 </div>
                             </div>
@@ -222,10 +222,10 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                 </form>
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3 w-full">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
                         Cancel
                     </Button>
-                    <Button type="submit" form="acquisition-form" className="rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button type="submit" form="acquisition-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Initiate Procurement
                     </Button>
                 </DialogFooter>

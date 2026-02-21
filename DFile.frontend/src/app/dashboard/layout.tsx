@@ -45,11 +45,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const adminNavItems: NavItem[] = [
         { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin', 'Super Admin'] },
         { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin', 'Super Admin'] },
+    ];
+
+    const superAdminNavItems: NavItem[] = [
         { href: "/dashboard/super-admin/dashboard", label: "Super Admin Control", icon: UserCheck, allowedRoles: ['Super Admin'] },
         { href: "/dashboard/super-admin/create-tenant", label: "Create Tenant", icon: Building2, allowedRoles: ['Super Admin'] },
     ];
 
-    const allNavItems = [...mainNavItems, ...adminNavItems];
+    const allNavItems = [...mainNavItems, ...adminNavItems, ...superAdminNavItems];
 
     useEffect(() => {
         if (!isLoggedIn) {
@@ -179,6 +182,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             </div>
                         </section>
                     )}
+
+                    {superAdminNavItems.some(item => !item.allowedRoles || item.allowedRoles.includes(user.role)) && (
+                        <section>
+                             {!isCollapsed && (
+                                <div className="flex items-center gap-2 px-2 mb-2">
+                                    <span className="w-1 h-3 rounded-full bg-primary/40"></span>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">SUPER ADMIN</p>
+                                </div>
+                             )}
+                            <div className="space-y-1">
+                                {superAdminNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
+                                    <NavButton key={item.href} item={item} />
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
 
                 <div className="p-4 mt-auto border-t border-border bg-card/50 backdrop-blur-sm sticky bottom-0">
@@ -225,6 +244,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 </div>
                             </section>
                         )}
+
+                        {superAdminNavItems.some(item => !item.allowedRoles || item.allowedRoles.includes(user.role)) && (
+                            <section>
+                                <div className="flex items-center gap-2 px-2 mb-2">
+                                    <span className="w-1 h-3 rounded-full bg-primary/40"></span>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">SUPER ADMIN</p>
+                                </div>
+                                <div className="space-y-1">
+                                    {superAdminNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
+                                        <NavButton key={item.href} item={item} />
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     </div>
 
                     <div className="p-4 mt-auto border-t border-border bg-card/50">
@@ -238,7 +271,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Main Content */}
             <main className={`flex-1 min-w-0 bg-background min-h-screen transition-all duration-300 ${isCollapsed ? "lg:ml-20" : "lg:ml-72"}`}>
-                <header className="h-14 bg-card border-b border-border px-3 sm:px-6 flex items-center justify-between sticky top-0 z-10">
+                <header className="h-14 bg-card border-b border-border !px-3 sm:!px-6 flex items-center justify-between sticky top-0 z-10 w-full">
                     <button
                         onClick={() => setIsMobileSidebarOpen(true)}
                         className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors mr-2"
@@ -247,10 +280,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </button>
 
                     <div className="flex-1 max-w-md hidden sm:block">
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-foreground transition-colors" size={16} />
-                            <Input type="text" placeholder="Search assets..." className="pl-9 h-9 text-sm" />
-                        </div>
+                        {/* Search removed */}
                     </div>
 
                     <div className="flex items-center gap-3">

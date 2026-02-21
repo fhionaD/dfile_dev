@@ -2,6 +2,46 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* 
+   Prevents layout shift when modals open.
+   Strategy: Always keep the scrollbar visible on HTML.
+   Force zero padding on body to override Radix UI's compensation.
+*/
+html {
+  margin-right: 0 !important;
+  overflow-y: scroll !important;
+}
+
+body {
+  position: relative !important; /* Prevent Radix from setting fixed position if it tries */
+  padding-right: 0 !important;
+  margin-right: 0 !important; 
+  width: 100% !important; /* Ensure body width doesn't fluctuate */
+}
+
+/* Ensure no other element gets padding added by Radix */
+[data-radix-scroll-lock-ignore] {
+  padding-right: 0 !important;
+}
+
+/* 
+   Specific override for Radix UI Dialog open state
+   Radix adds style="pointer-events: none" and data-scroll-locked to body
+   We force overflow: hidden to lock scroll, but html scrollbar remains visible.
+*/
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  overflow: hidden !important; 
+  width: 100% !important; 
+}
+
+/* Force sticky/fixed elements to not shift */
+header.sticky, 
+[data-radix-scroll-lock-ignore] {
+  padding-right: 0 !important; /* Ensure header padding is consistent */
+  margin-right: 0 !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

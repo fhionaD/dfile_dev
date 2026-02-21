@@ -59,7 +59,7 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-primary/10 rounded-xl text-primary"><LayoutGrid size={22} /></div>
+                            <div className="p-3 bg-primary/10  text-primary"><LayoutGrid size={22} /></div>
                             <div>
                                 <DialogTitle className="text-lg font-semibold text-foreground">
                                     {view === 'active' ? "Physical Asset Categories" : "Archived Categories"}
@@ -69,21 +69,6 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                 </DialogDescription>
                             </div>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setView(view === 'active' ? 'archived' : 'active')}
-                            className="text-sm h-10 bg-background"
-                        >
-                            {view === 'active' ? (
-                                <>
-                                    <Archive size={14} className="mr-2" />
-                                    View Archived ({categories.filter(c => c.status === 'Archived').length})
-                                </>
-                            ) : (
-                                <>Back to Active</>
-                            )}
-                        </Button>
                     </div>
                 </DialogHeader>
 
@@ -118,12 +103,12 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                         <Input value={newCat.description} onChange={(e) => setNewCat({ ...newCat, description: e.target.value })} placeholder="Brief scope of assets" className="border-input bg-background" />
                                     </div>
                                 </div>
-                                <div className="flex gap-3">
-                                    <Button type="submit" className="flex-1 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
-                                        <Save size={14} className="mr-2" /> {editingId ? "Save Changes" : "Save Classification"}
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={handleCancel} className="px-6 rounded-xl">
+                                <div className="flex gap-3 justify-end">
+                                    <Button type="button" variant="outline" onClick={handleCancel} className="">
                                         Cancel
+                                    </Button>
+                                    <Button type="submit" className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                                        <Save size={14} className="mr-2" /> {editingId ? "Save Changes" : "Save Classification"}
                                     </Button>
                                 </div>
                             </form>
@@ -135,7 +120,7 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                         {categories.filter(cat => view === 'active' ? cat.status !== 'Archived' : cat.status === 'Archived').map((cat) => (
                             <div key={cat.id} className={`group flex items-center justify-between p-5 rounded-2xl border border-border transition-all ${cat.status === 'Archived' ? 'bg-muted/30 opacity-60 grayscale' : 'bg-card/50 hover:border-primary/20 hover:bg-card'}`}>
                                 <div className="flex items-center gap-5">
-                                    <div className="p-3 bg-primary/10 rounded-xl text-primary"><LayoutGrid size={18} /></div>
+                                    <div className="p-3 bg-primary/10  text-primary"><LayoutGrid size={18} /></div>
                                     <div className="flex-1 min-w-0 grid gap-0.5">
                                         <h4 className="text-sm font-bold text-foreground truncate">{cat.name}</h4>
                                         <p className="text-xs font-medium text-muted-foreground truncate">{cat.description}</p>
@@ -155,8 +140,8 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                         <p className="text-[10px] font-medium text-muted-foreground">Active Assets</p>
                                     </div>
                                     <div className="flex gap-1.5">
-                                        <button onClick={() => handleEdit(cat)} disabled={cat.status === 'Archived'} className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all disabled:opacity-50"><Edit3 size={16} /></button>
-                                        <button onClick={() => onArchiveCategory(cat.id)} className={`p-2.5 rounded-lg transition-all ${cat.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-destructive/70 hover:text-destructive hover:bg-destructive/10'}`}>
+                                        <button onClick={() => handleEdit(cat)} disabled={cat.status === 'Archived'} className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all disabled:opacity-50"><Edit3 size={16} /></button>
+                                        <button onClick={() => onArchiveCategory(cat.id)} className={`p-2.5 rounded-md transition-all ${cat.status === 'Archived' ? 'text-primary hover:bg-primary/10' : 'text-destructive/70 hover:text-destructive hover:bg-destructive/10'}`}>
                                             {cat.status === 'Archived' ? <RotateCcw size={16} /> : <Archive size={16} />}
                                         </button>
                                     </div>
@@ -166,8 +151,26 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0">
-                    <Button onClick={() => onOpenChange(false)} className="px-8 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-between gap-3">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setView(view === 'active' ? 'archived' : 'active')}
+                        className="h-10 text-sm w-[160px] justify-start bg-background"
+                    >
+                        {view === 'active' ? (
+                            <>
+                                <Archive size={14} className="mr-2" />
+                                Show Archive ({categories.filter(c => c.status === 'Archived').length})
+                            </>
+                        ) : (
+                            <>
+                                <RotateCcw size={14} className="mr-2" />
+                                Show Active ({categories.filter(c => c.status !== 'Archived').length})
+                            </>
+                        )}
+                    </Button>
+                    <Button onClick={() => onOpenChange(false)} className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Finished Configuration
                     </Button>
                 </DialogFooter>

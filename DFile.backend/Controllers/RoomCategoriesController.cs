@@ -20,9 +20,26 @@ namespace DFile.backend.Controllers
 
         // GET: api/RoomCategories
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RoomCategory>>> GetRoomCategories()
+        public async Task<ActionResult<IEnumerable<RoomCategory>>> GetRoomCategories(
+            [FromQuery] bool includeArchived = false,
+            [FromQuery] string? search = null)
         {
-            return await _context.RoomCategories.ToListAsync();
+            var query = _context.RoomCategories.AsQueryable();
+
+            if (!includeArchived)
+            {
+                query = query.Where(c => !c.Archived);
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                search = search.ToLower();
+                query = query.Where(c => 
+                    c.Name.ToLower().Contains(search) || 
+                    (c.Description != null && c.Description.ToLower().Contains(search)));
+            }
+
+            return await query.ToListAsync();
         }
 
         // GET: api/RoomCategories/5

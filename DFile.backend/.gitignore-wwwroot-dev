@@ -1,0 +1,2 @@
+# Exclude Next.js dev artifacts
+wwwroot/dev/

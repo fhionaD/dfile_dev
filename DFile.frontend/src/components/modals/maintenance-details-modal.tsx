@@ -43,7 +43,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
             <DialogContent className="max-w-lg rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[85vh]">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <div className="h-12 w-12  bg-primary/10 flex items-center justify-center text-primary">
                             <Wrench size={24} />
                         </div>
                         <div>
@@ -64,7 +64,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <AlertTriangle size={16} className="text-primary" /> Issue Description
                         </h4>
-                        <p className="text-sm text-foreground bg-muted/10 p-4 rounded-xl border border-border/50 leading-relaxed">
+                        <p className="text-sm text-foreground bg-muted/10 p-4  border border-border/50 leading-relaxed">
                             {record.description}
                         </p>
                     </div>
@@ -76,7 +76,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Package size={16} className="text-primary" /> Asset Information
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Asset ID</p>
                                 <Badge variant="secondary" className="font-mono text-xs mt-1">{record.assetId}</Badge>
@@ -105,7 +105,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Calendar size={16} className="text-primary" /> Timeline
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Date Reported</p>
                                 <p className="font-medium">{record.dateReported}</p>
@@ -125,27 +125,25 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                             {record.cost !== undefined && (
                                 <div>
                                     <p className="text-xs text-muted-foreground">Cost</p>
-                                    <p className="font-semibold">${record.cost.toLocaleString()}</p>
+                                    <p className="font-semibold">₱{record.cost.toLocaleString()}</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border flex flex-col sm:flex-row gap-2 sm:justify-between items-center bg-card shrink-0">
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        {onEdit && (
-                            <Button variant="outline" onClick={onEdit} className="rounded-xl flex-1 sm:flex-none">
-                                <Wrench size={16} className="mr-2" /> Edit Request
-                            </Button>
-                        )}
-                        {onRequestReplacement && (
-                            <Button variant="destructive" onClick={() => onRequestReplacement(record.assetId)} className="rounded-xl flex-1 sm:flex-none bg-red-100 text-red-700 hover:bg-red-200 border-red-200">
-                                <Package size={16} className="mr-2" /> Request Replacement
-                            </Button>
-                        )}
-                    </div>
-                    <Button variant="default" onClick={() => onOpenChange(false)} className="rounded-xl w-full sm:w-auto mt-2 sm:mt-0">
+                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    {onEdit && (
+                        <Button variant="outline" onClick={onEdit} className="">
+                            <Wrench size={16} className="mr-2" /> Edit Request
+                        </Button>
+                    )}
+                    {onRequestReplacement && (
+                        <Button variant="destructive" onClick={() => onRequestReplacement(record.assetId)} className=" bg-red-100 text-red-700 hover:bg-red-200 border-red-200 shadow-none">
+                            <Package size={16} className="mr-2" /> Request Replacement
+                        </Button>
+                    )}
+                    <Button variant="default" onClick={() => onOpenChange(false)} className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
                         Close
                     </Button>
                 </DialogFooter>

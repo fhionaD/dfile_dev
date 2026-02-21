@@ -33,7 +33,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
             <DialogContent className="max-w-md rounded-2xl border-border p-0 overflow-hidden flex flex-col gap-0 shadow-lg">
                 <DialogHeader className="p-6 bg-muted/30 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-background border border-border/50 rounded-xl text-primary shadow-sm">
+                        <div className="p-3 bg-background border border-border/50  text-primary shadow-sm">
                             <DoorOpen size={24} strokeWidth={1.5} />
                         </div>
                         <div>
@@ -52,7 +52,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                             <DoorOpen size={12} />
                             Room Identification
                         </div>
-                        <div className="p-4 bg-muted/20 rounded-xl border border-border/40 space-y-4">
+                        <div className="p-4 bg-muted/20  border border-border/40 space-y-4">
                              <div>
                                 <span className="text-xs text-muted-foreground block mb-1">Room Number</span>
                                 <span className="text-sm font-semibold text-foreground">{room.name}</span>
@@ -66,7 +66,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                             <Layers size={12} />
                             Category / Classification
                         </div>
-                        <div className="p-4 bg-muted/20 rounded-xl border border-border/40">
+                        <div className="p-4 bg-muted/20  border border-border/40">
                              <span className="text-sm font-medium text-foreground">
                                 {category?.name || "Uncategorized"} 
                                 {category?.subCategory && <span className="mx-2 text-muted-foreground">—</span>}
@@ -82,7 +82,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                                 <Building size={12} />
                                 Floor / Level
                             </div>
-                            <div className="p-3 bg-muted/20 rounded-xl border border-border/40 h-16 flex items-center px-4">
+                            <div className="p-3 bg-muted/20  border border-border/40 h-16 flex items-center px-4">
                                 <span className="text-sm font-semibold">{room.floor}</span>
                             </div>
                         </div>
@@ -92,7 +92,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                                 <Users size={12} />
                                 Max Occupancy
                             </div>
-                            <div className="p-3 bg-muted/20 rounded-xl border border-border/40 h-16 flex items-center px-4">
+                            <div className="p-3 bg-muted/20  border border-border/40 h-16 flex items-center px-4">
                                 <span className="text-sm font-semibold">{category?.maxOccupancy || room.maxOccupancy || "-"}</span>
                             </div>
                         </div> */}
@@ -113,8 +113,8 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                     </div>
                 </div>
 
-                <DialogFooter className="gap-3 p-6 bg-muted/30 border-t border-border shrink-0 sm:justify-between">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl h-11 px-6">
+                <DialogFooter className="p-6 bg-muted/30 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} className="">
                         Close
                     </Button>
                     <Button 
@@ -122,7 +122,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                             onOpenChange(false);
                             onEdit();
                         }} 
-                        className="rounded-xl h-11 px-6 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                        className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
                     >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Details

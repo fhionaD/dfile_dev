@@ -26,7 +26,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     {/* Header */}
                     <div className="relative z-10">
                         <div className="flex items-center gap-3">
-                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+                            <div className="grid h-10 w-10 place-items-center  bg-white/10 backdrop-blur-sm border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
                                 <span className="font-black tracking-tight">D</span>
                             </div>
                             <div className="flex flex-col leading-tight">
@@ -69,7 +69,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     <div className="relative w-full max-w-sm">
                         {/* Mobile header (since left panel is hidden on mobile) */}
                         <div className="mb-8 flex items-center gap-3 lg:hidden">
-                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#182350] text-white shadow-lg shadow-[#182350]/20">
+                            <div className="grid h-10 w-10 place-items-center  bg-[#182350] text-white shadow-lg shadow-[#182350]/20">
                                 <span className="font-black tracking-tight">D</span>
                             </div>
                             <div className="flex flex-col leading-tight">

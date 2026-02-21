@@ -101,12 +101,9 @@ export default function TasksPage() {
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant={showArchived ? "default" : "outline"} size="lg" className="text-sm font-medium h-10" onClick={() => setShowArchived(!showArchived)}>
-                            {showArchived ? <><RotateCcw size={16} className="mr-2" />Active Tasks</> : <><Archive size={16} className="mr-2" />Archived Tasks</>}
-                        </Button>
                         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                             <DialogTrigger asChild>
-                                <Button size="lg" className="rounded-xl h-10 text-sm bg-primary text-primary-foreground shadow-sm">
+                                <Button size="sm" className="h-10 text-sm px-4 rounded-md bg-primary text-primary-foreground shadow-sm">
                                     <Plus size={16} className="mr-2" /> Create Task
                                 </Button>
                             </DialogTrigger>
@@ -175,10 +172,13 @@ export default function TasksPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <Button onClick={handleCreate} className="w-full">Create Task</Button>
+                                    <Button onClick={handleCreate} className="h-10 text-sm w-full">Create Task</Button>
                                 </div>
                             </DialogContent>
                         </Dialog>
+                        <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm w-[160px] justify-start bg-background" onClick={() => setShowArchived(!showArchived)}>
+                            {showArchived ? <><RotateCcw size={16} className="mr-2" />Show Active</> : <><Archive size={16} className="mr-2" />Show Archive</>}
+                        </Button>
                     </div>
                 </div>
 
@@ -199,7 +199,7 @@ export default function TasksPage() {
                             <SelectValue placeholder="Filter by Status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="Pending">Pending</SelectItem>
                             <SelectItem value="In Progress">In Progress</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>

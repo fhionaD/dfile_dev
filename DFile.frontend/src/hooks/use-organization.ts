@@ -10,11 +10,6 @@ let MOCK_ROLES: Role[] = [
     { id: "RL-03", designation: "Procurement Officer", department: "Finance", scope: "Procurement Module", status: "Active" }
 ];
 
-let MOCK_EMPLOYEES: Employee[] = [
-    { id: "EMP-001", firstName: "John", lastName: "Doe", email: "john@example.com", contactNumber: "555-0101", department: "IT", role: "Administrator", hireDate: "2023-01-15", status: "Active" },
-    { id: "EMP-002", firstName: "Jane", lastName: "Smith", email: "jane@example.com", contactNumber: "555-0102", department: "Operations", role: "Maintenance Manager", hireDate: "2023-03-20", status: "Active" }
-];
-
 let MOCK_DEPARTMENTS: Department[] = [
     { id: "D-01", name: "IT", description: "Information Technology", head: "John Doe", itemCount: 15, status: "Active" },
     { id: "D-02", name: "Operations", description: "Facility Operations", head: "Jane Smith", itemCount: 42, status: "Active" },
@@ -36,9 +31,8 @@ export function useEmployees() {
     return useQuery({
         queryKey: ['employees'],
         queryFn: async () => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            return [...MOCK_EMPLOYEES];
+             const { data } = await api.get<Employee[]>('/api/Employees');
+             return data;
         },
     });
 }
@@ -81,15 +75,12 @@ export function useAddEmployee() {
 
     return useMutation({
         mutationFn: async (employee: Employee) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const newEmp = { ...employee, id: `EMP-MOCK-${Date.now()}` };
-            MOCK_EMPLOYEES.push(newEmp);
-            return newEmp;
+            const { data } = await api.post<Employee>('/api/Employees', employee);
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            toast.success('Employee added successfully (Mock)');
+            toast.success('Employee added successfully');
         },
         onError: (error) => {
             console.error('Failed to add employee:', error);
@@ -103,14 +94,12 @@ export function useUpdateEmployee() {
 
     return useMutation({
         mutationFn: async (employee: Employee) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-             MOCK_EMPLOYEES = MOCK_EMPLOYEES.map(e => e.id === employee.id ? employee : e);
+            await api.put<Employee>(`/api/Employees/${employee.id}`, employee);
             return employee;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            toast.success('Employee updated successfully (Mock)');
+            toast.success('Employee updated successfully');
         },
         onError: (error) => {
             console.error('Failed to update employee:', error);
@@ -124,17 +113,20 @@ export function useArchiveEmployee() {
 
     return useMutation({
         mutationFn: async (employeeId: string) => {
-             // MOCK DATA ONLY
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const emp = MOCK_EMPLOYEES.find(e => e.id === employeeId);
-            if (emp) {
-                emp.status = emp.status === "Archived" ? "Active" : "Archived";
+             // First fetch to clear status
+            const { data: emp } = await api.get<Employee>(`/api/Employees/${employeeId}`);
+            if (emp.status === "Archived") {
+                await api.put(`/api/Employees/restore/${employeeId}`);
+                emp.status = "Active";
+            } else {
+                await api.put(`/api/Employees/archive/${employeeId}`);
+                emp.status = "Archived";
             }
             return emp;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            const message = data?.status === 'Archived' ? 'Employee archived (Mock)' : 'Employee restored (Mock)';
+            const message = data?.status === 'Archived' ? 'Employee archived' : 'Employee restored';
             toast.success(message);
         },
         onError: (error) => {
