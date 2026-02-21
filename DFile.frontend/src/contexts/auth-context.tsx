@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { AxiosError } from "axios";
 import { User } from "@/types/asset";
 import api from "@/lib/api"; // Centralized API client
 
@@ -37,7 +38,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setIsLoggedIn(true);
 
                     // 2. Validate with Backend using our centralized API client
-                    await api.get('/api/auth/me');
+                    try {
+                        await api.get('/api/auth/me');
+                    } catch (error: unknown) {
+                        // Backward compatibility: some deployments expose auth routes without the /api prefix.
+                        if (error instanceof AxiosError && error.response?.status === 404) {
+                            await api.get('/auth/me');
+                        } else {
+                            throw error;
+                        }
+                    }
 
                     // If we reach here, the token is valid (status 200-299)
                 } catch (e) {
@@ -55,7 +65,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             console.log(`[Auth] Initiating login via API client`);
 
-            const response = await api.post('/api/auth/login', { email, password });
+            let response;
+            try {
+                response = await api.post('/api/auth/login', { email, password });
+            } catch (error: unknown) {
+                // Backward compatibility: support deployments where auth routes are mounted at /auth/*.
+                if (error instanceof AxiosError && error.response?.status === 404) {
+                    console.warn(`[Auth] /api/auth/login returned 404, retrying /auth/login`);
+                    response = await api.post('/auth/login', { email, password });
+                } else {
+                    throw error;
+                }
+            }
             
             console.log(`[Auth] Response status: ${response.status} ${response.statusText}`);
 
@@ -68,9 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoggedIn(true);
             localStorage.setItem("dfile_user", JSON.stringify(userData));
             localStorage.setItem("dfile_token", token);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Handle Axios error structure
-            const message = error.response?.data?.message || error.message || "Login failed";
+            const axiosError = error instanceof AxiosError ? error : null;
+            const message = (axiosError?.response?.data as { message?: string } | undefined)?.message || axiosError?.message || "Login failed";
             console.error(`[Auth] Login error: ${message}`);
             throw new Error(message);
         }
