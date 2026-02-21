@@ -52,6 +52,14 @@ jobs:
         mkdir -p ./publish/wwwroot
         mkdir -p ./publish/logs
 
+        # IMPORTANT: Force-copy our custom web.config AFTER dotnet publish.
+        # dotnet publish may generate its own web.config even with
+        # IsTransformWebConfigDisabled=true on some SDK versions.
+        # This ensures our processPath/hostingModel settings always win.
+        cp DFile.backend/web.config ./publish/web.config
+        echo "--- deployed web.config contents ---"
+        cat ./publish/web.config
+
         # Copy Next.js static export (out folder) to wwwroot
         cp -r DFile.frontend/out/* ./publish/wwwroot/
 
