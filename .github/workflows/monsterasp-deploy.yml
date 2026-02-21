@@ -40,11 +40,10 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Publish Backend
-      # -r win-x64: cross-compile from Linux to produce a Windows .exe
-      # --self-contained false: use the .NET runtime already installed on the server (smaller deploy)
-      # This is required so web.config can use processPath=.\dfile.backend.exe
-      # instead of processPath=dotnet (which is not in PATH on IIS shared hosting)
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish -r win-x64 --self-contained false
+      # Self-contained: bundles .NET 8 runtime into the exe.
+      # No 'dotnet' in server PATH needed. Works regardless of server .NET installation.
+      # Output: dfile.backend.exe (+ all runtime dlls) in ./publish/
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish -r win-x64 --self-contained true
 
     # 4. Correctly Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
@@ -55,11 +54,16 @@ jobs:
 
         # Copy Next.js static export (out folder) to wwwroot
         cp -r DFile.frontend/out/* ./publish/wwwroot/
-        
-        # Verify file structure before upload (optional logging)
-        ls -R ./publish/wwwroot | head -n 20
-        echo "--- Checking for exe ---"
-        ls ./publish/*.exe || echo "WARNING: No .exe found in publish output!"
+
+        # Add a diagnostic marker so we can confirm FTP path is correct
+        echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
+        echo "Deployed: $(date -u)" > ./publish/wwwroot/deploy-check.txt
+
+        # Verify key files exist
+        echo "--- publish root ---"
+        ls ./publish/*.dll ./publish/*.json ./publish/web.config
+        echo "--- publish/wwwroot ---"
+        ls ./publish/wwwroot/index.html ./publish/wwwroot/deploy-check.txt
 
     # 5. Deploy via FTP
     - name: Deploy to MonsterAsp.net via FTP

@@ -105,22 +105,24 @@ app.Map("/api/{**rest}", (HttpContext context) =>
 // so that client-side routing (e.g. /dashboard, /login) works on hard-refresh.
 app.MapFallbackToFile("index.html");
 
-// Seed Database
-using (var scope = app.Services.CreateScope())
+// Seed Database in background — do NOT block app.Run().
+// Blocking startup here causes ANCM startup timeout on IIS hosted deployments.
+_ = Task.Run(async () =>
 {
+    await Task.Delay(2000); // Give the app a moment to fully initialize
+    using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        // Check connectivity first
         if (context.Database.CanConnect())
         {
-            Console.WriteLine("Database connection successful.");
+            Console.WriteLine("Database connection successful. Seeding...");
             DbInitializer.Initialize(context);
         }
         else
         {
-             Console.WriteLine("WARNING: Could not connect to the database.");
+            Console.WriteLine("WARNING: Could not connect to the database.");
         }
     }
     catch (Exception ex)
@@ -130,6 +132,6 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine($"CRITICAL ERROR: {ex.Message}");
         if (ex.InnerException != null) Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
     }
-}
+});
 
 app.Run();
