@@ -48,28 +48,32 @@ jobs:
     # 4. Correctly Merge Frontend into Backend wwwroot
     - name: Copy Frontend to Backend wwwroot
       run: |
-        # Ensure wwwroot directory exists (the backend serves static files from here)
+        # Ensure wwwroot directory exists (ASP.NET Core serves static files from here)
         mkdir -p ./publish/wwwroot
 
         # Force-copy our custom web.config AFTER dotnet publish.
         # Even with IsTransformWebConfigDisabled=true, some SDK versions still
         # generate a default web.config. This guarantees our settings always win.
         cp DFile.backend/web.config ./publish/web.config
-        echo "--- deployed web.config (verify processPath=dotnet, inprocess) ---"
+        echo "=== Deployed web.config (expecting processPath=dotnet, inprocess) ==="
         cat ./publish/web.config
 
-        # Copy Next.js static export into the backend's wwwroot
+        # Copy Next.js static export into the backend's wwwroot subdirectory.
+        # With server-dir=/wwwroot/, the final server layout will be:
+        #   /wwwroot/dfile.backend.dll    ← IIS app root (ANCM loads this)
+        #   /wwwroot/web.config           ← IIS reads this to start ANCM
+        #   /wwwroot/wwwroot/index.html   ← ASP.NET Core UseStaticFiles root
+        #   /wwwroot/wwwroot/_next/...    ← served as static files
         cp -r DFile.frontend/out/* ./publish/wwwroot/
 
-        # Diagnostic marker to confirm FTP upload path is correct
+        # Diagnostic marker
         echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
-        echo "Deployed: $(date -u)" > ./publish/wwwroot/deploy-check.txt
 
-        # Verify key files exist before upload
-        echo "--- publish root ---"
-        ls ./publish/*.dll ./publish/web.config
-        echo "--- publish/wwwroot ---"
-        ls ./publish/wwwroot/index.html
+        # Verify the publish output structure before upload
+        echo "=== publish root (goes to server /wwwroot/) ==="
+        ls ./publish/*.dll ./publish/web.config ./publish/appsettings.json
+        echo "=== publish/wwwroot (goes to server /wwwroot/wwwroot/) ==="
+        ls ./publish/wwwroot/index.html ./publish/wwwroot/_next 2>/dev/null || echo "WARNING: index.html or _next missing"
 
     # 5. Deploy via FTP
     - name: Deploy to MonsterAsp.net via FTP
@@ -79,3 +83,14 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./publish/
+        # CRITICAL: server-dir must be the IIS web root, NOT the FTP root.
+        # On MonsterASP.NET the FTP root is the account home directory.
+        # The IIS web root (where web.config and .dll must live) is /wwwroot/.
+        # Without this, dfile.backend.dll and web.config land outside the IIS
+        # application directory and ANCM never starts — every /api/* call gets
+        # an IIS-native "404 File or directory not found" response.
+        server-dir: /wwwroot/
+        # Wipe the server-dir clean before uploading. This removes stale files
+        # (old JS chunks, old self-contained exe, leftover deploys) so the server
+        # always matches exactly what was just built — no ghost files.
+        dangerous-clean-slate: true
