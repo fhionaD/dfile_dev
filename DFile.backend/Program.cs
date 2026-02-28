@@ -3,6 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using DFile.backend.Core.Application.Services;
+using DFile.backend.Core.Interfaces;
+using DFile.backend.Infrastructure;
+using DFile.backend.Middleware;
+using DFile.backend.Services;
+using System.IdentityModel.Tokens.Jwt;
+
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,9 +45,21 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ValidateIssuer = false,
-        ValidateAudience = false
+        ValidateAudience = false,
+        RoleClaimType = "role",
+        NameClaimType = "sub"
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"[JWT Auth Failed] {context.Exception.Message}");
+            return Task.CompletedTask;
+        }
     };
 });
+
+builder.Services.AddAuthorization();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -51,13 +71,21 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader());
 });
 
+// Dependency Injection
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IProcurementService, ProcurementService>();
+builder.Services.AddScoped<IAssetService, AssetService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // 1. Static files FIRST — lets IIS/Kestrel short-circuit for .js/.css/etc.
-//    without passing through auth or CORS middleware on every asset request.
-//    Do NOT call UseDefaultFiles() — MapFallbackToFile handles the root redirect.
+//    UseDefaultFiles() rewrites directory requests (e.g. /login/) to /login/index.html
+//    so the pre-rendered Next.js HTML for each route is served directly.
+app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // 2. Swagger (before auth so it's always accessible for debugging)
@@ -69,6 +97,46 @@ app.UseCors("AllowAll");
 
 // 4. Authentication & Authorization
 app.UseAuthentication();
+
+// Diagnostic logging for Auth
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value;
+    if (path != null && path.StartsWith("/api"))
+    {
+        var user = context.User;
+        var isAuthenticated = user.Identity?.IsAuthenticated ?? false;
+        var method = context.Request.Method;
+        
+        if (isAuthenticated)
+        {
+            var roleClaimsList = user.FindAll("role").Select(c => c.Value).ToList();
+            if (!roleClaimsList.Any()) roleClaimsList = user.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value).ToList();
+            
+            var roles = string.Join(", ", roleClaimsList);
+            var userId = user.FindFirst("sub")?.Value ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var tenantId = user.FindFirst("TenantId")?.Value;
+            Console.WriteLine($"[Auth Log] {method} {path} - Authenticated: {isAuthenticated}, User: {userId}, Roles: [{roles}], Tenant: {tenantId}");
+        }
+        else
+        {
+            Console.WriteLine($"[Auth Log] {method} {path} - NOT AUTHENTICATED");
+        }
+    }
+    await next();
+    
+    if (path != null && path.StartsWith("/api"))
+    {
+        Console.WriteLine($"[Trace Log] {context.Request.Method} {path} - Response: {context.Response.StatusCode}");
+        if (context.Response.StatusCode == 403)
+        {
+            var user = context.User;
+            var allClaims = user.Claims.Select(c => $"{c.Type}: {c.Value}").ToList();
+            Console.WriteLine($"[Trace Log] 403 DETAIL - All Claims: {string.Join(" | ", allClaims)}");
+        }
+    }
+});
+
 app.UseAuthorization();
 
 // 5. Diagnostic endpoints
@@ -116,15 +184,11 @@ _ = Task.Run(async () =>
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        if (context.Database.CanConnect())
-        {
-            Console.WriteLine("Database connection successful. Seeding...");
-            DbInitializer.Initialize(context);
-        }
-        else
-        {
-            Console.WriteLine("WARNING: Could not connect to the database.");
-        }
+        // Ensure Database is created if migration is pending
+        // CanConnect() returns false if the DB doesn't exist yet, so we shouldn't rely on it to skip initialization.
+        // DbInitializer.Initialize calls Migrate(), which creates the DB safely.
+        Console.WriteLine("Applying database migrations and seeding...");
+        DbInitializer.Initialize(context);
     }
     catch (Exception ex)
     {

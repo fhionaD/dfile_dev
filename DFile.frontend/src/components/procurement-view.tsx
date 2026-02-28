@@ -20,10 +20,9 @@ interface ProcurementViewProps {
 }
 
 export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewProps) {
-    const { data: orders = [], isLoading } = usePurchaseOrders();
-    const archiveOrderMutation = useArchiveOrder();
-
     const [showArchived, setShowArchived] = useState(false);
+    const { data: orders = [], isLoading } = usePurchaseOrders(showArchived);
+    const archiveOrderMutation = useArchiveOrder();
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
     const [dateFilter, setDateFilter] = useState("All Time");
@@ -124,13 +123,13 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {summaryCards.map((stat, i) => (
                     <div key={i} className="bg-card  border border-border p-4 shadow-sm flex items-center justify-between">
-                         <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                         <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                        <div className="flex items-center gap-2">
                             <h3 className={`text-2xl font-bold ${stat.valueColor}`}>{stat.value}</h3>
                             <div className={`h-10 w-10 rounded-full ${stat.iconBg} flex items-center justify-center ${stat.iconText}`}>
                                 <stat.icon size={20} />
                             </div>
-                         </div>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -235,12 +234,11 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
                                             <TableCell className="px-6 py-4 align-middle text-center text-sm text-muted-foreground">{order.purchaseDate}</TableCell>
                                             <TableCell className="px-6 py-4 align-middle text-center text-sm text-muted-foreground">{order.usefulLifeYears} yrs</TableCell>
                                             <TableCell className="px-6 py-4 align-middle text-center">
-                                                <span className={`text-sm font-normal inline-flex ${
-                                                    order.status === "Approved" ? "text-blue-700" :
-                                                    order.status === "Delivered" ? "text-emerald-700" :
-                                                    order.status === "Pending" ? "text-amber-700" :
-                                                    "text-red-700"
-                                                }`}>
+                                                <span className={`text-sm font-normal inline-flex ${order.status === "Approved" ? "text-blue-700" :
+                                                        order.status === "Delivered" ? "text-emerald-700" :
+                                                            order.status === "Pending" ? "text-amber-700" :
+                                                                "text-red-700"
+                                                    }`}>
                                                     {order.status}
                                                 </span>
                                             </TableCell>
@@ -269,7 +267,7 @@ export function ProcurementView({ onNewOrder, onOrderClick }: ProcurementViewPro
                             </TableBody>
                         </Table>
                     </div>
-                     <div className="p-4 border-t border-border bg-muted/5 flex items-center justify-between">
+                    <div className="p-4 border-t border-border bg-muted/5 flex items-center justify-between">
                         <div className="text-xs text-muted-foreground font-normal">
                             Showing {filteredOrders.length} orders
                         </div>

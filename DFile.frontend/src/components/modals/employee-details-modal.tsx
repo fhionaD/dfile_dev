@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Phone, Building2, ShieldCheck, CalendarClock, Hash } from "lucide-react";
+import { User, Mail, Phone, ShieldCheck, CalendarClock, Hash } from "lucide-react";
 import { Employee } from "@/types/asset";
 
 import { Edit } from "lucide-react";
@@ -14,9 +14,10 @@ interface EmployeeDetailsModalProps {
     onOpenChange: (open: boolean) => void;
     employee: Employee | null;
     onEdit?: (employee: Employee) => void;
+    onResetPassword?: (employee: Employee) => void;
 }
 
-export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: EmployeeDetailsModalProps) {
+export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit, onResetPassword }: EmployeeDetailsModalProps) {
     if (!employee) return null;
 
     const fullName = `${employee.firstName}${employee.middleName ? ` ${employee.middleName}` : ""} ${employee.lastName}`;
@@ -65,15 +66,11 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
                     {/* Assignment Info */}
                     <div>
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                            <Building2 size={16} className="text-primary" /> Assignment Details
+                            Assignment Details
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                             <div>
-                                <p className="text-xs text-muted-foreground">Department</p>
-                                <p className="font-medium">{employee.department}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Role</p>
+                                <p className="text-xs text-muted-foreground">Organizational Role</p>
                                 <p className="font-medium flex items-center gap-1.5"><ShieldCheck size={12} />{employee.role}</p>
                             </div>
                             <div>
@@ -85,6 +82,19 @@ export function EmployeeDetailsModal({ open, onOpenChange, employee, onEdit }: E
                 </div>
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
+                    {onResetPassword && (
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (window.confirm("Are you sure you want to reset the password for this user? This action cannot be undone.")) {
+                                    onResetPassword(employee);
+                                }
+                            }}
+                            className="mr-auto"
+                        >
+                            Reset Password
+                        </Button>
+                    )}
                     <Button variant="outline" onClick={() => onOpenChange(false)} className="">
                         Close
                     </Button>

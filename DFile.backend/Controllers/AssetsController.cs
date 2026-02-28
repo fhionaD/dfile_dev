@@ -1,183 +1,123 @@
-using DFile.backend.Data;
+using DFile.backend.Core.Application.Services;
 using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Linq;
 
 namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize] 
     public class AssetsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IAssetService _assetService;
 
-        public AssetsController(AppDbContext context)
+        public AssetsController(IAssetService assetService)
         {
-            _context = context;
+            _assetService = assetService;
+        }
+
+        private int? GetTenantIdFromClaims()
+        {
+            var tenantIdStr = User.FindFirst("TenantId")?.Value;
+            if (!string.IsNullOrEmpty(tenantIdStr) && int.TryParse(tenantIdStr, out int tenantId))
+                return tenantId;
+            return null;
+        }
+
+        private string? GetUserRole()
+        {
+            var role = User.FindFirst("role")?.Value;
+            if (string.IsNullOrEmpty(role)) role = User.Claims.FirstOrDefault(c => c.Type.ToLower().Contains("role"))?.Value;
+            return role;
+        }
+
+        private (bool ok, string? roleFound) AccessCheck(params string[] allowedRoles)
+        {
+            var role = GetUserRole();
+            if (role == null) return (false, null);
+            return (allowedRoles.Any(r => r.Equals(role, StringComparison.OrdinalIgnoreCase)), role);
+        }
+
+        private IActionResult ForbiddenResponse(string action, string? roleFound)
+        {
+            return StatusCode(403, new 
+            { 
+                error = "Forbidden", 
+                message = $"Role '{roleFound}' is not authorized for {action}.",
+                roleFound = roleFound,
+                userId = User.FindFirst("sub")?.Value
+            });
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Asset>>> GetAssets([FromQuery] bool? showArchived = null)
+        public async Task<IActionResult> GetAssets([FromQuery] bool? showArchived = null)
         {
-            if (showArchived == true)
-            {
-                 return await _context.Assets.Where(a => a.Status == "Archived").ToListAsync();
-            }
-            else if (showArchived == false)
-            {
-                return await _context.Assets.Where(a => a.Status != "Archived").ToListAsync();
-            }
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Procurement", "Employee");
+            if (!check.ok) return ForbiddenResponse("View Assets", check.roleFound);
             
-            return await _context.Assets.ToListAsync();
+            var tenantId = GetTenantIdFromClaims();
+            var assets = await _assetService.GetAssetsAsync(tenantId, showArchived);
+            return Ok(assets);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Asset>> GetAsset(string id)
+        public async Task<IActionResult> GetAsset(string id)
         {
-            var asset = await _context.Assets.FindAsync(id);
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Procurement", "Employee");
+            if (!check.ok) return ForbiddenResponse("View Asset", check.roleFound);
 
-            if (asset == null)
-            {
-                return NotFound();
-            }
-
-            return asset;
+            var asset = await _assetService.GetAssetByIdAsync(id);
+            if (asset == null) return NotFound();
+            return Ok(asset);
         }
 
         [HttpPost]
-        public async Task<ActionResult<Asset>> PostAsset(Asset asset)
+        public async Task<IActionResult> PostAsset(Asset asset)
         {
-            _context.Assets.Add(asset);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (AssetExists(asset.Id))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Procurement");
+            if (!check.ok) return ForbiddenResponse("Create Asset", check.roleFound);
 
-            return CreatedAtAction("GetAsset", new { id = asset.Id }, asset);
+            var createdAsset = await _assetService.CreateAssetAsync(asset);
+            return CreatedAtAction(nameof(GetAsset), new { id = createdAsset.Id }, createdAsset);
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutAsset(string id, Asset asset)
         {
-            if (id != asset.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(asset).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AssetExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Procurement");
+            if (!check.ok) return ForbiddenResponse("Edit Asset", check.roleFound);
+            await _assetService.UpdateAssetAsync(asset);
             return NoContent();
         }
 
         [HttpPut("archive/{id}")]
         public async Task<IActionResult> ArchiveAsset(string id)
         {
-            var asset = await _context.Assets.FindAsync(id);
-            if (asset == null)
-            {
-                return NotFound();
-            }
-
-            asset.Status = "Archived";
-            _context.Entry(asset).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AssetExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Archive Asset", check.roleFound);
+            await _assetService.ArchiveAssetAsync(id);
             return NoContent();
         }
 
         [HttpPut("restore/{id}")]
         public async Task<IActionResult> RestoreAsset(string id)
         {
-            var asset = await _context.Assets.FindAsync(id);
-            if (asset == null)
-            {
-                return NotFound();
-            }
-
-            asset.Status = "Active"; // Or previous status? Default to Active.
-            _context.Entry(asset).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AssetExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Restore Asset", check.roleFound);
+            await _assetService.RestoreAssetAsync(id);
             return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsset(string id)
         {
-            var asset = await _context.Assets.FindAsync(id);
-            if (asset == null)
-            {
-                return NotFound();
-            }
-
-            _context.Assets.Remove(asset);
-            await _context.SaveChangesAsync();
-
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin");
+            if (!check.ok) return ForbiddenResponse("Delete Asset", check.roleFound);
+            await _assetService.DeleteAssetAsync(id);
             return NoContent();
-        }
-
-        private bool AssetExists(string id)
-        {
-            return _context.Assets.Any(e => e.Id == id);
         }
     }
 }

@@ -4,12 +4,12 @@ import { Category } from '@/types/asset';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 
-export function useCategories(showArchived: boolean = false) {
+export function useCategories(includeArchived: boolean = false) {
     return useQuery({
-        queryKey: ['categories', showArchived],
+        queryKey: ['categories', includeArchived],
         queryFn: async () => {
              const { data } = await api.get<Category[]>('/api/AssetCategories', {
-                params: { showArchived }
+                params: { includeArchived }
             });
             return data;
         },

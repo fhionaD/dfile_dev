@@ -4,9 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Prevent dotnet publish from overwriting our custom web.config.
-         Without this, the SDK replaces processPath/arguments automatically,
-         which breaks self-contained (exe) deployments. -->
+    <!-- Prevent dotnet publish from auto-generating a default web.config.
+         Without this, the SDK replaces our processPath/arguments with its own
+         defaults (processPath=dotnet, arguments=app.dll) which may differ from
+         what we need. We control web.config ourselves. -->
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
 

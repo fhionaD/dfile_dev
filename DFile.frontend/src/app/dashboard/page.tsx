@@ -30,6 +30,7 @@ export default function DashboardPage() {
     };
 
     if (!user) return null;
+    if (user.mustChangePassword) return null; // Guard against leaked API calls before layout redirect
 
     let content;
 
@@ -45,7 +46,7 @@ export default function DashboardPage() {
         );
     } else if (user.role === 'Finance') {
         content = <FinanceDashboard />;
-    } else {
+    } else if (user.role === 'Admin' || user.role === 'Tenant Admin' || user.role === 'Super Admin') {
         // Admin & Super Admin View (Stats + Table)
         content = (
             <div className="space-y-6">
@@ -53,6 +54,19 @@ export default function DashboardPage() {
                 <AssetTable
                     onAssetClick={handleAssetClick}
                 />
+            </div>
+        );
+    } else {
+        // Employee / Default View (Restricted)
+        content = (
+            <div className="p-8 text-center space-y-4">
+                <div className="inline-flex p-4 rounded-full bg-muted">
+                    <PieChart className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold">Node Connected</h2>
+                <p className="text-muted-foreground max-w-sm mx-auto">
+                    Welcome to the DFile Asset Management System. Your account is active, but you do not have administrative permissions for this dashboard.
+                </p>
             </div>
         );
     }

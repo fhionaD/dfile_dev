@@ -14,12 +14,12 @@ export default function SuperAdminDashboard() {
     useEffect(() => {
         if (!isLoading) {
             if (!isLoggedIn) {
-                router.push("/login");
+                router.replace("/login");
             } else if (user?.role !== "Super Admin") {
-                router.push("/dashboard");
+                router.replace("/dashboard");
             }
         }
-    }, [user, isLoggedIn, isLoading, router]);
+    }, [user, isLoggedIn, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (isLoading || !user || user.role !== "Super Admin") {
         return null; // or a spinner/unauthorized view

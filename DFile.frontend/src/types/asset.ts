@@ -27,19 +27,41 @@ export interface User {
     role: UserRole;
     roleLabel: string;
     avatar?: string;
+    tenantId?: number;
+    mustChangePassword?: boolean;
 }
 
-export type UserRole = 'Admin' | 'Maintenance' | 'Procurement' | 'Finance' | 'Super Admin';
+export type UserRole = 'Admin' | 'Tenant Admin' | 'Maintenance' | 'Procurement' | 'Finance' | 'Super Admin' | 'Employee';
 
-export type AssetType = string;
+export interface TenantSubscription {
+    id: number;
+    name: string;
+    subscriptionPlan: number; // 0=Starter, 1=Basic, 2=Pro
+    maxRooms: number;
+    maxPersonnel: number;
+    assetTracking: boolean;
+    depreciation: boolean;
+    maintenanceModule: boolean;
+    reportsLevel: string; // "Standard" | "Able"
+    status: string;
+}
+
+export type HandlingType = "Consumable" | "Moveable" | "Fixed";
 
 export interface Category {
     id: string;
     name: string;
     description: string;
-    type: AssetType;
+    handlingType: HandlingType;
     items: number;
     status: "Active" | "Archived";
+    isArchived: boolean;
+    createdAt?: string;
+    createdBy?: string;
+    updatedAt?: string;
+    updatedBy?: string;
+    archivedAt?: string;
+    archivedBy?: string;
 }
 
 export interface Room {
@@ -96,10 +118,10 @@ export interface Employee {
     lastName: string;
     email: string;
     contactNumber: string;
-    department: string;
     role: string;
     hireDate: string;
     status: "Active" | "Inactive" | "Archived";
+    password?: string; // Used during registration
 }
 
 export interface RoomCategory {
@@ -116,7 +138,6 @@ export interface RoomCategory {
 export interface Role {
     id: string;
     designation: string;
-    department: string;
     scope: string;
     // Optional fields for backward compatibility or future use
     title?: string;
@@ -126,13 +147,6 @@ export interface Role {
     status?: "Active" | "Archived";
 }
 
-export interface Department {
-    id: string;
-    name: string;
-    description: string;
-    head: string;
-    itemCount: number;
-    status: "Active" | "Archived";
-}
+
 
 

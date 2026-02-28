@@ -1,24 +1,13 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PurchaseOrder, Asset } from '@/types/asset';
+import { Asset, PurchaseOrder } from '@/types/asset';
 import { toast } from 'sonner';
 import { useAddAsset } from './use-assets';
+import { procurementService } from '@/services/procurement.service';
 
-// Mock Data
-const MOCK_ORDERS: PurchaseOrder[] = [
-    { id: "PO-001", assetName: "Samsung 55\" Smart TV", category: "Electronics", vendor: "TechSupply Co.", manufacturer: "Samsung", model: "QN90C", serialNumber: "SN-TV55001", purchasePrice: 1200, purchaseDate: "2024-01-15", usefulLifeYears: 5, status: "Delivered", requestedBy: "Alex Thompson", createdAt: "2024-01-10", assetId: "AST-001" },
-    { id: "PO-002", assetName: "Conference Table", category: "Furniture", vendor: "OfficePlus", manufacturer: "Steelcase", model: "CT-2400", serialNumber: "SN-TBL002", purchasePrice: 3200, purchaseDate: "2024-02-01", usefulLifeYears: 10, status: "Delivered", requestedBy: "Alex Thompson", createdAt: "2024-01-25", assetId: "AST-010" },
-    { id: "PO-003", assetName: "Industrial Drill", category: "Maintenance", vendor: "ToolMaster", manufacturer: "DeWalt", model: "DW-500", serialNumber: "SN-DRL003", purchasePrice: 300, purchaseDate: "2024-03-01", usefulLifeYears: 3, status: "Approved", requestedBy: "Alex Thompson", createdAt: "2024-02-28" },
-];
-
-export function usePurchaseOrders() {
+export function usePurchaseOrders(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['purchaseOrders'],
-        queryFn: async () => {
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 500));
-            return MOCK_ORDERS;
-        },
+        queryKey: ['purchaseOrders', showArchived],
+        queryFn: () => procurementService.getPurchaseOrders(showArchived),
     });
 }
 
@@ -28,21 +17,23 @@ export function useCreateOrder() {
 
     return useMutation({
         mutationFn: async ({ order, asset }: { order: PurchaseOrder; asset: Asset }) => {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // 1. Create the Purchase Order via service
+            const newOrder = await procurementService.createPurchaseOrder(order);
 
-            // If we were real, we'd probably create the order first, then the asset, or simpler
-            // For now, we mimic the DataContext behavior: create order + create asset
-            return order;
+            // 2. Also trigger asset creation (Registration)
+            await addAssetMutation.mutateAsync(asset);
+
+            return newOrder;
         },
-        onSuccess: async (data, variables) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
-            // Also trigger asset creation
-            // Note: In a real app, the backend might handle this transactionally
-            await addAssetMutation.mutateAsync(variables.asset);
-
-            toast.success('Procurement order initiated');
+            toast.success('Procurement order initiated and asset registered');
         },
+        onError: (error: any) => {
+            console.error('Failed to create order:', error);
+            const message = error.response?.data?.Message || error.message || 'Failed to initiate procurement order';
+            toast.error(message);
+        }
     });
 }
 
@@ -50,13 +41,30 @@ export function useArchiveOrder() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (id: string) => {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-        },
+        mutationFn: (id: string) => procurementService.archivePurchaseOrder(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
             toast.success('Order archived');
         },
+        onError: (error: any) => {
+            console.error('Failed to archive order:', error);
+            toast.error(error.response?.data?.Message || 'Failed to archive order');
+        }
+    });
+}
+
+export function useRestoreOrder() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => procurementService.restorePurchaseOrder(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            toast.success('Order restored');
+        },
+        onError: (error: any) => {
+            console.error('Failed to restore order:', error);
+            toast.error(error.response?.data?.Message || 'Failed to restore order');
+        }
     });
 }

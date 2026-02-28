@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -26,58 +26,65 @@ interface NavItem {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { user, logout, isLoggedIn } = useAuth();
+    const { user, logout, isLoggedIn, tenant, isLoading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
 
-    const mainNavItems: NavItem[] = [
+    // Build nav items, filtering based on subscription plan
+    const mainNavItems: NavItem[] = useMemo(() => [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, // Allowed for all
-        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
-        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Procurement', 'Super Admin'] },
-        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin', 'Super Admin'] },
-        { href: "/dashboard/depreciation", label: "Asset Depreciation", icon: TrendingDown, allowedRoles: ['Admin', 'Finance', 'Super Admin'] },
-        { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
-        { href: "/dashboard/tasks", label: "Task Management", icon: LayoutGrid, allowedRoles: ['Admin', 'Maintenance', 'Super Admin'] },
-    ];
+        { href: "/dashboard/procurement", label: "Asset Acquisition / Purchase", icon: ShoppingCart, allowedRoles: ['Admin', 'Tenant Admin', 'Procurement', 'Finance', 'Super Admin'] },
+        { href: "/dashboard/inventory", label: "Asset Registration & Tagging", icon: QrCode, allowedRoles: ['Admin', 'Tenant Admin', 'Procurement', 'Maintenance', 'Super Admin'] },
+        { href: "/dashboard/asset-categories", label: "Asset Categories", icon: LayoutGrid, allowedRoles: ['Admin', 'Tenant Admin', 'Procurement', 'Maintenance', 'Super Admin'] },
+        { href: "/dashboard/allocation", label: "Asset Allocation / Assignment", icon: UserCheck, allowedRoles: ['Admin', 'Tenant Admin', 'Super Admin'] },
+        { href: "/dashboard/depreciation", label: "Asset Depreciation", icon: TrendingDown, allowedRoles: ['Admin', 'Tenant Admin', 'Finance', 'Super Admin'] },
+        // Only show Maintenance if subscription allows it (or no tenant = Super Admin)
+        ...((!tenant || tenant.maintenanceModule) ? [
+            { href: "/dashboard/maintenance", label: "Asset Maintenance & Repair", icon: Wrench, allowedRoles: ['Admin', 'Tenant Admin', 'Maintenance', 'Super Admin'] as UserRole[] },
+        ] : []),
+        { href: "/dashboard/tasks", label: "Task Management", icon: LayoutGrid, allowedRoles: ['Admin', 'Tenant Admin', 'Maintenance', 'Super Admin'] },
+    ], [tenant]);
 
-    const adminNavItems: NavItem[] = [
-        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin', 'Super Admin'] },
-        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin', 'Super Admin'] },
-    ];
+    const adminNavItems: NavItem[] = useMemo(() => [
+        { href: "/dashboard/rooms", label: "Room Units", icon: DoorOpen, allowedRoles: ['Admin', 'Tenant Admin', 'Super Admin'] },
+        { href: "/dashboard/organization", label: "Organization", icon: Building2, allowedRoles: ['Admin', 'Tenant Admin', 'Super Admin'] },
+    ], []);
 
-    const superAdminNavItems: NavItem[] = [
+    const superAdminNavItems: NavItem[] = useMemo(() => [
         { href: "/dashboard/super-admin/dashboard", label: "Super Admin Control", icon: UserCheck, allowedRoles: ['Super Admin'] },
         { href: "/dashboard/super-admin/create-tenant", label: "Create Tenant", icon: Building2, allowedRoles: ['Super Admin'] },
-    ];
+    ], []);
 
-    const allNavItems = [...mainNavItems, ...adminNavItems, ...superAdminNavItems];
+    const allNavItems = useMemo(() => [...mainNavItems, ...adminNavItems, ...superAdminNavItems], [mainNavItems, adminNavItems, superAdminNavItems]);
 
     useEffect(() => {
-        if (!isLoggedIn) {
-            router.push("/login");
+        if (!isLoading && !isLoggedIn) {
+            router.replace("/login");
             return;
         }
 
-        // Route Protection
-        // 1. Find the nav item that matches the current path
-        //    (We check if pathname starts with the item href to handle potential sub-routes, 
-        //     but exact match is safer for this flat structure, or strict prefix)
-        //    For now, exact match or simple parent check.
-        //    Actually, /dashboard is allowed for everyone in the list, but we need to check specific pages.
+        if (!isLoading && isLoggedIn && user) {
+            if (user.mustChangePassword && pathname !== "/dashboard/change-password") {
+                router.replace("/dashboard/change-password");
+                return;
+            }
+            if (!user.mustChangePassword && pathname === "/dashboard/change-password") {
+                router.replace("/dashboard");
+                return;
+            }
+        }
 
-        // Skip check for root dashboard as it's the fallback
+        // Route Protection
         if (pathname === "/dashboard") return;
 
         const currentItem = allNavItems.find(item => item.href === pathname);
 
         if (currentItem && currentItem.allowedRoles && user && !currentItem.allowedRoles.includes(user.role)) {
-            // Unauthorized
-            router.push("/dashboard");
-            // You might want to show a toast here
+            router.replace("/dashboard");
         }
-    }, [isLoggedIn, router, pathname, user, allNavItems]);
+    }, [isLoggedIn, pathname, user, allNavItems, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!user) return null; // Or a loading spinner
 
@@ -87,8 +94,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         // Strict active check to avoid partial matches on root path being active for subpaths
         // Normalize pathname by removing trailing slash for consistent comparison
         const normalizedPath = pathname?.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
-        
-        const isActive = item.href === "/dashboard" 
+
+        const isActive = item.href === "/dashboard"
             ? normalizedPath === "/dashboard"
             : normalizedPath.startsWith(item.href);
 
@@ -142,9 +149,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Image src="/d_file.svg" alt="DFILE" width={180} height={90} className="w-auto h-24 object-contain" priority />
                         </div>
                     )}
-                     <Button 
-                        variant="ghost" 
-                        size="icon" 
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setIsCollapsed(!isCollapsed)}
                         className="text-muted-foreground hover:text-foreground"
                     >
@@ -169,12 +176,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     {adminNavItems.some(item => !item.allowedRoles || item.allowedRoles.includes(user.role)) && (
                         <section>
-                             {!isCollapsed && (
+                            {!isCollapsed && (
                                 <div className="flex items-center gap-2 px-2 mb-2">
                                     <span className="w-1 h-3 rounded-full bg-primary/40"></span>
                                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Administrator</p>
                                 </div>
-                             )}
+                            )}
                             <div className="space-y-1">
                                 {adminNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
                                     <NavButton key={item.href} item={item} />
@@ -185,12 +192,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     {superAdminNavItems.some(item => !item.allowedRoles || item.allowedRoles.includes(user.role)) && (
                         <section>
-                             {!isCollapsed && (
+                            {!isCollapsed && (
                                 <div className="flex items-center gap-2 px-2 mb-2">
                                     <span className="w-1 h-3 rounded-full bg-primary/40"></span>
                                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">SUPER ADMIN</p>
                                 </div>
-                             )}
+                            )}
                             <div className="space-y-1">
                                 {superAdminNavItems.filter(item => !item.allowedRoles || item.allowedRoles.includes(user.role)).map((item) => (
                                     <NavButton key={item.href} item={item} />
@@ -291,9 +298,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full border-2 border-background" />
                         </button>
                         <div className="flex items-center gap-2.5 pl-1">
-                            <div className="text-right hidden md:block">
-                                <p className="text-sm font-medium text-foreground leading-tight">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">{user.roleLabel}</p>
+                            <div className="text-right hidden md:block group cursor-pointer" onClick={() => router.push("/dashboard/change-password")}>
+                                <p className="text-sm font-medium text-foreground leading-tight group-hover:text-primary transition-colors">{user.name}</p>
+                                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">{user.roleLabel} • <span className="underline decoration-dotted">Settings</span></p>
                             </div>
                             <Avatar className="h-8 w-8 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
                                 {/* <AvatarImage src="/d_file.png" alt="Profile" /> */}
@@ -304,8 +311,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </header>
 
                 <div className="px-4 sm:px-6 lg:px-8 pt-4 pb-20 max-w-[1400px] mx-auto">
-                    {/* Hide Dashboard header for Finance role as they have custom dashboard header */}
-                    {!(getPageTitle() === 'Dashboard' && user?.role === 'Finance' || getPageTitle() === 'Asset Maintenance & Repair') && (
+                    {/* Hide Dashboard header for specific roles on root page as they have custom dashboard headers */}
+                    {!(pathname === '/dashboard' && (user?.role === 'Finance' || user?.role === 'Employee')) && (
                         <div className="mb-4">
                             <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
                                 {getPageTitle()}

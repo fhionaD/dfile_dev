@@ -1,32 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Fingerprint, Plus, Shield, ChevronRight, Users, Mail, Phone, Building2, Archive, RotateCcw, Search, Filter } from "lucide-react";
+import { Fingerprint, Plus, Shield, ChevronRight, Users, Mail, Phone, Archive, RotateCcw, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Employee } from "@/types/asset";
-
-interface Role {
-    id: string;
-    designation: string;
-    department: string;
-    scope: string;
-}
+import { Employee, Role } from "@/types/asset";
 
 interface RolesDashboardProps {
     roles: Role[];
     employees: Employee[];
-    onOpenModal: () => void;
     onAddPersonnel: () => void;
     onEmployeeClick?: (employee: Employee) => void;
     onArchiveEmployee?: (id: string) => void;
 }
 
-export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, onEmployeeClick, onArchiveEmployee }: RolesDashboardProps) {
+export function RolesDashboard({ roles, employees, onAddPersonnel, onEmployeeClick, onArchiveEmployee }: RolesDashboardProps) {
     const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("All");
@@ -54,7 +46,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
         return true;
     });
 
-    const uniqueRoles = Array.from(new Set(employees.map(e => e.role).filter(role => role && role.trim() !== ""))).sort();
+    const uniqueRoles = ["Finance Manager", "Maintenance Manager"];
 
     const statusColor: Record<string, string> = {
         Active: "text-emerald-800 dark:text-emerald-400",
@@ -72,7 +64,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                             placeholder="Search employees..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-10 bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="pl-9 h-10 bg-background text-sm"
                         />
                     </div>
                     <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -94,10 +86,6 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                         <Plus size={16} className="mr-2" />
                         Register Personnel
                     </Button>
-                    <Button onClick={onOpenModal} size="sm" className="h-10 text-sm bg-primary text-primary-foreground shadow-sm">
-                        <Shield size={16} className="mr-2" />
-                        Deploy Role
-                    </Button>
                     <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm w-[160px] justify-start" onClick={() => setShowArchived(!showArchived)}>
                         {showArchived ? <><RotateCcw size={16} className="mr-2" />Show Active ({activeEmps.length})</> : <><Archive size={16} className="mr-2" />Show Archive ({archivedEmps.length})</>}
                     </Button>
@@ -114,7 +102,6 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[200px]">Name</TableHead>
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[250px]">Email</TableHead>
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[140px]">Contact</TableHead>
-                                <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[140px]">Department</TableHead>
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[140px]">Role</TableHead>
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[120px]">Hire Date</TableHead>
                                 <TableHead className="h-10 px-4 py-3 text-left align-middle font-medium text-muted-foreground text-xs w-[100px]">Status</TableHead>
@@ -151,11 +138,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                                                 {emp.contactNumber}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle border-b border-border">
-                                            <div className="px-4 py-3 w-[140px] truncate text-sm text-muted-foreground font-normal" title={emp.department}>
-                                                {emp.department}
-                                            </div>
-                                        </TableCell>
+
                                         <TableCell className="p-0 align-middle border-b border-border">
                                             <div className="px-4 py-3 w-[140px] truncate text-sm text-muted-foreground font-normal" title={emp.role}>
                                                 {emp.role}
@@ -176,7 +159,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                                         <TableCell className="p-0 align-middle text-center border-b border-border">
                                             <div className="px-4 py-3 w-[80px] flex justify-center">
                                                 <Button
-                                                    variant="ghost" 
+                                                    variant="ghost"
                                                     size="icon"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -218,7 +201,6 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="text-sm font-medium text-foreground">{role.designation}</h3>
-                                        <p className="text-xs text-muted-foreground mt-0.5">Dept: {role.department}</p>
                                     </div>
                                     <div className="flex-1 max-w-xs bg-muted/50 p-3 rounded-lg text-xs text-muted-foreground leading-relaxed hidden md:block border border-border/50">
                                         &ldquo;{role.scope}&rdquo;

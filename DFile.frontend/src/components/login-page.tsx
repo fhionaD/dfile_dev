@@ -23,20 +23,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
                     </div>
 
-                    {/* Header */}
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="grid h-10 w-10 place-items-center  bg-white/10 backdrop-blur-sm border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
-                                <span className="font-black tracking-tight">D</span>
-                            </div>
-                            <div className="flex flex-col leading-tight">
-                                <span className="text-lg font-semibold tracking-tight">DFile</span>
-                                <span className="text-xs text-white/70">
-                                    Asset Management System
-                                </span>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Center Visual */}
                     <div className="relative z-10 flex items-center justify-center py-10">

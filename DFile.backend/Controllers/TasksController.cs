@@ -3,12 +3,14 @@ using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Linq;
 
 namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize] 
     public class TasksController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -18,128 +20,96 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
-        // GET: api/Tasks
+        private int? GetTenantIdFromClaims()
+        {
+            var tenantIdStr = User.FindFirst("TenantId")?.Value;
+            if (!string.IsNullOrEmpty(tenantIdStr) && int.TryParse(tenantIdStr, out int tenantId))
+                return tenantId;
+            return null;
+        }
+
+        private string? GetUserRole()
+        {
+            var role = User.FindFirst("role")?.Value;
+            if (string.IsNullOrEmpty(role)) role = User.Claims.FirstOrDefault(c => c.Type.ToLower().Contains("role"))?.Value;
+            return role;
+        }
+
+        private (bool ok, string? roleFound) AccessCheck(params string[] allowedRoles)
+        {
+            var role = GetUserRole();
+            if (role == null) return (false, null);
+            return (allowedRoles.Any(r => r.Equals(role, StringComparison.OrdinalIgnoreCase)), role);
+        }
+
+        private IActionResult ForbiddenResponse(string action, string? roleFound)
+        {
+            return StatusCode(403, new 
+            { 
+                error = "Forbidden", 
+                message = $"Role '{roleFound}' is not authorized for {action}.",
+                roleFound = roleFound,
+                userId = User.FindFirst("sub")?.Value
+            });
+        }
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<TaskItem>>> GetTasks([FromQuery] bool showArchived = false)
+        public async Task<IActionResult> GetTasks([FromQuery] bool showArchived = false)
         {
-            return await _context.Tasks.Where(t => t.Archived == showArchived).ToListAsync();
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Employee");
+            if (!check.ok) return ForbiddenResponse("View Tasks", check.roleFound);
+
+            var tenantId = GetTenantIdFromClaims();
+            IQueryable<TaskItem> query = _context.Tasks.Where(t => t.Archived == showArchived);
+            if (tenantId.HasValue) query = query.Where(t => t.TenantId == tenantId.Value);
+            var result = await query.ToListAsync();
+            return Ok(result);
         }
 
-        // GET: api/Tasks/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<TaskItem>> GetTask(string id)
+        public async Task<IActionResult> GetTask(int id)
         {
-            var task = await _context.Tasks.FindAsync(id);
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Employee");
+            if (!check.ok) return ForbiddenResponse("View Task", check.roleFound);
 
-            if (task == null)
-            {
-                return NotFound();
-            }
-
-            return task;
+            var taskItem = await _context.Tasks.FindAsync(id);
+            if (taskItem == null) return NotFound();
+            return Ok(taskItem);
         }
 
-        // POST: api/Tasks
         [HttpPost]
-        public async Task<ActionResult<TaskItem>> PostTask(TaskItem task)
+        public async Task<IActionResult> PostTask(TaskItem taskItem)
         {
-            _context.Tasks.Add(task);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (TaskExists(task.Id))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Employee");
+            if (!check.ok) return ForbiddenResponse("Create Task", check.roleFound);
 
-            return CreatedAtAction("GetTask", new { id = task.Id }, task);
-        }
-
-        // PUT: api/Tasks/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutTask(string id, TaskItem task)
-        {
-            if (id != task.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(task).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!TaskExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // PUT: api/Tasks/restore/5
-        [HttpPut("restore/{id}")]
-        public async Task<IActionResult> RestoreTask(string id)
-        {
-            var task = await _context.Tasks.FindAsync(id);
-            if (task == null)
-            {
-                return NotFound();
-            }
-
-            task.Archived = false;
-            _context.Entry(task).State = EntityState.Modified;
-            
-            try 
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!TaskExists(id)) throw;
-            }
-
-            return NoContent();
-        }
-
-        // DELETE: api/Tasks/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteTask(string id)
-        {
-            var task = await _context.Tasks.FindAsync(id);
-            if (task == null)
-            {
-                return NotFound();
-            }
-
-            // Soft delete
-            task.Archived = true;
-            _context.Entry(task).State = EntityState.Modified;
-            
+            var tenantId = GetTenantIdFromClaims();
+            if (tenantId.HasValue) taskItem.TenantId = tenantId.Value;
+            _context.Tasks.Add(taskItem);
             await _context.SaveChangesAsync();
+            return CreatedAtAction("GetTask", new { id = taskItem.Id }, taskItem);
+        }
 
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutTask(int id, TaskItem taskItem)
+        {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Edit Task", check.roleFound);
+            _context.Entry(taskItem).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        private bool TaskExists(string id)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteTask(int id)
         {
-            return _context.Tasks.Any(e => e.Id == id);
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin");
+            if (!check.ok) return ForbiddenResponse("Delete Task", check.roleFound);
+            var taskItem = await _context.Tasks.FindAsync(id);
+            if (taskItem == null) return NotFound();
+            _context.Tasks.Remove(taskItem);
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
     }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Package, Tag, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
+import { Package, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +23,9 @@ interface AddAssetFormProps {
 
 export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
-    const [selectedType, setSelectedType] = useState<string>(initialData ? 
-        (categories.find(c => c.name === initialData.cat)?.type || "Tangible") 
-        : "Tangible");
+    const [selectedHandlingType, setSelectedHandlingType] = useState<string>(initialData ? 
+        (categories.find(c => c.name === initialData.cat)?.handlingType || "Fixed") 
+        : "Fixed");
     const [isManufacturerOpen, setIsManufacturerOpen] = useState(!!initialData?.manufacturer);
     
     // Using refs for file inputs to programmatically click them
@@ -100,7 +100,9 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category <span className="text-destructive">*</span></Label>
                                 <Select name="category" defaultValue={initialCategoryId} onValueChange={(val) => {
                                     const cat = categories.find(c => c.id === val);
-                                    if (cat) setSelectedType(cat.type);
+                                    if (cat) {
+                                        setSelectedHandlingType(cat.handlingType);
+                                    }
                                 }}>
                                     <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select Category..." /></SelectTrigger>
                                     <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
@@ -112,15 +114,11 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             </div>
 
                             <div className="space-y-2.5">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Type</Label>
-                                <Select name="type" value={selectedType} onValueChange={setSelectedType}>
-                                    <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
-                                    <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
-                                        {Array.from(new Set([...categories.map(c => c.type), "Tangible", "Intangible"])).map(t => (
-                                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Handling Type</Label>
+                                <div className="flex items-center gap-3 h-10 px-3 rounded-md border bg-muted/30 text-muted-foreground text-sm font-medium">
+                                    <Layers size={14} className="text-primary/70" />
+                                    {selectedHandlingType}
+                                </div>
                             </div>
 
                             <div className="space-y-2.5">
@@ -261,10 +259,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Warranty Expiry">Warranty Expiry</Label>
                                         <Input name="warrantyExpiry" defaultValue={initialData?.warrantyExpiry ? new Date(initialData.warrantyExpiry).toISOString().split('T')[0] : ''} type="date" className="h-9 bg-background" />
                                     </div>
-                                    <div className="space-y-2.5">
-                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Next Maintenance">Next Maintenance</Label>
-                                        <Input name="nextMaintenance" defaultValue={initialData?.nextMaintenance ? new Date(initialData.nextMaintenance).toISOString().split('T')[0] : ''} type="date" className="h-9 bg-background" />
-                                    </div>
+                                    {/* Next Maintenance field removed */}
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>

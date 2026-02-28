@@ -1,4 +1,5 @@
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\web.config
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\web.config
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\appsettings.json
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish\appsettings.Development.json
@@ -9,10 +10,6 @@ C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\publish
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.staticwebassets.runtime.json
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.staticwebassets.endpoints.json
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.exe
-C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.deps.json
-C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.runtimeconfig.json
-C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.dll
-C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.pdb
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\Azure.Core.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\Azure.Identity.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\BCrypt.Net-Next.dll
@@ -197,6 +194,9 @@ C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.b
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.backend.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\refint\dfile.backend.dll
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.backend.pdb
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.deps.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.runtimeconfig.json
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.dll
+C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\dfile.backend.pdb
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\dfile.backend.genruntimeconfig.cache
 C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\obj\Debug\net8.0\ref\dfile.backend.dll
-C:\Users\Fhiona Domini\source\repos\DFile\DFile.backend\bin\Debug\net8.0\web.config

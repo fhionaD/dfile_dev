@@ -39,17 +39,12 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
   return (
     <div className={cn("flex flex-col gap-10", className)} {...props}>
       <div className="space-y-4 text-center lg:text-left">
-        <div className="flex justify-center lg:justify-start mb-4">
-          <img src="/AMS.svg" alt="AMS Logo" className="h-16 w-auto dark:hidden" />
-          <img src="/AMS_dark.svg" alt="AMS Logo" className="h-16 w-auto hidden dark:block" />
-        </div>
+
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-[#182350] dark:text-white">
             Welcome back
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Sign in to manage assets with speed and clarity.
-          </p>
+
         </div>
       </div>
 
@@ -118,7 +113,7 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
         <div className="pt-4">
           <Button
             type="submit"
-            className="w-full h-12  bg-gradient-to-r from-[#182350] to-[#243575] text-white hover:to-[#182350] hover:shadow-lg hover:-translate-y-0.5 font-bold tracking-wide shadow-md shadow-[#182350]/20 transition-all duration-300 active:scale-[0.98]"
+            className="w-full h-12  bg-gradient-to-r from-[#182350] to-[#243575] text-white hover:to-[#182350] hover:shadow-lg"
             disabled={isLoading}
           >
             {isLoading ? (
@@ -131,9 +126,7 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
             )}
           </Button>
 
-          <p className="mt-6 text-center text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-slate-500">
-            Protected by DFile Security
-          </p>
+
         </div>
       </form>
     </div>

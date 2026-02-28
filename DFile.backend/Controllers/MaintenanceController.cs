@@ -3,6 +3,8 @@ using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Linq;
 
 namespace DFile.backend.Controllers
 {
@@ -18,154 +20,137 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
-        // GET: api/maintenance
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<MaintenanceRecord>>> GetMaintenanceRecords([FromQuery] bool showArchived = false)
+        private int? GetTenantIdFromClaims()
         {
-            return await _context.MaintenanceRecords.Where(r => r.Archived == showArchived).OrderByDescending(r => r.CreatedAt).ToListAsync();
+            var tenantIdStr = User.FindFirst("TenantId")?.Value;
+            if (!string.IsNullOrEmpty(tenantIdStr) && int.TryParse(tenantIdStr, out int tenantId))
+                return tenantId;
+            return null;
         }
 
-        // GET: api/maintenance/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<MaintenanceRecord>> GetMaintenanceRecord(string id)
+        private string? GetUserRole()
         {
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var role = User.FindFirst("role")?.Value;
+            if (string.IsNullOrEmpty(role)) role = User.Claims.FirstOrDefault(c => c.Type.ToLower().Contains("role"))?.Value;
+            return role;
+        }
 
-            if (record == null)
+        private (bool ok, string? roleFound) AccessCheck(params string[] allowedRoles)
+        {
+            var role = GetUserRole();
+            if (role == null) return (false, null);
+            return (allowedRoles.Any(r => r.Equals(role, StringComparison.OrdinalIgnoreCase)), role);
+        }
+
+        private IActionResult ForbiddenResponse(string action, string? roleFound)
+        {
+            Console.WriteLine($"[Maintenance Auth] DENIED - Role: '{roleFound}', Action: {action}, Path: {Request.Path}");
+            return StatusCode(403, new 
+            { 
+                error = "Forbidden", 
+                message = $"Role '{roleFound}' is not authorized for {action}.",
+                roleFound = roleFound,
+                userId = User.FindFirst("sub")?.Value
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetMaintenanceRecords([FromQuery] bool showArchived = false)
+        {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Employee", "Procurement");
+            if (!check.ok) return ForbiddenResponse("View Records", check.roleFound);
+
+            var tenantId = GetTenantIdFromClaims();
+            IQueryable<MaintenanceRecord> query = _context.MaintenanceRecords;
+
+            if (tenantId.HasValue)
             {
-                return NotFound();
+                query = query.Where(r => r.TenantId == tenantId.Value);
             }
 
-            return record;
+            var records = await query.Where(r => r.Archived == showArchived).OrderByDescending(r => r.CreatedAt).ToListAsync();
+            return Ok(records);
         }
 
-        // POST: api/maintenance
-        [HttpPost]
-        public async Task<ActionResult<MaintenanceRecord>> PostMaintenanceRecord(MaintenanceRecord record)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetMaintenanceRecord(string id)
         {
-            if (string.IsNullOrEmpty(record.Id))
-                record.Id = Guid.NewGuid().ToString();
-            
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Employee", "Procurement");
+            if (!check.ok) return ForbiddenResponse("View Record", check.roleFound);
+
+            var record = await _context.MaintenanceRecords.FindAsync(id);
+            if (record == null) return NotFound();
+            return Ok(record);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> PostMaintenanceRecord(MaintenanceRecord record)
+        {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance", "Finance", "Employee");
+            if (!check.ok) return ForbiddenResponse("Create Record", check.roleFound);
+
+            var tenantId = GetTenantIdFromClaims();
+            if (tenantId.HasValue)
+            {
+                var tenant = await _context.Tenants.FindAsync(tenantId.Value);
+                if (tenant != null && !tenant.MaintenanceModule)
+                {
+                    return BadRequest(new { message = "Maintenance module is not available on your current subscription plan." });
+                }
+                record.TenantId = tenantId.Value;
+            }
+
+            if (string.IsNullOrEmpty(record.Id)) record.Id = Guid.NewGuid().ToString();
             record.CreatedAt = DateTime.UtcNow;
             _context.MaintenanceRecords.Add(record);
             await _context.SaveChangesAsync();
-
             return CreatedAtAction("GetMaintenanceRecord", new { id = record.Id }, record);
         }
 
-        // PUT: api/maintenance/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutMaintenanceRecord(string id, MaintenanceRecord record)
         {
-            if (id != record.Id)
-            {
-                return BadRequest();
-            }
-
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Edit Record", check.roleFound);
             _context.Entry(record).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MaintenanceRecordExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // PUT: api/maintenance/archive/5
         [HttpPut("archive/{id}")]
         public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
         {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Archive Record", check.roleFound);
             var record = await _context.MaintenanceRecords.FindAsync(id);
-            if (record == null)
-            {
-                return NotFound();
-            }
-
+            if (record == null) return NotFound();
             record.Archived = true;
-            _context.Entry(record).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MaintenanceRecordExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // PUT: api/maintenance/restore/5
         [HttpPut("restore/{id}")]
         public async Task<IActionResult> RestoreMaintenanceRecord(string id)
         {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Restore Record", check.roleFound);
             var record = await _context.MaintenanceRecords.FindAsync(id);
-            if (record == null)
-            {
-                return NotFound();
-            }
-
+            if (record == null) return NotFound();
             record.Archived = false;
-            _context.Entry(record).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MaintenanceRecordExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // DELETE: api/maintenance/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMaintenanceRecord(string id)
         {
+            var check = AccessCheck("Admin", "Tenant Admin", "Super Admin", "Maintenance");
+            if (!check.ok) return ForbiddenResponse("Delete Record", check.roleFound);
             var record = await _context.MaintenanceRecords.FindAsync(id);
-            if (record == null)
-            {
-                return NotFound();
-            }
-
+            if (record == null) return NotFound();
             _context.MaintenanceRecords.Remove(record);
             await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        private bool MaintenanceRecordExists(string id)
-        {
-            return _context.MaintenanceRecords.Any(e => e.Id == id);
         }
     }
 }

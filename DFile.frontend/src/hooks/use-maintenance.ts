@@ -11,10 +11,18 @@ export function useMaintenanceRecords(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['maintenance', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<MaintenanceRecord[]>('/api/maintenance', {
-                params: { showArchived }
-            });
-            return data;
+            try {
+                const { data } = await api.get<MaintenanceRecord[]>('/api/maintenance', {
+                    params: { showArchived }
+                });
+                return data;
+            } catch (error: any) {
+                if (error.response?.status === 403) {
+                    toast.error('You do not have permission to view maintenance records');
+                    console.error('[Maintenance] 403 Forbidden - Check your user role permissions', error.response.data);
+                }
+                throw error;
+            }
         },
     });
 }
@@ -62,10 +70,10 @@ export function useUpdateMaintenanceStatus() {
 
     return useMutation({
         mutationFn: async ({ id, status }: { id: string; status: any }) => {
-             const { data: record } = await api.get<MaintenanceRecord>(`/api/maintenance/${id}`);
-             const updatedRecord = { ...record, status };
-             await api.put(`/api/maintenance/${id}`, updatedRecord);
-             return updatedRecord;
+            const { data: record } = await api.get<MaintenanceRecord>(`/api/maintenance/${id}`);
+            const updatedRecord = { ...record, status };
+            await api.put(`/api/maintenance/${id}`, updatedRecord);
+            return updatedRecord;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });

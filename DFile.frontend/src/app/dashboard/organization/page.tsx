@@ -2,28 +2,29 @@
 
 import { useState } from "react";
 import { RolesDashboard } from "@/components/roles-dashboard";
-import { CreateRoleModal } from "@/components/modals/create-role-modal";
 import { AddEmployeeModal } from "@/components/modals/add-employee-modal";
 import { EmployeeDetailsModal } from "@/components/modals/employee-details-modal";
-import { useRoles, useEmployees, useDepartments, useAddRole, useAddEmployee, useArchiveEmployee, useUpdateEmployee } from "@/hooks/use-organization";
+import { PasswordDisplayModal } from "@/components/modals/password-display-modal";
+import { useRoles, useEmployees, useAddEmployee, useArchiveEmployee, useUpdateEmployee, useResetPassword } from "@/hooks/use-organization";
 import { useAuth } from "@/contexts/auth-context";
-import { Employee } from "@/types/asset";
+import { Employee, Role } from "@/types/asset";
 
 export default function OrganizationPage() {
     const { user } = useAuth();
     const { data: roles = [] } = useRoles();
     const { data: employees = [] } = useEmployees();
-    const { data: departments = [] } = useDepartments();
 
-    const addRoleMutation = useAddRole();
     const addEmployeeMutation = useAddEmployee();
     const updateEmployeeMutation = useUpdateEmployee();
     const archiveEmployeeMutation = useArchiveEmployee();
+    const resetPasswordMutation = useResetPassword();
 
-    const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
     const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
     const [isEmployeeDetailsOpen, setIsEmployeeDetailsOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [tempPassword, setTempPassword] = useState("");
 
     const handleEmployeeClick = (employee: Employee) => {
         setSelectedEmployee(employee);
@@ -34,6 +35,15 @@ export default function OrganizationPage() {
         setSelectedEmployee(employee);
         setIsEmployeeDetailsOpen(false);
         setIsEmployeeModalOpen(true);
+    };
+
+    const handleResetPassword = async (employee: Employee) => {
+        const result = await resetPasswordMutation.mutateAsync(employee.id);
+        if (result && result.temporaryPassword) {
+            setTempPassword(result.temporaryPassword);
+            setIsEmployeeDetailsOpen(false);
+            setIsPasswordModalOpen(true);
+        }
     };
 
     const handleAddEmployee = async (employee: Employee) => {
@@ -51,7 +61,11 @@ export default function OrganizationPage() {
         if (selectedEmployee && selectedEmployee.id === employee.id) {
             await updateEmployeeMutation.mutateAsync(employee);
         } else {
-            await addEmployeeMutation.mutateAsync(employee);
+            const result = await addEmployeeMutation.mutateAsync(employee);
+            if (result && result.temporaryPassword) {
+                setTempPassword(result.temporaryPassword);
+                setIsPasswordModalOpen(true);
+            }
         }
 
         setIsEmployeeModalOpen(false);
@@ -63,16 +77,9 @@ export default function OrganizationPage() {
             <RolesDashboard
                 roles={roles}
                 employees={employees}
-                onOpenModal={() => setIsRoleModalOpen(true)}
                 onAddPersonnel={() => setIsEmployeeModalOpen(true)}
                 onEmployeeClick={handleEmployeeClick}
                 onArchiveEmployee={async (id) => await archiveEmployeeMutation.mutateAsync(id)}
-            />
-
-            <CreateRoleModal
-                open={isRoleModalOpen}
-                onOpenChange={setIsRoleModalOpen}
-                onSave={async (role) => await addRoleMutation.mutateAsync(role)}
             />
 
             <AddEmployeeModal
@@ -81,7 +88,6 @@ export default function OrganizationPage() {
                     setIsEmployeeModalOpen(open);
                     if (!open) setSelectedEmployee(null);
                 }}
-                departments={departments}
                 roles={roles}
                 onAddEmployee={handleAddEmployee}
                 initialData={selectedEmployee}
@@ -92,6 +98,14 @@ export default function OrganizationPage() {
                 onOpenChange={setIsEmployeeDetailsOpen}
                 employee={selectedEmployee}
                 onEdit={handleEditEmployee}
+                onResetPassword={handleResetPassword}
+            />
+
+            <PasswordDisplayModal
+                open={isPasswordModalOpen}
+                onOpenChange={setIsPasswordModalOpen}
+                password={tempPassword}
+                onClose={() => setIsPasswordModalOpen(false)}
             />
         </>
     );

@@ -25,7 +25,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const archiveRecordMutation = useArchiveMaintenanceRecord();
     const restoreRecordMutation = useRestoreMaintenanceRecord();
-    
+
     // Request Filters
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
@@ -73,7 +73,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
         if (!matchesSearch) return false;
         if (statusFilter !== "All" && record.status !== statusFilter) return false;
         if (priorityFilter !== "All" && record.priority !== priorityFilter) return false;
-        
+
         if (dateFilter !== "All Time") {
             const date = new Date(record.dateReported);
             const now = new Date();
@@ -96,12 +96,6 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
 
     return (
         <div className="space-y-6">
-            <div className="mb-4">
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-                    Asset Maintenance & Repair
-                </h1>
-            </div>
-
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-background p-1 rounded-lg">
                 <div className="flex flex-1 gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 items-center">
                     <div className="relative flex-1 max-w-sm min-w-[200px]">
@@ -156,9 +150,9 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                         <Plus size={16} className="mr-2" />
                         Create Ticket
                     </Button>
-                    <Button 
-                        variant={showArchived ? "default" : "outline"} 
-                        size="sm" 
+                    <Button
+                        variant={showArchived ? "default" : "outline"}
+                        size="sm"
                         className="h-10 text-sm w-[160px] justify-start"
                         onClick={() => setShowArchived(!showArchived)}
                     >
@@ -171,68 +165,68 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <Table className="w-full table-fixed">
-                        <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[12%]">Request ID</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[20%]">Asset</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[28%]">Description</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Priority</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[12%]">Date Reported</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Status</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[8%]">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRecords.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
-                                        {showArchived ? "No archived maintenance records yet" : "No maintenance records match your search"}
-                                    </TableCell>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[12%]">Request ID</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[20%]">Asset</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[28%]">Description</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Priority</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[12%]">Date Reported</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Status</TableHead>
+                                    <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[8%]">Action</TableHead>
                                 </TableRow>
-                            ) : (
-                                filteredRecords.map((record) => (
-                                    <TableRow 
-                                        key={record.id} 
-                                        className="border-border cursor-pointer hover:bg-muted/5 transition-colors border-b last:border-0"
-                                        onClick={() => onRecordClick(record)}
-                                    >
-                                        <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
-                                            <div className="flex flex-col items-start">
-                                                <span>{getAssetName(record.assetId)}</span>
-                                                <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground truncate text-left" title={record.description}>{record.description}</TableCell>
-                                        <TableCell className={`px-6 py-4 align-middle text-sm text-center ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground text-center">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-center">
-                                            <Badge variant="outline" className={`text-sm border-none rounded-none bg-transparent inline-flex ${getStatusColor(record.status)}`}>
-                                                {record.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    onClick={() => {
-                                                        if (record.archived) {
-                                                            restoreRecordMutation.mutateAsync(record.id);
-                                                        } else {
-                                                            archiveRecordMutation.mutateAsync(record.id);
-                                                        }
-                                                    }}
-                                                    className={`p-1.5 rounded-md transition-colors ${record.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                    title={record.archived ? 'Restore' : 'Archive'}
-                                                >
-                                                    {record.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
-                                                </button>
-                                            </div>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredRecords.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
+                                            {showArchived ? "No archived maintenance records yet" : "No maintenance records match your search"}
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+                                ) : (
+                                    filteredRecords.map((record) => (
+                                        <TableRow
+                                            key={record.id}
+                                            className="border-border cursor-pointer hover:bg-muted/5 transition-colors border-b last:border-0"
+                                            onClick={() => onRecordClick(record)}
+                                        >
+                                            <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
+                                            <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
+                                                <div className="flex flex-col items-start">
+                                                    <span>{getAssetName(record.assetId)}</span>
+                                                    <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground truncate text-left" title={record.description}>{record.description}</TableCell>
+                                            <TableCell className={`px-6 py-4 align-middle text-sm text-center ${getPriorityColor(record.priority)}`}>{record.priority}</TableCell>
+                                            <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground text-center">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
+                                            <TableCell className="px-6 py-4 align-middle text-center">
+                                                <Badge variant="outline" className={`text-sm border-none rounded-none bg-transparent inline-flex ${getStatusColor(record.status)}`}>
+                                                    {record.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (record.archived) {
+                                                                restoreRecordMutation.mutateAsync(record.id);
+                                                            } else {
+                                                                archiveRecordMutation.mutateAsync(record.id);
+                                                            }
+                                                        }}
+                                                        className={`p-1.5 rounded-md transition-colors ${record.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
+                                                        title={record.archived ? 'Restore' : 'Archive'}
+                                                    >
+                                                        {record.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
+                                                    </button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>

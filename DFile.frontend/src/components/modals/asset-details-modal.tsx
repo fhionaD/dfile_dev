@@ -113,10 +113,7 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                                     <p className="text-xs text-muted-foreground">Warranty Expiry</p>
                                     <p className="font-medium">{asset.warrantyExpiry || "—"}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">Next Maintenance</p>
-                                    <p className="font-medium">{asset.nextMaintenance || "—"}</p>
-                                </div>
+                                {/* Next Maintenance display removed */}
                             </div>
                         </div>
 

@@ -120,16 +120,18 @@ namespace DFile.backend.Data
                 }
                 else
                 {
-                    // Force update password for dev/test convenience
+                    // Force update password and roles for dev/test convenience
                     existingUser.PasswordHash = user.PasswordHash;
-                    // Also ensure TenantId is correct if null? (Optional)
+                    existingUser.Role = user.Role; // FORCE ROLE SYNC
+                    existingUser.RoleLabel = user.RoleLabel;
+                    
                     if (existingUser.TenantId == null && user.TenantId != null)
                     {
                          existingUser.TenantId = user.TenantId;
                     }
                     context.Entry(existingUser).State = EntityState.Modified;
-                    usersAdded = true; // Mark as modified to trigger SaveChanges
-                    Console.WriteLine($"Updated password for existing user: {user.Email}");
+                    usersAdded = true; 
+                    Console.WriteLine($"Updated credentials and ROLE for existing user: {user.Email}");
                 }
             }
 

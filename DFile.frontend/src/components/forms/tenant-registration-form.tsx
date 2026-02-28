@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardTitle, CardHeader, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import api from "@/lib/api";
 
 enum SubscriptionPlanType {
     Starter = 0,
@@ -58,11 +59,15 @@ const plans = [
     }
 ];
 
-export function TenantRegistrationForm() {
+interface TenantRegistrationFormProps {
+    onTenantCreated?: () => void;
+}
+
+export function TenantRegistrationForm({ onTenantCreated }: TenantRegistrationFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanType>(SubscriptionPlanType.Starter);
-    
+
     // Organization Details
     const [tenantName, setTenantName] = useState("");
 
@@ -120,31 +125,35 @@ export function TenantRegistrationForm() {
             return;
         }
 
-        // UI-only as requested for mock
-        console.log("Submitting Tenant Creation:", {
-            tenantName,
-            admin: {
-                firstName,
-                middleName,
-                lastName,
-                workEmail,
-                contactNumber,
-                initialPassword
-            },
-            plan: selectedPlan
-        });
+        try {
+            const adminName = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim();
 
-        // Simulate network delay and success
-        setTimeout(() => {
+            await api.post('/api/tenants', {
+                tenantName,
+                adminName,
+                adminEmail: workEmail,
+                adminPassword: initialPassword,
+                subscriptionPlan: selectedPlan
+            });
+
             setIsLoading(false);
             setSuccess(true);
-            
+
+            // Notify parent to refresh tenant list
+            if (onTenantCreated) {
+                onTenantCreated();
+            }
+
             // Auto hide success message and reset form after 3 seconds
             setTimeout(() => {
                 setSuccess(false);
                 resetForm();
             }, 3000);
-        }, 1500);
+        } catch (error: any) {
+            setIsLoading(false);
+            const message = error.response?.data?.message || error.response?.data || error.message || "Failed to create tenant";
+            setErrors({ submit: typeof message === 'string' ? message : "Failed to create tenant. Please try again." });
+        }
     };
 
     const resetForm = () => {
@@ -174,17 +183,23 @@ export function TenantRegistrationForm() {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-8">
+            {/* API Error Display */}
+            {errors.submit && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm font-medium">
+                    {errors.submit}
+                </div>
+            )}
             {/* Organization Details Section */}
             <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b">
-                     <h3 className="text-lg font-semibold text-foreground">Organization Details</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Organization Details</h3>
                 </div>
-                
+
                 <div className="grid gap-2">
                     <Label htmlFor="tenantName">Organization / Tenant Name <span className="text-red-500">*</span></Label>
-                    <Input 
-                        id="tenantName" 
-                        placeholder="e.g. Acme Corporation" 
+                    <Input
+                        id="tenantName"
+                        placeholder="e.g. Acme Corporation"
                         value={tenantName}
                         onChange={(e) => setTenantName(e.target.value)}
                         required
@@ -196,15 +211,15 @@ export function TenantRegistrationForm() {
             {/* Admin User Section */}
             <div className="space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b pt-4">
-                     <h3 className="text-lg font-semibold text-foreground">Tenant Admin Account</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Tenant Admin Account</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="firstName" 
-                            placeholder="e.g. John" 
+                        <Input
+                            id="firstName"
+                            placeholder="e.g. John"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
                             required
@@ -212,18 +227,18 @@ export function TenantRegistrationForm() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="middleName">Middle Name <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
-                        <Input 
-                            id="middleName" 
-                            placeholder="" 
+                        <Input
+                            id="middleName"
+                            placeholder=""
                             value={middleName}
                             onChange={(e) => setMiddleName(e.target.value)}
                         />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="lastName" 
-                            placeholder="e.g. Doe" 
+                        <Input
+                            id="lastName"
+                            placeholder="e.g. Doe"
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
                             required
@@ -234,21 +249,21 @@ export function TenantRegistrationForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                     <div className="grid gap-2">
                         <Label htmlFor="workEmail">Work Email <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="workEmail" 
-                            type="email" 
-                            placeholder="admin@organization.com" 
+                        <Input
+                            id="workEmail"
+                            type="email"
+                            placeholder="admin@organization.com"
                             value={workEmail}
                             onChange={(e) => setWorkEmail(e.target.value)}
                             required
                         />
                     </div>
-                     <div className="grid gap-2 relative">
+                    <div className="grid gap-2 relative">
                         <Label htmlFor="contactNumber">Contact Number</Label>
                         <div className="relative">
-                            <Input 
-                                id="contactNumber" 
-                                placeholder="(Optional) 0912-345-6789" 
+                            <Input
+                                id="contactNumber"
+                                placeholder="(Optional) 0912-345-6789"
                                 value={contactNumber}
                                 onChange={handleContactChange}
                                 className="pl-10 h-10"
@@ -266,10 +281,10 @@ export function TenantRegistrationForm() {
                     <div className="grid gap-2">
                         <Label htmlFor="initialPassword">Initial Password <span className="text-red-500">*</span></Label>
                         <div className="relative">
-                            <Input 
-                                id="initialPassword" 
+                            <Input
+                                id="initialPassword"
                                 type={showPassword ? "text" : "password"}
-                                placeholder="Min 6 characters" 
+                                placeholder="Min 6 characters"
                                 value={initialPassword}
                                 onChange={(e) => setInitialPassword(e.target.value)}
                                 required
@@ -289,10 +304,10 @@ export function TenantRegistrationForm() {
                     <div className="grid gap-2 relative">
                         <Label htmlFor="confirmPassword">Confirm Password <span className="text-red-500">*</span></Label>
                         <div className="relative">
-                            <Input 
-                                id="confirmPassword" 
+                            <Input
+                                id="confirmPassword"
                                 type={showConfirmPassword ? "text" : "password"}
-                                placeholder="Confirm password" 
+                                placeholder="Confirm password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
@@ -315,17 +330,17 @@ export function TenantRegistrationForm() {
 
             {/* Plan Selection Section */}
             <div className="space-y-4 pt-4">
-                 <div className="flex items-center gap-2 pb-2 border-b">
-                     <h3 className="text-lg font-semibold text-foreground">Subscription Plan</h3>
+                <div className="flex items-center gap-2 pb-2 border-b">
+                    <h3 className="text-lg font-semibold text-foreground">Subscription Plan</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {plans.map((plan) => (
-                        <Card 
+                        <Card
                             key={plan.id}
                             className={cn(
                                 "cursor-pointer transition-all border-2 relative overflow-hidden",
-                                selectedPlan === plan.id 
-                                    ? "border-primary bg-primary/5 shadow-md scale-[1.01]" 
+                                selectedPlan === plan.id
+                                    ? "border-primary bg-primary/5 shadow-md scale-[1.01]"
                                     : "border-muted hover:border-primary/50 hover:shadow-sm"
                             )}
                             onClick={() => setSelectedPlan(plan.id)}

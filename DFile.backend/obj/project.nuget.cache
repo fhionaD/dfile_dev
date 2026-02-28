@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "+fb06xy3CpE=",
+  "dgSpecHash": "2RDJF1jvYzA=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\DFile.backend\\dfile.backend.csproj",
+  "projectFilePath": "C:\\Users\\Fhiona Domini\\source\\repos\\DFile\\Dfile.backend\\dfile.backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Fhiona Domini\\.nuget\\packages\\azure.core\\1.38.0\\azure.core.1.38.0.nupkg.sha512",
     "C:\\Users\\Fhiona Domini\\.nuget\\packages\\azure.identity\\1.11.4\\azure.identity.1.11.4.nupkg.sha512",
