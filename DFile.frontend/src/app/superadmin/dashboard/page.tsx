@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Activity, Building2, Users, ArrowRight } from "lucide-react";
+import { StatusText } from "@/components/ui/status-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -137,7 +138,7 @@ export default function SuperAdminDashboard() {
                                             <p className="text-sm font-semibold truncate">{tenant.name}</p>
                                             <p className="text-xs text-muted-foreground">Created {new Date(tenant.createdAt).toLocaleDateString()}</p>
                                         </div>
-                                        <Badge variant={tenant.status === "Active" ? "success" : "muted"}>{tenant.status}</Badge>
+                                        <StatusText variant={tenant.status === "Active" ? "success" : "muted"}>{tenant.status}</StatusText>
                                     </div>
                                 ))}
                                 {tenants.length > 5 && (

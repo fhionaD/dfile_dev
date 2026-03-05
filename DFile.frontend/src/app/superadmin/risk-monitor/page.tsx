@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { AlertTriangle, ShieldAlert, Clock, TrendingDown, Building2 } from "lucide-react";
 import { useRiskIndicators } from "@/hooks/use-tenants";
 
@@ -82,9 +82,9 @@ export default function RiskMonitorPage() {
                     <p className="text-sm text-muted-foreground">Platform-wide risk assessment and alerts</p>
                 </div>
                 {!isLoading && (
-                    <Badge variant={riskBadge as "success" | "info" | "warning" | "danger"} className="text-sm px-3 py-1">
+                    <StatusText variant={riskBadge as "success" | "info" | "warning" | "danger"} className="text-sm px-3 py-1">
                         Risk Level: {riskLevel}
-                    </Badge>
+                    </StatusText>
                 )}
             </div>
 
@@ -123,7 +123,7 @@ export default function RiskMonitorPage() {
                                 <>
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-3xl font-bold tracking-tight">{ind.value}</span>
-                                        <Badge variant={severityColor[ind.severity]}>{ind.severity}</Badge>
+                                        <StatusText variant={severityColor[ind.severity]}>{ind.severity}</StatusText>
                                     </div>
                                     <p className="text-xs text-muted-foreground">{ind.description}</p>
                                 </>

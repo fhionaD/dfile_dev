@@ -30,7 +30,11 @@ namespace DFile.backend.Controllers
                 query = query.Where(d => d.TenantId == tenantId);
             }
 
-            if (!showArchived)
+            if (showArchived)
+            {
+                query = query.Where(d => d.Status == "Archived");
+            }
+            else
             {
                 query = query.Where(d => d.Status != "Archived");
             }

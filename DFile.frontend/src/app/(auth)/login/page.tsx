@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LoginPage as LoginPageComponent } from "@/components/login-page";
 import { useAuth } from "@/contexts/auth-context";
 import { getDashboardPath } from "@/lib/role-routing";
+import { LoadingScreen } from "@/components/loading-screen";
 
 export default function LoginPage() {
     const { login, isLoggedIn, user, isLoading } = useAuth();
@@ -24,7 +25,7 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn, isLoading]);
 
-    if (isLoading) return null;
+    if (isLoading) return <LoadingScreen message="Checking your session…" />;
 
     return <LoginPageComponent onLogin={login} />;
 }

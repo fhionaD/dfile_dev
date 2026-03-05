@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -77,63 +77,58 @@ export default function DisposalsPage() {
             </section>
 
             {/* Disposal Table */}
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <CardTitle>Disposal Registry</CardTitle>
-                            <CardDescription>{filtered.length} assets</CardDescription>
-                        </div>
-                        <div className="relative sm:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search disposals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filtered.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Trash2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>No disposed assets found</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Tag</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Category</TableHead>
-                                        <TableHead>Purchase Date</TableHead>
-                                        <TableHead className="text-right">Original Value</TableHead>
-                                        <TableHead className="text-right">Book Value</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filtered.map(a => (
-                                        <TableRow key={a.id}>
-                                            <TableCell className="font-mono text-sm">{a.tagNumber ?? "—"}</TableCell>
-                                            <TableCell className="font-medium max-w-[200px] truncate">{a.desc}</TableCell>
-                                            <TableCell>{a.categoryName ?? "—"}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString() : "—"}
-                                            </TableCell>
-                                            <TableCell className="text-right"><CurrencyCell value={a.purchasePrice ?? a.value ?? 0} /></TableCell>
-                                            <TableCell className="text-right"><CurrencyCell value={a.currentBookValue ?? 0} /></TableCell>
-                                            <TableCell>
-                                                <Badge variant={a.archived ? "muted" : "danger"}>{a.status}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">Disposal Registry</h2>
+                    <span className="text-sm text-muted-foreground">({filtered.length})</span>
+                </div>
+                <div className="relative sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search disposals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : filtered.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <Trash2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>No disposed assets found</p>
+                </div>
+            ) : (
+                <div className="rounded-md border overflow-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Tag</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Purchase Date</TableHead>
+                                <TableHead className="text-right">Original Value</TableHead>
+                                <TableHead className="text-right">Book Value</TableHead>
+                                <TableHead>Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filtered.map(a => (
+                                <TableRow key={a.id}>
+                                    <TableCell className="font-mono text-sm">{a.tagNumber ?? "—"}</TableCell>
+                                    <TableCell className="font-medium max-w-[200px] truncate">{a.desc}</TableCell>
+                                    <TableCell>{a.categoryName ?? "—"}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                        {a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString() : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right"><CurrencyCell value={a.purchasePrice ?? a.value ?? 0} /></TableCell>
+                                    <TableCell className="text-right"><CurrencyCell value={a.currentBookValue ?? 0} /></TableCell>
+                                    <TableCell>
+                                        <StatusText variant={a.archived ? "muted" : "danger"}>{a.status}</StatusText>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
         </div>
     );
 }

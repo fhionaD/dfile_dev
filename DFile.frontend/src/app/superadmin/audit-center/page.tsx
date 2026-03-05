@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,116 +98,113 @@ export default function AuditCenterPage() {
             </section>
 
             {/* Filters */}
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search logs..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                        <Select value={action} onValueChange={(v) => { setAction(v === "all" ? "" : v); setPage(1); }}>
-                            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Action" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Actions</SelectItem>
-                                <SelectItem value="Create">Create</SelectItem>
-                                <SelectItem value="Update">Update</SelectItem>
-                                <SelectItem value="Delete">Delete</SelectItem>
-                                <SelectItem value="Archive">Archive</SelectItem>
-                                <SelectItem value="Login">Login</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={entityType} onValueChange={(v) => { setEntityType(v === "all" ? "" : v); setPage(1); }}>
-                            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Entity" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Entities</SelectItem>
-                                <SelectItem value="Asset">Asset</SelectItem>
-                                <SelectItem value="Room">Room</SelectItem>
-                                <SelectItem value="Tenant">Tenant</SelectItem>
-                                <SelectItem value="User">User</SelectItem>
-                                <SelectItem value="MaintenanceRecord">Maintenance</SelectItem>
-                                <SelectItem value="PurchaseOrder">Purchase Order</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search logs..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                <Select value={action} onValueChange={(v) => { setAction(v === "all" ? "" : v); setPage(1); }}>
+                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Action" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Actions</SelectItem>
+                        <SelectItem value="Create">Create</SelectItem>
+                        <SelectItem value="Update">Update</SelectItem>
+                        <SelectItem value="Delete">Delete</SelectItem>
+                        <SelectItem value="Archive">Archive</SelectItem>
+                        <SelectItem value="Login">Login</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Select value={entityType} onValueChange={(v) => { setEntityType(v === "all" ? "" : v); setPage(1); }}>
+                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Entity" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Entities</SelectItem>
+                        <SelectItem value="Asset">Asset</SelectItem>
+                        <SelectItem value="Room">Room</SelectItem>
+                        <SelectItem value="Tenant">Tenant</SelectItem>
+                        <SelectItem value="User">User</SelectItem>
+                        <SelectItem value="MaintenanceRecord">Maintenance</SelectItem>
+                        <SelectItem value="PurchaseOrder">Purchase Order</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
 
             {/* Audit Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Audit Trail</CardTitle>
-                    <CardDescription>{logsResponse?.totalCount ?? 0} total records</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filteredLogs.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <ShieldCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>No audit logs found</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Timestamp</TableHead>
-                                        <TableHead>Action</TableHead>
-                                        <TableHead>Entity</TableHead>
-                                        <TableHead>Entity ID</TableHead>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>IP Address</TableHead>
+            <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Audit Trail</h2>
+                <span className="text-sm text-muted-foreground">({logsResponse?.totalCount ?? 0} records)</span>
+            </div>
+
+            {isLoading ? (
+                <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : filteredLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <ShieldCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>No audit logs found</p>
+                </div>
+            ) : (
+                <>
+                    <div className="rounded-md border overflow-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Timestamp</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>Entity</TableHead>
+                                    <TableHead>Entity ID</TableHead>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>IP Address</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredLogs.map((log) => (
+                                    <TableRow key={log.id}>
+                                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                            {new Date(log.createdAt).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            <StatusText variant={actionColors[log.action] ?? "muted"}>{log.action}</StatusText>
+                                        </TableCell>
+                                        <TableCell className="font-medium">{log.entityType}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground font-mono">{log.entityId ?? "—"}</TableCell>
+                                        <TableCell>{log.userName ?? "System"}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground font-mono">{log.ipAddress ?? "—"}</TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredLogs.map((log) => (
-                                        <TableRow key={log.id}>
-                                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                                {new Date(log.createdAt).toLocaleString()}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={actionColors[log.action] ?? "muted"}>{log.action}</Badge>
-                                            </TableCell>
-                                            <TableCell className="font-medium">{log.entityType}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground font-mono">{log.entityId ?? "—"}</TableCell>
-                                            <TableCell>{log.userName ?? "System"}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground font-mono">{log.ipAddress ?? "—"}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center justify-between">
                             <p className="text-sm text-muted-foreground">Page {page} of {totalPages}</p>
                             <div className="flex gap-2">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => setPage(p => Math.max(1, p - 1))}
                                     disabled={page <= 1}
-                                    className="px-3 py-1.5 text-sm rounded-md border disabled:opacity-50 hover:bg-muted transition-colors"
                                 >
                                     Previous
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                     disabled={page >= totalPages}
-                                    className="px-3 py-1.5 text-sm rounded-md border disabled:opacity-50 hover:bg-muted transition-colors"
                                 >
                                     Next
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </>
+            )}
         </div>
     );
 }

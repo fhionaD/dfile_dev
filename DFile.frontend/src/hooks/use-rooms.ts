@@ -3,11 +3,13 @@ import api from '@/lib/api';
 import { Room, RoomCategory } from '@/types/asset';
 import { toast } from 'sonner';
 
-export function useRooms() {
+export function useRooms(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['rooms'],
+        queryKey: ['rooms', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<Room[]>('/api/rooms');
+            const { data } = await api.get<Room[]>('/api/rooms', {
+                params: { showArchived }
+            });
             return data;
         },
     });

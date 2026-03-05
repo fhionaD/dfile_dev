@@ -9,6 +9,7 @@ interface AuthContextType {
     token: string | null;
     isLoggedIn: boolean;
     isLoading: boolean;
+    isLoggingOut: boolean;
     login: (email: string, password: string) => Promise<void>;
     logout: () => void;
 }
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // Persist login state
     // Persist login state and validate session
@@ -100,15 +102,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const logout = () => {
-        setUser(null);
-        setToken(null);
-        setIsLoggedIn(false);
-        localStorage.removeItem("dfile_user");
-        localStorage.removeItem("dfile_token");
+        setIsLoggingOut(true);
+        // Brief delay so the loading screen is visible before state wipes
+        setTimeout(() => {
+            setUser(null);
+            setToken(null);
+            setIsLoggedIn(false);
+            setIsLoggingOut(false);
+            localStorage.removeItem("dfile_user");
+            localStorage.removeItem("dfile_token");
+        }, 800);
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoggedIn, isLoading, login, logout }}>
+        <AuthContext.Provider value={{ user, token, isLoggedIn, isLoading, isLoggingOut, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

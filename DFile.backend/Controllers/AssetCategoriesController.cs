@@ -25,7 +25,7 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
 
             var categoriesQuery = _context.AssetCategories
-                .Where(c => showArchived || c.Status != "Archived");
+                .Where(c => showArchived ? c.Status == "Archived" : c.Status != "Archived");
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {

@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Wrench, Plus, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, CheckCircle2 } from "lucide-react";
+import { Wrench, Plus, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, CheckCircle2, Eye, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { StatusText } from "@/components/ui/status-text";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useRestoreMaintenanceRecord } from "@/hooks/use-maintenance";
 import { useAssets } from "@/hooks/use-assets";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -159,75 +161,73 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                 </div>
             </div>
 
-            <Card className="border-border shadow-sm  overflow-hidden">
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table className="w-full table-fixed">
-                        <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b border-border">
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[12%]">Request ID</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[20%]">Asset</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[28%]">Description</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Priority</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[12%]">Date Reported</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Status</TableHead>
-                                <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[8%]">Action</TableHead>
+            <div className="rounded-md border overflow-auto">
+                <Table className="w-full table-fixed">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[12%]">Request ID</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[20%]">Asset</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-left w-[28%]">Description</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Priority</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[12%]">Date Reported</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[10%]">Status</TableHead>
+                            <TableHead className="px-6 py-4 align-middle font-medium text-muted-foreground text-center w-[8%]">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredRecords.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
+                                    {showArchived ? "No archived maintenance records yet" : "No maintenance records match your search"}
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRecords.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
-                                        {showArchived ? "No archived maintenance records yet" : "No maintenance records match your search"}
+                        ) : (
+                            filteredRecords.map((record) => (
+                                <TableRow key={record.id} className="border-b last:border-0">
+                                    <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
+                                        <div className="flex flex-col items-start">
+                                            <span>{getAssetName(record.assetId)}</span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground truncate text-left" title={record.description}>{record.description}</TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-center">
+                                        <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority}</StatusText>
+                                    </TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground text-center">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-center">
+                                        <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
+                                    </TableCell>
+                                    <TableCell className="px-6 py-4 align-middle text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onClick={() => onRecordClick(record)} className="gap-2 cursor-pointer">
+                                                    <Eye className="h-4 w-4" /> View
+                                                </DropdownMenuItem>
+                                                {record.archived ? (
+                                                    <DropdownMenuItem onClick={() => restoreRecordMutation.mutateAsync(record.id)} className="gap-2 cursor-pointer">
+                                                        <RotateCcw className="h-4 w-4" /> Restore
+                                                    </DropdownMenuItem>
+                                                ) : (
+                                                    <DropdownMenuItem onClick={() => setArchiveTarget(record.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                        <Archive className="h-4 w-4" /> Archive
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
-                            ) : (
-                                filteredRecords.map((record) => (
-                                    <TableRow 
-                                        key={record.id} 
-                                        className="border-border cursor-pointer hover:bg-muted/5 transition-colors border-b last:border-0"
-                                        onClick={() => onRecordClick(record)}
-                                    >
-                                        <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
-                                            <div className="flex flex-col items-start">
-                                                <span>{getAssetName(record.assetId)}</span>
-                                                <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground truncate text-left" title={record.description}>{record.description}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-center">
-                                            <Badge variant={priorityVariant[record.priority] ?? "muted"}>{record.priority}</Badge>
-                                        </TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground text-center">{new Date(record.dateReported).toLocaleDateString()}</TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-center">
-                                            <Badge variant={statusVariant[record.status] ?? "muted"}>{record.status}</Badge>
-                                        </TableCell>
-                                        <TableCell className="px-6 py-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    onClick={() => {
-                                                        if (record.archived) {
-                                                            restoreRecordMutation.mutateAsync(record.id);
-                                                        } else {
-                                                            setArchiveTarget(record.id);
-                                                        }
-                                                    }}
-                                                    className={`p-1.5 rounded-md transition-colors ${record.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                    title={record.archived ? 'Restore' : 'Archive'}
-                                                >
-                                                    {record.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
-                                                </button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                    </div>
-                </CardContent>
-            </Card>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
 
             <ConfirmDialog
                 open={archiveTarget !== null}

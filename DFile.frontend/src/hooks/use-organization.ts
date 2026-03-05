@@ -30,11 +30,13 @@ interface UpdateEmployeePayload extends CreateEmployeePayload {
     status: string;
 }
 
-export function useRoles() {
+export function useRoles(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['roles'],
+        queryKey: ['roles', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<Role[]>('/api/Roles');
+            const { data } = await api.get<Role[]>('/api/Roles', {
+                params: { showArchived }
+            });
             return data;
         },
     });

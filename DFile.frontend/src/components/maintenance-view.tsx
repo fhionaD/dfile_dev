@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { StatusText } from "@/components/ui/status-text";
+import { Card } from "@/components/ui/card";
 import { MaintenanceRecord, Asset } from "@/types/asset";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -303,67 +303,61 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                 </div>
             </div>
 
-            {/* Main Content Card */}
-            <Card>
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
+            {/* Main Content */}
+            <div className="rounded-md border overflow-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[100px]">ID</TableHead>
+                            <TableHead>Asset / Description</TableHead>
+                            <TableHead className="text-center w-[100px]">Status</TableHead>
+                            <TableHead className="text-center w-[100px]">Priority</TableHead>
+                            <TableHead className="text-center w-[120px]">Date</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredRecords.length === 0 ? (
                             <TableRow>
-                                <TableHead className="w-[100px]">ID</TableHead>
-                                <TableHead>Asset / Description</TableHead>
-                                <TableHead className="text-center w-[100px]">Status</TableHead>
-                                <TableHead className="text-center w-[100px]">Priority</TableHead>
-                                <TableHead className="text-center w-[120px]">Date</TableHead>
+                                <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center h-full gap-3">
+                                        <Wrench className="h-8 w-8 opacity-20" />
+                                        <p className="text-sm">No maintenance requests found</p>
+                                    </div>
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRecords.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
-                                        <div className="flex flex-col items-center justify-center h-full gap-3">
-                                            <Wrench className="h-8 w-8 opacity-20" />
-                                            <p className="text-sm">No maintenance requests found</p>
+                        ) : (
+                            filteredRecords.map((record) => (
+                                <TableRow key={record.id}>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">
+                                        {record.id}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="space-y-0.5">
+                                            <span className="text-sm font-medium block line-clamp-1">{getAssetName(record.assetId)}</span>
+                                            <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
                                         </div>
                                     </TableCell>
+                                    <TableCell className="text-center">
+                                        <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <div className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-semibold ${
+                                            record.priority === 'High' ? 'bg-red-500/10 text-red-700' :
+                                            record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700' :
+                                            'bg-emerald-500/10 text-emerald-700'
+                                        }`}>
+                                           {record.priority!.charAt(0)}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
+                                        {new Date(record.dateReported).toLocaleDateString()}
+                                    </TableCell>
                                 </TableRow>
-                            ) : (
-                                filteredRecords.map((record) => (
-                                    <TableRow 
-                                        key={record.id} 
-                                        className="cursor-pointer group"
-                                        onClick={() => {}}
-                                    >
-                                        <TableCell className="font-mono text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                                            {record.id}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="space-y-0.5">
-                                                <span className="text-sm font-medium block line-clamp-1">{getAssetName(record.assetId)}</span>
-                                                <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant={statusVariant[record.status] ?? "muted"}>{record.status}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <div className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-semibold ${
-                                                record.priority === 'High' ? 'bg-red-500/10 text-red-700' :
-                                                record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700' :
-                                                'bg-emerald-500/10 text-emerald-700'
-                                            }`}>
-                                               {record.priority!.charAt(0)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
-                                            {new Date(record.dateReported).toLocaleDateString()}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-            </Card>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 }

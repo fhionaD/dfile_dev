@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { MoreHorizontal, Search, Archive, Filter, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -203,9 +202,8 @@ export function TenantList() {
             </div>
 
             {/* Table */}
-            <Card>
-                <div className="overflow-x-auto">
-                    <Table>
+            <div className="rounded-md border overflow-auto">
+                <Table>
                         <TableHeader>
                             <TableRow>
                                 <SortableTableHead
@@ -328,13 +326,10 @@ export function TenantList() {
                             )}
                         </TableBody>
                     </Table>
-                </div>
-                <div className="px-6 py-4 border-t border-border/40">
-                    <p className="text-sm text-muted-foreground">
-                        Showing {displayTenants.length} of {filtered.length} organization{filtered.length !== 1 ? "s" : ""}
-                    </p>
-                </div>
-            </Card>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Showing {displayTenants.length} of {filtered.length} organization{filtered.length !== 1 ? "s" : ""}
+            </div>
 
             {/* Modals */}
             <TenantDetailsModal

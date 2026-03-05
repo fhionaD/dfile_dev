@@ -3,7 +3,7 @@
 import { DoorOpen, Layers, Building, Users, Activity, Edit, Hash, MapPin, Tag } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Room } from "@/types/asset";
 
 interface RoomDetailsModalProps {
@@ -99,9 +99,9 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                     <div className="pt-2 flex items-center justify-between">
                         <div className="space-y-1">
                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Status</span>
-                             <Badge variant={statusVariant[room.status] ?? "muted"} className="mt-1">
+                             <StatusText variant={statusVariant[room.status] ?? "muted"}>
                                 {room.status}
-                             </Badge>
+                             </StatusText>
                         </div>
                         <div className="text-right space-y-1">
                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">ID</span>

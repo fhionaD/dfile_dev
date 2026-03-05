@@ -31,6 +31,7 @@ export function QRCodeModal({ open, onOpenChange, asset }: QRCodeModalProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl rounded-2xl border-border p-0 overflow-hidden">
                 <DialogTitle className="sr-only">Asset QR Code</DialogTitle>
+                <DialogDescription className="sr-only">QR code and details for the selected asset.</DialogDescription>
                 <div className="flex flex-row bg-white overflow-hidden printable-sticker w-full">
                     {/* Left Side: QR Code */}
                     <div className="shrink-0 p-6 flex flex-col items-center justify-center bg-white border-r border-border/50 w-[240px]">

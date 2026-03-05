@@ -68,6 +68,49 @@ var app = builder.Build();
 //    per-page HTML from the Next.js static export — NOT the root index.html.
 //    Without this, every hard-refresh falls through to MapFallback and always
 //    serves the Home page, causing a visible redirect loop.
+
+// Rewrite Next.js RSC prefetch requests from dot-separated to directory-based paths.
+// Next.js 16 client requests: /tenant/dashboard/__next.tenant.dashboard.__PAGE__.txt
+// But the static export generates: /tenant/dashboard/__next.tenant/dashboard/__PAGE__.txt
+// Without this rewrite, UseStaticFiles returns 404 for all RSC navigation prefetches.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? "";
+    // Only process __next. prefixed .txt files (RSC payloads)
+    var lastSlash = path.LastIndexOf('/');
+    if (lastSlash >= 0)
+    {
+        var fileName = path[(lastSlash + 1)..];
+        if (fileName.StartsWith("__next.", StringComparison.Ordinal) && fileName.EndsWith(".txt", StringComparison.Ordinal))
+        {
+            // Convert dot-separated filename to directory path:
+            // __next.tenant.dashboard.__PAGE__.txt → __next.tenant/dashboard/__PAGE__.txt
+            // __next.tenant.dashboard.txt → __next.tenant/dashboard.txt
+            var withoutExt = fileName[..^4]; // strip .txt
+            var parts = withoutExt.Split('.');
+            if (parts.Length >= 3) // __next + at least 2 segments
+            {
+                // First two parts form the directory prefix: __next.tenant
+                var dirPrefix = parts[0] + "." + parts[1];
+                // Remaining parts form the sub-path
+                var subPath = string.Join("/", parts[2..]) + ".txt";
+                var basePath = path[..(lastSlash + 1)];
+                var rewritten = basePath + dirPrefix + "/" + subPath;
+
+                // Only rewrite if the rewritten file actually exists
+                var webRoot = app.Environment.WebRootPath
+                    ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+                var physicalPath = Path.Combine(webRoot, rewritten.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(physicalPath))
+                {
+                    context.Request.Path = rewritten;
+                }
+            }
+        }
+    }
+    await next();
+});
+
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {

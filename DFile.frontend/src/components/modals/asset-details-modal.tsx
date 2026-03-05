@@ -48,6 +48,7 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                             </Button>
                         )}
                     </div>
+                    <DialogDescription className="sr-only">Detailed information about the selected asset.</DialogDescription>
                 </DialogHeader>
 
                 <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 overflow-y-auto">

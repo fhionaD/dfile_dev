@@ -1,19 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { KeyRound, Plus, Pencil, Trash2, Shield } from "lucide-react";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { KeyRound, Plus, Pencil, Trash2, Shield, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { RoleTemplate, RolePermissionEntry } from "@/types/asset";
 import { useRoleTemplates, useCreateRoleTemplate, useUpdateRoleTemplate, useDeleteRoleTemplate } from "@/hooks/use-role-templates";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const DEFAULT_MODULES = ["Assets", "Rooms", "Maintenance", "Procurement", "Employees", "Departments", "Reports"];
 
@@ -45,6 +49,7 @@ export default function RoleTemplatesPage() {
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
     const [form, setForm] = useState<TemplateFormData>(emptyForm());
 
     const openCreate = () => {
@@ -115,68 +120,75 @@ export default function RoleTemplatesPage() {
                 </Button>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Templates</CardTitle>
-                    <CardDescription>{templates.length} role templates defined</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-                    ) : templates.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Shield className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>No role templates defined yet</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Permissions</TableHead>
-                                        <TableHead>Tenants Using</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="w-[100px]">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {templates.map((t) => (
-                                        <TableRow key={t.id}>
-                                            <TableCell className="font-medium">{t.name}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{t.description ?? "—"}</TableCell>
-                                            <TableCell><Badge variant="muted">{t.permissions.length} modules</Badge></TableCell>
-                                            <TableCell>{t.tenantCount}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={t.isSystem ? "info" : "muted"}>{t.isSystem ? "System" : "Custom"}</Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Button variant="ghost" size="icon" onClick={() => openEdit(t)}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    {!t.isSystem && t.tenantCount === 0 && (
-                                                        <Button variant="ghost" size="icon" onClick={() => handleDelete(t.id)}>
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">Templates</h2>
+                    <span className="text-sm text-muted-foreground">({templates.length})</span>
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+            ) : templates.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <Shield className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>No role templates defined yet</p>
+                </div>
+            ) : (
+                <div className="rounded-md border overflow-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Permissions</TableHead>
+                                <TableHead>Tenants Using</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="w-[80px] text-center">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {templates.map((t) => (
+                                <TableRow key={t.id}>
+                                    <TableCell className="font-medium">{t.name}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{t.description ?? "—"}</TableCell>
+                                    <TableCell><Badge variant="muted">{t.permissions.length} modules</Badge></TableCell>
+                                    <TableCell>{t.tenantCount}</TableCell>
+                                    <TableCell>
+                                        <StatusText variant={t.isSystem ? "info" : "muted"}>{t.isSystem ? "System" : "Custom"}</StatusText>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onClick={() => openEdit(t)} className="gap-2 cursor-pointer">
+                                                    <Pencil className="h-4 w-4" /> Edit
+                                                </DropdownMenuItem>
+                                                {!t.isSystem && t.tenantCount === 0 && (
+                                                    <DropdownMenuItem onClick={() => setDeleteTarget(t.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                        <Trash2 className="h-4 w-4" /> Delete
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
 
             {/* Create/Edit Dialog */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{editingId ? "Edit Role Template" : "Create Role Template"}</DialogTitle>
+                        <DialogDescription>{editingId ? "Update the role template and its permissions." : "Define a new role template with module permissions."}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-6">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -229,6 +241,22 @@ export default function RoleTemplatesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+                title="Delete Role Template"
+                description="This will permanently delete this role template. This action cannot be undone."
+                confirmLabel="Delete"
+                confirmVariant="destructive"
+                onConfirm={async () => {
+                    if (deleteTarget !== null) {
+                        await deleteMutation.mutateAsync(deleteTarget);
+                        toast.success("Role template deleted");
+                        setDeleteTarget(null);
+                    }
+                }}
+            />
         </div>
     );
 }

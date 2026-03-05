@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { ShieldAlert, Ban, CheckCircle2, Building2, AlertTriangle } from "lucide-react";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ShieldAlert, Ban, CheckCircle2, Building2, AlertTriangle, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { useTenants, useUpdateTenantStatus, Tenant } from "@/hooks/use-tenants";
 
@@ -71,72 +74,72 @@ export default function EmergencyControlsPage() {
             </section>
 
             {/* Tenant Controls Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                        Tenant Status Controls
-                    </CardTitle>
-                    <CardDescription>Suspend or reactivate tenant access to the platform</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-                    ) : tenants.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Building2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>No tenants registered</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Tenant</TableHead>
-                                        <TableHead>Created</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {tenants.map((t) => (
-                                        <TableRow key={t.id}>
-                                            <TableCell className="font-medium">{t.name}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={t.status === "Active" ? "success" : t.status === "Suspended" ? "danger" : "muted"}>
-                                                    {t.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
+            <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                <h2 className="text-lg font-semibold">Tenant Status Controls</h2>
+                <span className="text-sm text-muted-foreground">— Suspend or reactivate tenant access</span>
+            </div>
+
+            {isLoading ? (
+                <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+            ) : tenants.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <Building2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>No tenants registered</p>
+                </div>
+            ) : (
+                <div className="rounded-md border overflow-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Tenant</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-[80px] text-center">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {tenants.map((t) => (
+                                <TableRow key={t.id}>
+                                    <TableCell className="font-medium">{t.name}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                                    <TableCell>
+                                        <StatusText variant={t.status === "Active" ? "success" : t.status === "Suspended" ? "danger" : "muted"}>
+                                            {t.status}
+                                        </StatusText>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-44">
                                                 {t.status === "Active" ? (
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        className="gap-1.5"
+                                                    <DropdownMenuItem
                                                         onClick={() => setConfirmAction({ tenant: t, newStatus: "Suspended" })}
+                                                        className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
                                                     >
-                                                        <Ban className="h-3.5 w-3.5" /> Suspend
-                                                    </Button>
+                                                        <Ban className="h-4 w-4" /> Suspend
+                                                    </DropdownMenuItem>
                                                 ) : t.status === "Suspended" ? (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                                    <DropdownMenuItem
                                                         onClick={() => setConfirmAction({ tenant: t, newStatus: "Active" })}
+                                                        className="gap-2 cursor-pointer"
                                                     >
-                                                        <CheckCircle2 className="h-3.5 w-3.5" /> Reactivate
-                                                    </Button>
+                                                        <CheckCircle2 className="h-4 w-4" /> Reactivate
+                                                    </DropdownMenuItem>
                                                 ) : null}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
 
             {/* Confirmation Dialog */}
             <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>

@@ -2,24 +2,28 @@
 
 import { useState, useMemo } from "react";
 import {
-    ShoppingCart, Search, Filter, DollarSign, Package, CheckCircle2, XCircle,
+    ShoppingCart, Search, Filter, DollarSign, Package, CheckCircle2, XCircle, Eye, MoreHorizontal, Archive, RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Card } from "@/components/ui/card";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { PurchaseOrder } from "@/types/asset";
-import { usePurchaseOrders, useUpdateOrder } from "@/hooks/use-procurement";
+import { usePurchaseOrders, useUpdateOrder, useArchiveOrder, useRestoreOrder } from "@/hooks/use-procurement";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusVariant: Record<string, "info" | "success" | "warning" | "danger" | "muted"> = {
@@ -30,17 +34,19 @@ const statusVariant: Record<string, "info" | "success" | "warning" | "danger" | 
 };
 
 export default function ProcurementApprovalsPage() {
-    const { data: orders = [], isLoading } = usePurchaseOrders();
+    const [showArchived, setShowArchived] = useState(false);
+    const { data: orders = [], isLoading } = usePurchaseOrders(showArchived);
     const updateMutation = useUpdateOrder();
+    const archiveMutation = useArchiveOrder();
+    const restoreMutation = useRestoreOrder();
 
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null);
-
-    const activeOrders = useMemo(() => orders.filter((o) => !o.archived), [orders]);
+    const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
 
     const filteredOrders = useMemo(() => {
-        return activeOrders.filter((o) => {
+        return orders.filter((o) => {
             if (statusFilter !== "all" && o.status !== statusFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -53,7 +59,7 @@ export default function ProcurementApprovalsPage() {
             }
             return true;
         });
-    }, [activeOrders, searchQuery, statusFilter]);
+    }, [orders, searchQuery, statusFilter]);
 
     const handleStatusChange = async (order: PurchaseOrder, newStatus: string) => {
         await updateMutation.mutateAsync({
@@ -75,9 +81,9 @@ export default function ProcurementApprovalsPage() {
         setDetailOrder(null);
     };
 
-    const pendingCount = activeOrders.filter((o) => o.status === "Pending").length;
-    const approvedCount = activeOrders.filter((o) => o.status === "Approved").length;
-    const totalValue = activeOrders
+    const pendingCount = orders.filter((o) => o.status === "Pending").length;
+    const approvedCount = orders.filter((o) => o.status === "Approved").length;
+    const totalValue = orders
         .filter((o) => o.status === "Approved" || o.status === "Delivered")
         .reduce((sum, o) => sum + o.purchasePrice, 0);
 
@@ -96,7 +102,7 @@ export default function ProcurementApprovalsPage() {
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Total Orders</p>
-                            <p className="text-2xl font-bold">{activeOrders.length}</p>
+                            <p className="text-2xl font-bold">{orders.length}</p>
                         </div>
                     </div>
                 </Card>
@@ -136,18 +142,12 @@ export default function ProcurementApprovalsPage() {
             </div>
 
             {/* Table */}
-            <Card className="overflow-hidden">
-                <div className="px-6 py-5 border-b border-border/40 flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <ShoppingCart className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-semibold">Procurement Approvals</h3>
-                        <p className="text-sm text-muted-foreground">Review and approve procurement requests</p>
-                    </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{showArchived ? "Archived Orders" : "Procurement Approvals"}</h2>
+                    <span className="text-sm text-muted-foreground">({filteredOrders.length} of {orders.length})</span>
                 </div>
-
-                <div className="px-6 py-4 border-b border-border/40 flex flex-col lg:flex-row gap-3">
+                <div className="flex flex-col lg:flex-row gap-3">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="Search orders..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-10" />
@@ -167,12 +167,23 @@ export default function ProcurementApprovalsPage() {
                             <SelectItem value="Cancelled">Cancelled</SelectItem>
                         </SelectContent>
                     </Select>
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 gap-2" onClick={() => setShowArchived(!showArchived)}>
+                        <Archive className="h-4 w-4" />
+                        {showArchived ? "View Active" : "View Archived"}
+                    </Button>
                 </div>
+            </div>
 
-                <div className="overflow-x-auto">
+            {filteredOrders.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>No purchase orders match your filters</p>
+                </div>
+            ) : (
+                <div className="rounded-md border overflow-auto">
                     <Table>
                         <TableHeader>
-                            <TableRow className="hover:bg-transparent border-b border-border/40">
+                            <TableRow>
                                 <TableHead>Order ID</TableHead>
                                 <TableHead>Asset Name</TableHead>
                                 <TableHead>Category</TableHead>
@@ -181,71 +192,71 @@ export default function ProcurementApprovalsPage() {
                                 <TableHead>Status</TableHead>
                                 <TableHead>Requested By</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead className="text-center">Action</TableHead>
+                                <TableHead className="w-[80px] text-center">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredOrders.length === 0 ? (
-                                <TableRow className="hover:bg-transparent">
-                                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                                        No purchase orders match your filters
+                            {filteredOrders.map((order) => (
+                                <TableRow key={order.id}>
+                                    <TableCell className="font-mono text-xs text-muted-foreground">{order.id}</TableCell>
+                                    <TableCell className="font-medium">{order.assetName}</TableCell>
+                                    <TableCell className="text-muted-foreground">{order.category || "—"}</TableCell>
+                                    <TableCell className="text-muted-foreground">{order.vendor || "—"}</TableCell>
+                                    <TableCell className="text-right"><CurrencyCell value={order.purchasePrice} /></TableCell>
+                                    <TableCell>
+                                        <StatusText variant={statusVariant[order.status] ?? "muted"}>{order.status}</StatusText>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">{order.requestedBy || "—"}</TableCell>
+                                    <TableCell className="text-muted-foreground text-xs">
+                                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onClick={() => setDetailOrder(order)} className="gap-2 cursor-pointer">
+                                                    <Eye className="h-4 w-4" /> View
+                                                </DropdownMenuItem>
+                                                {order.status === "Pending" && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => handleStatusChange(order, "Approved")} className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-600 focus:bg-emerald-500/10">
+                                                            <CheckCircle2 className="h-4 w-4" /> Approve
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleStatusChange(order, "Cancelled")} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                            <XCircle className="h-4 w-4" /> Reject
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                                {showArchived ? (
+                                                    <DropdownMenuItem onClick={() => restoreMutation.mutate(order.id)} className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-600 focus:bg-emerald-500/10">
+                                                        <RotateCcw className="h-4 w-4" /> Restore
+                                                    </DropdownMenuItem>
+                                                ) : (
+                                                    <DropdownMenuItem onClick={() => setArchiveTarget(order.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                        <Archive className="h-4 w-4" /> Archive
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
-                            ) : (
-                                filteredOrders.map((order) => (
-                                    <TableRow key={order.id} className="cursor-pointer" onClick={() => setDetailOrder(order)}>
-                                        <TableCell className="font-mono text-xs text-muted-foreground">{order.id}</TableCell>
-                                        <TableCell className="font-medium">{order.assetName}</TableCell>
-                                        <TableCell className="text-muted-foreground">{order.category || "—"}</TableCell>
-                                        <TableCell className="text-muted-foreground">{order.vendor || "—"}</TableCell>
-                                        <TableCell><CurrencyCell value={order.purchasePrice} /></TableCell>
-                                        <TableCell>
-                                            <Badge variant={statusVariant[order.status] ?? "muted"}>{order.status}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">{order.requestedBy || "—"}</TableCell>
-                                        <TableCell className="text-muted-foreground text-xs">
-                                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—"}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            {order.status === "Pending" && (
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <Button
-                                                        variant="ghost" size="icon"
-                                                        className="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10"
-                                                        onClick={(e) => { e.stopPropagation(); handleStatusChange(order, "Approved"); }}
-                                                        title="Approve"
-                                                    >
-                                                        <CheckCircle2 size={14} />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost" size="icon"
-                                                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                                                        onClick={(e) => { e.stopPropagation(); handleStatusChange(order, "Cancelled"); }}
-                                                        title="Reject"
-                                                    >
-                                                        <XCircle size={14} />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
+                            ))}
                         </TableBody>
                     </Table>
                 </div>
-
-                <div className="px-6 py-4 border-t border-border/40 bg-muted/20">
-                    <span className="text-sm text-muted-foreground font-medium">
-                        Showing {filteredOrders.length} of {activeOrders.length} orders
-                    </span>
-                </div>
-            </Card>
+            )}
 
             {/* Detail Dialog */}
             <Dialog open={!!detailOrder} onOpenChange={(open) => { if (!open) setDetailOrder(null); }}>
                 <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader><DialogTitle>Order Details — {detailOrder?.id}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>Order Details — {detailOrder?.id}</DialogTitle>
+                        <DialogDescription>Review the purchase order details and take action.</DialogDescription>
+                    </DialogHeader>
                     {detailOrder && (
                         <div className="space-y-3 py-4">
                             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -263,9 +274,9 @@ export default function ProcurementApprovalsPage() {
                             <div className="pt-3 border-t">
                                 <span className="text-sm text-muted-foreground">Status</span>
                                 <div className="flex items-center gap-3 mt-1">
-                                    <Badge variant={statusVariant[detailOrder.status] ?? "muted"} className="text-sm">
+                                    <StatusText variant={statusVariant[detailOrder.status] ?? "muted"} className="text-sm">
                                         {detailOrder.status}
-                                    </Badge>
+                                    </StatusText>
                                     {detailOrder.status === "Pending" && (
                                         <div className="flex gap-2">
                                             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleStatusChange(detailOrder, "Approved")}>
@@ -282,6 +293,21 @@ export default function ProcurementApprovalsPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={!!archiveTarget}
+                onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+                title="Archive Order"
+                description="Are you sure you want to archive this purchase order? You can restore it later."
+                confirmLabel="Archive"
+                confirmVariant="destructive"
+                onConfirm={() => {
+                    if (archiveTarget) {
+                        archiveMutation.mutate(archiveTarget);
+                        setArchiveTarget(null);
+                    }
+                }}
+            />
         </div>
     );
 }

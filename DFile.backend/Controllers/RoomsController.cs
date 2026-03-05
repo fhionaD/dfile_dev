@@ -35,7 +35,11 @@ namespace DFile.backend.Controllers
             }
 
             // By default exclude archived rooms
-            if (!showArchived)
+            if (showArchived)
+            {
+                query = query.Where(r => r.Archived);
+            }
+            else
             {
                 query = query.Where(r => !r.Archived);
             }

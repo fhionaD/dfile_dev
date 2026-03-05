@@ -15,15 +15,15 @@ import {
     QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
     Archive, RotateCcw, Search, Filter, Package, SlidersHorizontal,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+    MoreHorizontal, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     DropdownMenu, DropdownMenuCheckboxItem,
-    DropdownMenuContent, DropdownMenuTrigger,
+    DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { QRCodeModal } from "@/components/modals/qr-code-modal";
 import {
@@ -68,11 +68,10 @@ interface AssetTableProps {
 }
 
 export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) {
-    const { data: assets = [], isLoading } = useAssets();
+    const [showArchived, setShowArchived] = useState(false);
+    const { data: assets = [], isLoading } = useAssets(showArchived);
     const archiveAssetMutation = useArchiveAsset();
     const restoreAssetMutation = useRestoreAsset();
-
-    const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
     const [categoryFilter, setCategoryFilter] = useState("All");
@@ -89,8 +88,6 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
 
     const filteredAssets = useMemo(() => {
         return assets.filter((asset) => {
-            if (showArchived ? asset.status !== "Archived" : asset.status === "Archived") return false;
-
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
                 const match =
@@ -106,7 +103,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
 
             return true;
         });
-    }, [assets, showArchived, searchQuery, statusFilter, categoryFilter]);
+    }, [assets, searchQuery, statusFilter, categoryFilter]);
 
     const columns = useMemo<ColumnDef<Asset>[]>(
         () => [
@@ -138,7 +135,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                 header: ({ column }) => <SortableHeader column={column}>Status</SortableHeader>,
                 cell: ({ row }) => {
                     const status = row.getValue("status") as string;
-                    return <Badge variant={statusVariant[status] ?? "muted"}>{status}</Badge>;
+                    return <StatusText variant={statusVariant[status] ?? "muted"}>{status}</StatusText>;
                 },
             },
             {
@@ -157,59 +154,41 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                 ),
                 cell: ({ row }) => <CurrencyCell value={row.getValue("value") as number} />,
             },
-            {
-                id: "qr",
-                enableHiding: false,
-                header: () => (
-                    <span className="text-xs font-medium text-muted-foreground">QR</span>
-                ),
-                cell: ({ row }) => (
-                    <div className="text-center">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAssetForQR(row.original);
-                            }}
-                            aria-label="Show QR code"
-                        >
-                            <QrCode size={15} />
-                        </Button>
-                    </div>
-                ),
-            },
             ...(!readOnly ? [{
                 id: "actions",
                 enableHiding: false,
                 header: () => (
-                    <span className="text-xs font-medium text-muted-foreground text-center block">
-                        {showArchived ? "Restore" : "Archive"}
-                    </span>
+                    <span className="text-xs font-medium text-muted-foreground text-center block">Actions</span>
                 ),
                 cell: ({ row }: { row: { original: Asset } }) => {
                     const asset = row.original;
                     const isArchived = asset.status === "Archived";
                     return (
                         <div className="text-center">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className={`h-7 w-7 ${isArchived ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
-                                title={isArchived ? "Restore" : "Archive"}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isArchived) {
-                                        restoreAssetMutation.mutate(asset.id);
-                                    } else {
-                                        setArchiveTarget(asset.id);
-                                    }
-                                }}
-                                aria-label={isArchived ? "Restore asset" : "Archive asset"}
-                            >
-                                {isArchived ? <RotateCcw size={15} /> : <Archive size={15} />}
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions" onClick={(e) => e.stopPropagation()}>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssetClick?.(asset); }} className="gap-2 cursor-pointer">
+                                        <Eye className="h-4 w-4" /> View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedAssetForQR(asset); }} className="gap-2 cursor-pointer">
+                                        <QrCode className="h-4 w-4" /> QR Code
+                                    </DropdownMenuItem>
+                                    {isArchived ? (
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); restoreAssetMutation.mutate(asset.id); }} className="gap-2 cursor-pointer">
+                                            <RotateCcw className="h-4 w-4" /> Restore
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setArchiveTarget(asset.id); }} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                            <Archive className="h-4 w-4" /> Archive
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     );
                 },
@@ -261,7 +240,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
 
     if (isLoading) {
         return (
-            <Card className="overflow-hidden">
+            <div className="rounded-md border overflow-hidden">
                 <div className="p-6">
                     <div className="flex justify-between items-center">
                         <Skeleton className="h-5 w-40" />
@@ -283,7 +262,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                         </div>
                     ))}
                 </div>
-            </Card>
+            </div>
         );
     }
 
@@ -295,7 +274,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                 asset={selectedAssetForQR}
             />
 
-            <Card className="overflow-hidden">
+            <div className="rounded-md border overflow-hidden">
                 {/* Toolbar */}
                 <div className="p-6 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
                     <div className="flex flex-1 flex-wrap gap-3 w-full lg:w-auto items-center">
@@ -490,7 +469,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                         </div>
                     </div>
                 </div>
-            </Card>
+            </div>
 
             <ConfirmDialog
                 open={archiveTarget !== null}

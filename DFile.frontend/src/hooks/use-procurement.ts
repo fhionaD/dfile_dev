@@ -22,11 +22,13 @@ interface UpdatePurchaseOrderPayload extends CreatePurchaseOrderPayload {
     assetId?: string;
 }
 
-export function usePurchaseOrders() {
+export function usePurchaseOrders(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['purchaseOrders'],
+        queryKey: ['purchaseOrders', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<PurchaseOrder[]>('/api/PurchaseOrders');
+            const { data } = await api.get<PurchaseOrder[]>('/api/PurchaseOrders', {
+                params: { showArchived }
+            });
             return data;
         },
     });

@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Separator } from "@/components/ui/separator";
 import { Wrench, Calendar, AlertTriangle, Package, RefreshCw } from "lucide-react";
 import { MaintenanceRecord } from "@/types/asset";
@@ -50,8 +51,8 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                             <DialogTitle className="text-lg font-semibold text-foreground">Maintenance Request</DialogTitle>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                 <Badge variant="secondary" className="font-mono text-xs">{record.id}</Badge>
-                                <Badge variant={statusVariant[record.status] ?? "muted"} className="text-xs">{record.status}</Badge>
-                                <Badge variant={priorityVariant[record.priority] ?? "muted"} className="text-xs">{record.priority} Priority</Badge>
+                                <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
+                                <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority} Priority</StatusText>
                             </div>
                         </div>
                     </div>

@@ -4,15 +4,13 @@ import api from '@/lib/api';
 import { Asset, CreateAssetPayload, UpdateAssetPayload, UpdateAssetFinancialPayload } from '@/types/asset';
 import { toast } from 'sonner';
 
-export function useAssets(showArchived?: boolean) {
+export function useAssets(showArchived: boolean = false) {
     return useQuery({
-        queryKey: ['assets', showArchived ?? 'all'],
+        queryKey: ['assets', showArchived],
         queryFn: async () => {
-            const params: Record<string, unknown> = {};
-            if (showArchived !== undefined) {
-                params.showArchived = showArchived;
-            }
-            const { data } = await api.get<Asset[]>('/api/assets', { params });
+            const { data } = await api.get<Asset[]>('/api/assets', {
+                params: { showArchived }
+            });
             return data;
         },
     });

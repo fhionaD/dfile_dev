@@ -37,6 +37,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/contexts/auth-context";
 import { UserRole } from "@/types/asset";
 import { getDashboardPath } from "@/lib/role-routing";
+import { LoadingScreen } from "@/components/loading-screen";
 
 export interface NavItem {
     href: string;
@@ -97,7 +98,7 @@ function NavItemButton({
                 className="shrink-0 transition-colors"
             />
             {!isCollapsed && (
-                <span className={`text-sm leading-none truncate ${isActive ? "font-semibold" : "font-medium"}`}>
+                <span className={`text-sm leading-normal truncate ${isActive ? "font-semibold" : "font-medium"}`}>
                     {item.label}
                 </span>
             )}
@@ -271,7 +272,7 @@ function SidebarContent({
 
 // ─── AppShell ─────────────────────────────────────────────────────
 export function AppShell({ children, navSections, requiredRoles, homePath }: AppShellProps) {
-    const { user, logout, isLoggedIn, isLoading } = useAuth();
+    const { user, logout, isLoggedIn, isLoading, isLoggingOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -305,7 +306,8 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoading, isLoggedIn, pathname, requiredRoles]);
 
-    if (isLoading || !user) return null;
+    if (isLoggingOut) return <LoadingScreen message="Signing you out…" />;
+    if (isLoading || !user) return <LoadingScreen message="Loading…" />;
     if (!requiredRoles.includes(user.role)) return null;
 
     return (

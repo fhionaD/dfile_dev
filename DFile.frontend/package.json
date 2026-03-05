@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "set TURBOPACK=0 && next build",
     "postbuild": "node -e \"const fs = require('fs'); const path = require('path'); const dest = path.join('..', 'DFile.backend', 'wwwroot'); if (process.platform === 'win32') { try { require('child_process').execSync('robocopy out ' + dest + ' /E /PURGE /XD dev', { stdio: 'inherit' }); } catch (e) { if (e.status > 7) process.exit(1); } }\"",
     "start": "next start",
     "lint": "eslint"

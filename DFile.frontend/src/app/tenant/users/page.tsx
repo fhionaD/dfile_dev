@@ -3,13 +3,15 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Plus, Search, Archive, RotateCcw } from "lucide-react";
-import { useEmployees, useRoles, useDepartments, useAddEmployee, useUpdateEmployee, useArchiveEmployee } from "@/hooks/use-organization";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Users, Plus, Search, Archive, RotateCcw, MoreHorizontal, Eye, Pencil } from "lucide-react";
+import { useEmployees, useRoles, useDepartments, useAddEmployee, useUpdateEmployee, useArchiveEmployee, useRestoreEmployee } from "@/hooks/use-organization";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Employee } from "@/types/asset";
 
@@ -25,6 +27,7 @@ export default function UsersPage() {
     const addMutation = useAddEmployee();
     const updateMutation = useUpdateEmployee();
     const archiveMutation = useArchiveEmployee();
+    const restoreMutation = useRestoreEmployee();
 
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -98,68 +101,82 @@ export default function UsersPage() {
                 </Button>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <CardTitle>{showArchived ? "Archived Users" : "Active Users"}</CardTitle>
-                            <CardDescription>{filtered.length} users</CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1 sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
-                            </div>
-                            <Button variant="outline" size="icon" onClick={() => setShowArchived(!showArchived)}>
-                                {showArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                            </Button>
-                        </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{showArchived ? "Archived Users" : "Active Users"}</h2>
+                    <span className="text-sm text-muted-foreground">({filtered.length})</span>
+                </div>
+                <div className="flex gap-2">
+                    <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
                     </div>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filtered.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>{showArchived ? "No archived users" : "No users found"}</p>
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Department</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="w-[100px]">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filtered.map(emp => (
-                                        <TableRow key={emp.id} className="cursor-pointer" onClick={() => handleEmployeeClick(emp)}>
-                                            <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{emp.email}</TableCell>
-                                            <TableCell>{emp.department}</TableCell>
-                                            <TableCell>{emp.role}</TableCell>
-                                            <TableCell><Badge variant={statusVariant[emp.status] ?? "muted"}>{emp.status}</Badge></TableCell>
-                                            <TableCell>
-                                                {emp.status !== "Archived" && (
-                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setArchiveTarget(emp.id); }}>
-                                                        <Archive className="h-4 w-4" />
-                                                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => setShowArchived(!showArchived)} aria-label={showArchived ? "Show active" : "Show archived"}>
+                        {showArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    </Button>
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            ) : filtered.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground rounded-md border">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                    <p>{showArchived ? "No archived users" : "No users found"}</p>
+                </div>
+            ) : (
+                <div className="rounded-md border overflow-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Department</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-[80px] text-center">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filtered.map(emp => (
+                                <TableRow key={emp.id}>
+                                    <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">{emp.email}</TableCell>
+                                    <TableCell>{emp.department}</TableCell>
+                                    <TableCell>{emp.role}</TableCell>
+                                    <TableCell><StatusText variant={statusVariant[emp.status] ?? "muted"}>{emp.status}</StatusText></TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40">
+                                                <DropdownMenuItem onClick={() => handleEmployeeClick(emp)} className="gap-2 cursor-pointer">
+                                                    <Eye className="h-4 w-4" /> View
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleEdit(emp)} className="gap-2 cursor-pointer">
+                                                    <Pencil className="h-4 w-4" /> Edit
+                                                </DropdownMenuItem>
+                                                {emp.status !== "Archived" ? (
+                                                    <DropdownMenuItem onClick={() => setArchiveTarget(emp.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                        <Archive className="h-4 w-4" /> Archive
+                                                    </DropdownMenuItem>
+                                                ) : (
+                                                    <DropdownMenuItem onClick={() => restoreMutation.mutateAsync(emp.id)} className="gap-2 cursor-pointer">
+                                                        <RotateCcw className="h-4 w-4" /> Restore
+                                                    </DropdownMenuItem>
                                                 )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
 
             <AddEmployeeModal
                 open={isAddOpen}

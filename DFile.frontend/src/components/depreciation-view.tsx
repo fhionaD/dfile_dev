@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { TrendingDown, TrendingUp, AlertTriangle, Building2, Calendar, DollarSign, Package, PieChart, Info, Download, Lock, RefreshCw, FileText, Search, Filter, ChevronDown, ChevronRight, Calculator } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -233,8 +232,7 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                 </div>
             </div>
 
-            <Card className="overflow-hidden">
-                <CardContent className="p-0">
+            <div className="rounded-md border overflow-hidden">
                 {/* Content View */}
                 {viewMode === "assets" ? (
                     <div className="overflow-x-auto">
@@ -318,9 +316,9 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
                                 <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[20%] text-left">Room / Location</TableHead>
                                 <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Total Assets</TableHead>
-                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Total Initial Cost</TableHead>
-                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Current Book Value</TableHead>
-                                <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Monthly Exposure</TableHead>
+                                <CurrencyHeader className="w-[15%]">Total Initial Cost</CurrencyHeader>
+                                <CurrencyHeader className="w-[15%]">Current Book Value</CurrencyHeader>
+                                <CurrencyHeader className="w-[15%]">Monthly Exposure</CurrencyHeader>
                                 <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Fully Depreciated</TableHead>
                                 <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Value Retention</TableHead>
                             </TableRow>
@@ -335,9 +333,9 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                                         </div>
                                     </TableCell>
                                     <TableCell className="p-4 align-middle text-center text-sm font-normal">{room.totalAssets}</TableCell>
-                                    <TableCell className="p-4 align-middle text-left text-sm font-normal">{fmt(room.totalCost)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-left text-sm font-normal text-foreground">{fmt(room.totalBookValue)}</TableCell>
-                                    <TableCell className="p-4 align-middle text-left text-sm text-red-600 font-normal">-{fmt(room.monthlyDepreciation)}</TableCell>
+                                    <TableCell className="p-4 align-middle text-right text-sm font-normal"><CurrencyCell value={room.totalCost} /></TableCell>
+                                    <TableCell className="p-4 align-middle text-right text-sm font-normal text-foreground"><CurrencyCell value={room.totalBookValue} /></TableCell>
+                                    <TableCell className="p-4 align-middle text-right text-sm text-red-600 font-normal"><CurrencyCell value={-room.monthlyDepreciation} className="text-red-600" /></TableCell>
                                     <TableCell className="p-4 align-middle text-center text-sm">
                                         {room.fullyDepreciatedCount > 0 ? (
                                              <span className="text-sm font-normal text-foreground">{room.fullyDepreciatedCount}</span>
@@ -359,8 +357,7 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                     </Table>
                     </div>
                 )}
-                </CardContent>
-            </Card>
+            </div>
         </div>
     );
 }

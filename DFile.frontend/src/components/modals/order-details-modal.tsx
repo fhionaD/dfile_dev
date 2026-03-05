@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, PhilippinePeso, Calendar, Building2, User, Package, TrendingDown } from "lucide-react";
 import { PurchaseOrder } from "@/types/asset";
@@ -40,7 +41,7 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                             <div className="flex items-center gap-2 mt-1.5">
                                 <Badge variant="secondary" className="font-mono text-xs">{order.id}</Badge>
                                 <Badge variant="outline" className="text-xs">{order.category}</Badge>
-                                <Badge variant={statusVariant[order.status] ?? "muted"} className="text-xs">{order.status}</Badge>
+                                <StatusText variant={statusVariant[order.status] ?? "muted"}>{order.status}</StatusText>
                             </div>
                         </div>
                     </div>

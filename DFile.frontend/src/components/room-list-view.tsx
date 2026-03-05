@@ -1,29 +1,33 @@
 import { useState, useMemo } from "react";
-import { DoorOpen, Layers, Building2, Plus, Search, Archive, RotateCcw, Filter } from "lucide-react";
+import { DoorOpen, Layers, Building2, Plus, Search, Archive, RotateCcw, Filter, Eye, Pencil, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Room } from "@/types/asset";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { RoomDetailsModal } from "./modals/room-details-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface RoomListViewProps {
     rooms: Room[];
     roomCategories: { id: string; name: string; subCategory?: string }[];
+    showArchived: boolean;
+    onToggleArchived: () => void;
     onCreateRoom?: () => void;
     onManageCategories?: () => void;
     onRoomClick?: (room: Room) => void;
     onArchiveRoom?: (id: string) => void;
+    onRestoreRoom?: (id: string) => void;
     readOnly?: boolean;
 }
 
-export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCategories, onRoomClick, onArchiveRoom, readOnly = false }: RoomListViewProps) {
+export function RoomListView({ rooms, roomCategories, showArchived, onToggleArchived, onCreateRoom, onManageCategories, onRoomClick, onArchiveRoom, onRestoreRoom, readOnly = false }: RoomListViewProps) {
     const [searchQuery, setSearchQuery] = useState("");
-    const [showArchived, setShowArchived] = useState(false);
     const [floorFilter, setFloorFilter] = useState<string>("all");
     
     // Details Modal State
@@ -58,9 +62,6 @@ export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCate
     };
 
     const filteredRooms = rooms.filter(room => {
-        // Archive Status
-        if (showArchived !== !!room.archived) return false;
-
         // Floor Filter
         if (floorFilter !== "all") {
              if (room.floor === null || room.floor === undefined) return false;
@@ -85,8 +86,7 @@ export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCate
         return name.includes(query) || unitId.includes(query) || categoryName.includes(query);
     });
 
-    const activeRoomsCount = rooms.filter(r => !r.archived).length;
-    const archivedRoomsCount = rooms.filter(r => r.archived).length;
+
 
     return (
         <div className="space-y-6">
@@ -133,98 +133,99 @@ export function RoomListView({ rooms, roomCategories, onCreateRoom, onManageCate
                     {!readOnly && (
                         <Button
                             variant={showArchived ? "default" : "outline"}
-                            onClick={() => setShowArchived(!showArchived)}
+                            onClick={onToggleArchived}
                             size="sm"
                             className="h-10"
                         >
                              {showArchived ? (
-                                <><RotateCcw size={16} className="mr-2" />Active ({activeRoomsCount})</>
+                                <><RotateCcw size={16} className="mr-2" />View Active</>
                             ) : (
-                                <><Archive size={16} className="mr-2" />Archived ({archivedRoomsCount})</>
+                                <><Archive size={16} className="mr-2" />View Archived</>
                             )}
                         </Button>
                     )}
                 </div>
             </div>
 
-            <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                    <Table className="w-full table-fixed">
-                        <TableHeader>
-                            <TableRow className="hover:bg-transparent border-y border-border/40">
-                                <TableHead className="w-[20%]">Room Number</TableHead>
-                                <TableHead className="w-[20%]">Category</TableHead>
-                                <TableHead className="w-[20%]">Sub-category</TableHead>
-                                <TableHead className="w-[20%]">Floor</TableHead>
-                                {!readOnly && <TableHead className="w-[20%] text-center">Actions</TableHead>}
+            <div className="rounded-md border overflow-auto">
+                <Table className="w-full table-fixed">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[20%]">Room Number</TableHead>
+                            <TableHead className="w-[20%]">Category</TableHead>
+                            <TableHead className="w-[20%]">Sub-category</TableHead>
+                            <TableHead className="w-[20%]">Floor</TableHead>
+                            {!readOnly && <TableHead className="w-[20%] text-center">Actions</TableHead>}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredRooms.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={readOnly ? 4 : 5} className="h-32 text-center text-muted-foreground">
+                                    {showArchived ? "No archived room units yet" : "No room units match your search."}
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRooms.length === 0 ? (
-                                <TableRow className="hover:bg-transparent">
-                                    <TableCell colSpan={readOnly ? 4 : 5} className="h-32 text-center text-muted-foreground">
-                                        {showArchived ? "No archived room units yet" : "No room units match your search."}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                filteredRooms.map((room) => {
-                                    const category = getRoomCategory(room.categoryId);
-                                    return (
-                                        <TableRow
-                                            key={room.id}
-                                            className="cursor-pointer"
-                                            onClick={() => handleRowClick(room)}
-                                        >
-                                            <TableCell className="font-medium w-[20%]">
-                                                <div className="flex flex-col">
-                                                    <span>{room.name || "—"}</span>
-                                                    <span className="text-xs text-muted-foreground font-normal">#{room.unitId}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="w-[20%]">
-                                                {category?.name || "—"}
-                                            </TableCell>
-                                            <TableCell className="w-[20%] text-muted-foreground">
-                                                {category?.subCategory || "—"}
-                                            </TableCell>
-                                            <TableCell className="w-[20%] text-muted-foreground">
-                                                {room.floor}
-                                            </TableCell>
-                                            {!readOnly && (
-                                                <TableCell className="w-[20%] text-center">
-                                                    <div className="flex items-center justify-center">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (room.archived) {
-                                                                    onArchiveRoom?.(room.id);
-                                                                } else {
-                                                                    setArchiveTarget(room.id);
-                                                                }
-                                                            }}
-                                                            className={`h-8 w-8 ${room.archived ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-                                                            title={room.archived ? 'Restore' : 'Archive'}
-                                                        >
-                                                            {room.archived ? <RotateCcw size={16} /> : <Archive size={16} />}
+                        ) : (
+                            filteredRooms.map((room) => {
+                                const category = getRoomCategory(room.categoryId);
+                                return (
+                                    <TableRow key={room.id}>
+                                        <TableCell className="font-medium w-[20%]">
+                                            <div className="flex flex-col">
+                                                <span>{room.name || "—"}</span>
+                                                <span className="text-xs text-muted-foreground font-normal">#{room.unitId}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="w-[20%]">
+                                            {category?.name || "—"}
+                                        </TableCell>
+                                        <TableCell className="w-[20%] text-muted-foreground">
+                                            {category?.subCategory || "—"}
+                                        </TableCell>
+                                        <TableCell className="w-[20%] text-muted-foreground">
+                                            {room.floor}
+                                        </TableCell>
+                                        {!readOnly && (
+                                            <TableCell className="w-[20%] text-center">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+                                                            <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
-                                                    </div>
-                                                </TableCell>
-                                            )}
-                                        </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-                <div className="px-6 py-4 border-t border-border/40 bg-muted/20">
-                     <div className="text-sm text-muted-foreground font-medium">
-                        Showing {filteredRooms.length} rooms
-                    </div>
-                </div>
-            </Card>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-40">
+                                                        <DropdownMenuItem onClick={() => handleRowClick(room)} className="gap-2 cursor-pointer">
+                                                            <Eye className="h-4 w-4" /> View
+                                                        </DropdownMenuItem>
+                                                        {onRoomClick && (
+                                                            <DropdownMenuItem onClick={() => onRoomClick(room)} className="gap-2 cursor-pointer">
+                                                                <Pencil className="h-4 w-4" /> Edit
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {showArchived ? (
+                                                            <DropdownMenuItem onClick={() => onRestoreRoom?.(room.id)} className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-600 focus:bg-emerald-500/10">
+                                                                <RotateCcw className="h-4 w-4" /> Restore
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem onClick={() => setArchiveTarget(room.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                                <Archive className="h-4 w-4" /> Archive
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                );
+                            })
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+                Showing {filteredRooms.length} rooms
+            </div>
 
             <RoomDetailsModal
                 open={isDetailsModalOpen}

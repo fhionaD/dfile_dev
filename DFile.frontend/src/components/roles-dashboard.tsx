@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Fingerprint, Plus, Shield, ChevronRight, Archive, RotateCcw, Search, Filter, MoreHorizontal } from "lucide-react";
+import { Plus, Shield, ChevronRight, Archive, RotateCcw, Search, Filter, MoreHorizontal, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,17 +29,19 @@ interface Role {
 interface RolesDashboardProps {
     roles: Role[];
     employees: Employee[];
+    showArchived: boolean;
+    onToggleArchived: () => void;
     onOpenModal: () => void;
     onAddPersonnel: () => void;
     onEmployeeClick?: (employee: Employee) => void;
     onArchiveEmployee?: (id: string) => void;
+    onRestoreEmployee?: (id: string) => void;
 }
 
-type SortKey = "name" | "email" | "department" | "role" | "hireDate" | "status";
+type SortKey = "name" | "email" | "department" | "role" | "status";
 type SortDir = "asc" | "desc";
 
-export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, onEmployeeClick, onArchiveEmployee }: RolesDashboardProps) {
-    const [showArchived, setShowArchived] = useState(false);
+export function RolesDashboard({ roles, employees, showArchived, onToggleArchived, onOpenModal, onAddPersonnel, onEmployeeClick, onArchiveEmployee, onRestoreEmployee }: RolesDashboardProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("All");
 
@@ -65,11 +68,7 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
     const sorted = (key: SortKey): "asc" | "desc" | false =>
         sortKey === key ? sortDir : false;
 
-    const activeEmps = employees.filter(e => e.status !== "Archived");
-    const archivedEmps = employees.filter(e => e.status === "Archived");
-    const baseEmps = showArchived ? archivedEmps : activeEmps;
-
-    const filteredEmps = baseEmps.filter(emp => {
+    const filteredEmps = employees.filter(emp => {
         const query = searchQuery.toLowerCase();
         const fullName = `${emp.firstName} ${emp.middleName ? emp.middleName + " " : ""}${emp.lastName}`.toLowerCase();
         const matchesSearch =
@@ -92,7 +91,6 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
         else if (sortKey === "email") { av = a.email.toLowerCase(); bv = b.email.toLowerCase(); }
         else if (sortKey === "department") { av = (a.department ?? "").toLowerCase(); bv = (b.department ?? "").toLowerCase(); }
         else if (sortKey === "role") { av = (a.role ?? "").toLowerCase(); bv = (b.role ?? "").toLowerCase(); }
-        else if (sortKey === "hireDate") { av = a.hireDate ?? ""; bv = b.hireDate ?? ""; }
         else if (sortKey === "status") { av = (a.status ?? "").toLowerCase(); bv = (b.status ?? "").toLowerCase(); }
         if (av < bv) return sortDir === "asc" ? -1 : 1;
         if (av > bv) return sortDir === "asc" ? 1 : -1;
@@ -109,7 +107,11 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
 
     const handleConfirm = () => {
         if (!confirmState) return;
-        onArchiveEmployee?.(confirmState.employeeId);
+        if (confirmState.action === "archive") {
+            onArchiveEmployee?.(confirmState.employeeId);
+        } else {
+            onRestoreEmployee?.(confirmState.employeeId);
+        }
         setConfirmState(null);
     };
 
@@ -149,59 +151,49 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                         <Shield size={16} className="mr-2" />
                         Deploy Role
                     </Button>
-                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm w-[160px] justify-start" onClick={() => setShowArchived(!showArchived)}>
+                    <Button variant={showArchived ? "default" : "outline"} size="sm" className="h-10 text-sm w-[160px] justify-start" onClick={onToggleArchived}>
                         {showArchived
-                            ? <><RotateCcw size={16} className="mr-2" />Show Active ({activeEmps.length})</>
-                            : <><Archive size={16} className="mr-2" />Show Archive ({archivedEmps.length})</>}
+                            ? <><RotateCcw size={16} className="mr-2" />Show Active</>
+                            : <><Archive size={16} className="mr-2" />Show Archive</>}
                     </Button>
                 </div>
             </div>
 
             {/* Personnel Table */}
-            <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                    <Table className="min-w-[1200px] table-fixed">
-                        <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="h-10 px-4 py-3 text-xs w-[100px]">ID</TableHead>
+            <div className="rounded-md border overflow-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
                                 <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[200px]"
+                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("name")}
                                     onSort={() => toggleSort("name")}
                                 >
                                     Name
                                 </SortableTableHead>
                                 <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[250px]"
+                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("email")}
                                     onSort={() => toggleSort("email")}
                                 >
                                     Email
                                 </SortableTableHead>
-                                <TableHead className="h-10 px-4 py-3 text-xs w-[140px]">Contact</TableHead>
                                 <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[140px]"
+                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("department")}
                                     onSort={() => toggleSort("department")}
                                 >
                                     Department
                                 </SortableTableHead>
                                 <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[140px]"
+                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("role")}
                                     onSort={() => toggleSort("role")}
                                 >
                                     Role
                                 </SortableTableHead>
                                 <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[120px]"
-                                    sorted={sorted("hireDate")}
-                                    onSort={() => toggleSort("hireDate")}
-                                >
-                                    Hire Date
-                                </SortableTableHead>
-                                <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs w-[100px]"
+                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("status")}
                                     onSort={() => toggleSort("status")}
                                 >
@@ -213,99 +205,75 @@ export function RolesDashboard({ roles, employees, onOpenModal, onAddPersonnel, 
                         <TableBody>
                             {displayEmps.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground text-sm">
+                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
                                         {showArchived ? "No archived personnel yet" : "No personnel match your search"}
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 displayEmps.map((emp) => (
-                                    <TableRow key={emp.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => onEmployeeClick?.(emp)}>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[100px] truncate font-mono text-xs text-muted-foreground" title={emp.id}>
-                                                {emp.id}
-                                            </div>
+                                    <TableRow key={emp.id} className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="font-medium text-sm">
+                                            {emp.firstName} {emp.middleName ? `${emp.middleName} ` : ""}{emp.lastName}
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[200px] truncate text-sm font-normal text-foreground" title={`${emp.firstName} ${emp.middleName ? emp.middleName + " " : ""}${emp.lastName}`}>
-                                                {emp.firstName} {emp.middleName ? `${emp.middleName} ` : ""}{emp.lastName}
-                                            </div>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {emp.email}
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[250px] truncate text-sm text-muted-foreground" title={emp.email}>
-                                                {emp.email}
-                                            </div>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {emp.department}
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[140px] truncate text-sm text-muted-foreground" title={emp.contactNumber}>
-                                                {emp.contactNumber}
-                                            </div>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {emp.role}
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[140px] truncate text-sm text-muted-foreground" title={emp.department}>
-                                                {emp.department}
-                                            </div>
+                                        <TableCell>
+                                            <StatusText variant={statusVariant[emp.status] ?? "muted"}>{emp.status}</StatusText>
                                         </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[140px] truncate text-sm text-muted-foreground" title={emp.role}>
-                                                {emp.role}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[120px] truncate text-sm text-muted-foreground" title={emp.hireDate}>
-                                                {emp.hireDate}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-0 align-middle">
-                                            <div className="px-4 py-3 w-[100px]">
-                                                <Badge variant={statusVariant[emp.status] ?? "muted"}>{emp.status}</Badge>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-0 align-middle text-center" onClick={e => e.stopPropagation()}>
-                                            <div className="px-4 py-3 w-[80px] flex justify-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                            <span className="sr-only">Actions</span>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-40 z-[200]">
-                                                        {emp.status === "Archived" ? (
-                                                            <DropdownMenuItem
-                                                                onClick={() => setConfirmState({
-                                                                    employeeId: emp.id,
-                                                                    action: "restore",
-                                                                    employeeName: `${emp.firstName} ${emp.lastName}`,
-                                                                })}
-                                                                className="gap-2 cursor-pointer"
-                                                            >
-                                                                <RotateCcw className="h-4 w-4 text-primary" />
-                                                                Restore
-                                                            </DropdownMenuItem>
-                                                        ) : (
-                                                            <DropdownMenuItem
-                                                                onClick={() => setConfirmState({
-                                                                    employeeId: emp.id,
-                                                                    action: "archive",
-                                                                    employeeName: `${emp.firstName} ${emp.lastName}`,
-                                                                })}
-                                                                className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                                                            >
-                                                                <Archive className="h-4 w-4" />
-                                                                Archive
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                                        <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <span className="sr-only">Actions</span>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-40 z-[200]">
+                                                    <DropdownMenuItem
+                                                        onClick={() => onEmployeeClick?.(emp)}
+                                                        className="gap-2 cursor-pointer"
+                                                    >
+                                                        <Eye className="h-4 w-4" /> View
+                                                    </DropdownMenuItem>
+                                                    {showArchived ? (
+                                                        <DropdownMenuItem
+                                                            onClick={() => setConfirmState({
+                                                                employeeId: emp.id,
+                                                                action: "restore",
+                                                                employeeName: `${emp.firstName} ${emp.lastName}`,
+                                                            })}
+                                                            className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-600 focus:bg-emerald-500/10"
+                                                        >
+                                                            <RotateCcw className="h-4 w-4" /> Restore
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem
+                                                            onClick={() => setConfirmState({
+                                                                employeeId: emp.id,
+                                                                action: "archive",
+                                                                employeeName: `${emp.firstName} ${emp.lastName}`,
+                                                            })}
+                                                            className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                        >
+                                                            <Archive className="h-4 w-4" /> Archive
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             )}
                         </TableBody>
                     </Table>
-                </div>
-            </Card>
+            </div>
 
             {/* Roles Section */}
             <div>

@@ -20,7 +20,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<AssetResponseDto>>> GetAssets([FromQuery] bool? showArchived = null)
+        public async Task<ActionResult<IEnumerable<AssetResponseDto>>> GetAssets([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
             var query = _context.Assets.AsQueryable();
@@ -34,7 +34,7 @@ namespace DFile.backend.Controllers
             {
                 query = query.Where(a => a.Archived || a.Status == "Archived");
             }
-            else if (showArchived == false)
+            else
             {
                 query = query.Where(a => !a.Archived && a.Status != "Archived");
             }
