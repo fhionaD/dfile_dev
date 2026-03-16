@@ -10,7 +10,7 @@ interface AddAssetModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     categories: Category[];
-    onAddAsset?: (payload: CreateAssetPayload, id?: string) => void;
+    onAddAsset?: (asset: Asset) => void;
     initialData?: Asset;
     mode?: "create" | "edit";
 }

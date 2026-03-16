@@ -51,10 +51,14 @@ export default function InventoryPage() {
                 mode={isEditMode ? "edit" : "create"}
                 initialData={isEditMode && selectedAsset ? selectedAsset : undefined}
                 onAddAsset={async (asset) => {
+                    const payload: any = {
+                        ...asset,
+                        tagNumber: asset.tagNumber || asset.assetCode || asset.id || `AST-${Date.now()}`
+                    };
                     if (isEditMode && selectedAsset) {
-                        await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: asset });
+                        await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as any });
                     } else {
-                        await addAssetMutation.mutateAsync(asset);
+                        await addAssetMutation.mutateAsync(payload as any);
                     }
                     setIsAddModalOpen(false);
                     setIsEditMode(false);

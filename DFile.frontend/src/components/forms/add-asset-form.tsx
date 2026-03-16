@@ -23,15 +23,19 @@ interface AddAssetFormProps {
 
 export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
-    const [selectedHandlingType, setSelectedHandlingType] = useState<string>(initialData ? 
-        (categories.find(c => c.name === initialData.cat)?.handlingType || "Fixed") 
-        : "Fixed");
-    const [isManufacturerOpen, setIsManufacturerOpen] = useState(!!initialData?.manufacturer);
     
+    // Resolve handling type from category
+    const initialCat = initialData ? categories.find(c => c.id === initialData.categoryId) : undefined;
+    const initialHandlingType = initialCat ? (initialCat.handlingType === 0 ? "Fixed" : initialCat.handlingType === 1 ? "Consumable" : "Movable") : "Fixed";
+    
+    const [selectedHandlingType, setSelectedHandlingType] = useState<string>(initialHandlingType);
+    const [isManufacturerOpen, setIsManufacturerOpen] = useState(!!initialData?.manufacturer);
+    const [isGenInfoOpen, setIsGenInfoOpen] = useState(true);
+    const [isDocOpen, setIsDocOpen] = useState(false);
     // Using refs for file inputs to programmatically click them
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const initialCategoryId = initialData ? categories.find(c => c.name === initialData.cat)?.id : undefined;
+    const initialCategoryId = initialData ? categories.find(c => c.categoryName === initialData.categoryId)?.id : undefined;
 
     const handleCalculate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -46,7 +50,8 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
             const newAsset: Asset = {
                 id: initialData?.id || (formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`),
                 desc: formData.get("name") as string,
-                cat:category?.name || "Unknown",
+                categoryId: catId,
+                categoryName: category?.categoryName || "Unknown",
                 status: initialData ? initialData.status : "Available", // Default to Available if new
                 room: "—",
                 image: previewUrl || undefined,
@@ -84,13 +89,22 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                 <div className="p-6 space-y-10">
                     
                     {/* Section 1: General Details */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-6 pb-2 border-b">
-                            <Layers className="w-4 h-4 text-primary" />
-                            <h3 className="font-semibold text-sm tracking-wide text-foreground uppercase">General Information</h3>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="border rounded-lg bg-card shadow-sm">
+                        <Collapsible open={isGenInfoOpen} onOpenChange={setIsGenInfoOpen}>
+                            <CollapsibleTrigger asChild>
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
+                                    <div className="flex items-center gap-2">
+                                        <Layers className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <h3 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground group-hover:text-foreground transition-colors">General Information</h3>
+                                    </div>
+                                    <div className={`p-1 rounded-full transition-colors ${isGenInfoOpen ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                        {isGenInfoOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    </div>
+                                </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <Separator />
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/10">
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Name <span className="text-destructive">*</span></Label>
                                 <Input name="name" defaultValue={initialData?.desc} required placeholder="e.g. Executive Desk" className="h-10" />
@@ -101,13 +115,13 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 <Select name="category" defaultValue={initialCategoryId} onValueChange={(val) => {
                                     const cat = categories.find(c => c.id === val);
                                     if (cat) {
-                                        setSelectedHandlingType(cat.handlingType);
+                                        setSelectedHandlingType(cat.handlingType === 0 ? "Fixed" : cat.handlingType === 1 ? "Consumable" : "Movable");
                                     }
                                 }}>
                                     <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select Category..." /></SelectTrigger>
                                     <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
                                         {categories.map((c) => (
-                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            <SelectItem key={c.id} value={c.id}>{c.categoryName}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -145,16 +159,27 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years)</Label>
                                 <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10" />
                             </div>
-                        </div>
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
                     </div>
 {/* Section 2: Image & Notes */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-6 pb-2 border-b mt-2">
-                             <FileText className="w-4 h-4 text-primary" />
-                             <h3 className="font-semibold text-sm tracking-wide text-foreground uppercase">Documentation & Visuals</h3>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="border rounded-lg bg-card shadow-sm">
+                        <Collapsible open={isDocOpen} onOpenChange={setIsDocOpen}>
+                            <CollapsibleTrigger asChild>
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <h3 className="font-semibold text-sm tracking-wide uppercase text-muted-foreground group-hover:text-foreground transition-colors">Documentation & Visuals</h3>
+                                    </div>
+                                    <div className={`p-1 rounded-full transition-colors ${isDocOpen ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                        {isDocOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    </div>
+                                </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <Separator />
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8 bg-muted/10">
                             <div className="md:col-span-1 space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Image</Label>
                                 <div 
@@ -213,6 +238,8 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 />
                             </div>
                         </div>
+                        </CollapsibleContent>
+                        </Collapsible>
                     </div>
 
                     {/* Section 3: Manufacturer Details */}
