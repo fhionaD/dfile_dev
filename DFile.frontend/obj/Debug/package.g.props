@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <PackageJsonName Condition="$(PackageJsonName) == ''">dfile.client</PackageJsonName>
+    <PackageJsonVersion Condition="$(PackageJsonVersion) == ''">0.1.0</PackageJsonVersion>
+    <PackageJsonPrivate Condition="$(PackageJsonPrivate) == ''">true</PackageJsonPrivate>
+    <PackageJsonScriptsDev Condition="$(PackageJsonScriptsDev) == ''">next dev</PackageJsonScriptsDev>
+    <PackageJsonScriptsBuild Condition="$(PackageJsonScriptsBuild) == ''">set TURBOPACK=0 &amp;&amp; next build</PackageJsonScriptsBuild>
+    <PackageJsonScriptsPostbuild Condition="$(PackageJsonScriptsPostbuild) == ''">node -e "const fs = require('fs'); const path = require('path'); const dest = path.join('..', 'DFile.backend', 'wwwroot'); if (process.platform === 'win32') { try { require('child_process').execSync('robocopy out ' + dest + ' /E /PURGE /XD dev', { stdio: 'inherit' }); } catch (e) { if (e.status &gt; 7) process.exit(1); } }"</PackageJsonScriptsPostbuild>
+    <PackageJsonScriptsStart Condition="$(PackageJsonScriptsStart) == ''">next start</PackageJsonScriptsStart>
+    <PackageJsonScriptsLint Condition="$(PackageJsonScriptsLint) == ''">eslint</PackageJsonScriptsLint>
+    <PackageJsonDependenciesHookformResolvers Condition="$(PackageJsonDependenciesHookformResolvers) == ''">^5.2.2</PackageJsonDependenciesHookformResolvers>
+    <PackageJsonDependenciesRadixUiReactProgress Condition="$(PackageJsonDependenciesRadixUiReactProgress) == ''">^1.1.8</PackageJsonDependenciesRadixUiReactProgress>
+    <PackageJsonDependenciesRadixUiReactTabs Condition="$(PackageJsonDependenciesRadixUiReactTabs) == ''">^1.1.13</PackageJsonDependenciesRadixUiReactTabs>
+    <PackageJsonDependenciesTanstackReactQuery Condition="$(PackageJsonDependenciesTanstackReactQuery) == ''">^5.90.21</PackageJsonDependenciesTanstackReactQuery>
+    <PackageJsonDependenciesTanstackReactTable Condition="$(PackageJsonDependenciesTanstackReactTable) == ''">^8.21.3</PackageJsonDependenciesTanstackReactTable>
+    <PackageJsonDependenciesAxios Condition="$(PackageJsonDependenciesAxios) == ''">^1.13.5</PackageJsonDependenciesAxios>
+    <PackageJsonDependenciesClassVarianceAuthority Condition="$(PackageJsonDependenciesClassVarianceAuthority) == ''">^0.7.1</PackageJsonDependenciesClassVarianceAuthority>
+    <PackageJsonDependenciesClsx Condition="$(PackageJsonDependenciesClsx) == ''">^2.1.1</PackageJsonDependenciesClsx>
+    <PackageJsonDependenciesDateFns Condition="$(PackageJsonDependenciesDateFns) == ''">^4.1.0</PackageJsonDependenciesDateFns>
+    <PackageJsonDependenciesLucideReact Condition="$(PackageJsonDependenciesLucideReact) == ''">^0.563.0</PackageJsonDependenciesLucideReact>
+    <PackageJsonDependenciesNext Condition="$(PackageJsonDependenciesNext) == ''">16.1.6</PackageJsonDependenciesNext>
+    <PackageJsonDependenciesNextThemes Condition="$(PackageJsonDependenciesNextThemes) == ''">^0.4.6</PackageJsonDependenciesNextThemes>
+    <PackageJsonDependenciesQrcodeReact Condition="$(PackageJsonDependenciesQrcodeReact) == ''">^4.2.0</PackageJsonDependenciesQrcodeReact>
+    <PackageJsonDependenciesRadixUi Condition="$(PackageJsonDependenciesRadixUi) == ''">^1.4.3</PackageJsonDependenciesRadixUi>
+    <PackageJsonDependenciesReact Condition="$(PackageJsonDependenciesReact) == ''">19.2.3</PackageJsonDependenciesReact>
+    <PackageJsonDependenciesReactDayPicker Condition="$(PackageJsonDependenciesReactDayPicker) == ''">^9.14.0</PackageJsonDependenciesReactDayPicker>
+    <PackageJsonDependenciesReactDom Condition="$(PackageJsonDependenciesReactDom) == ''">19.2.3</PackageJsonDependenciesReactDom>
+    <PackageJsonDependenciesReactHookForm Condition="$(PackageJsonDependenciesReactHookForm) == ''">^7.71.2</PackageJsonDependenciesReactHookForm>
+    <PackageJsonDependenciesSonner Condition="$(PackageJsonDependenciesSonner) == ''">^2.0.7</PackageJsonDependenciesSonner>
+    <PackageJsonDependenciesTailwindMerge Condition="$(PackageJsonDependenciesTailwindMerge) == ''">^3.4.0</PackageJsonDependenciesTailwindMerge>
+    <PackageJsonDependenciesZod Condition="$(PackageJsonDependenciesZod) == ''">^4.3.6</PackageJsonDependenciesZod>
+    <PackageJsonDevdependenciesTailwindcssPostcss Condition="$(PackageJsonDevdependenciesTailwindcssPostcss) == ''">^4</PackageJsonDevdependenciesTailwindcssPostcss>
+    <PackageJsonDevdependenciesTypesNode Condition="$(PackageJsonDevdependenciesTypesNode) == ''">^20</PackageJsonDevdependenciesTypesNode>
+    <PackageJsonDevdependenciesTypesReact Condition="$(PackageJsonDevdependenciesTypesReact) == ''">^19</PackageJsonDevdependenciesTypesReact>
+    <PackageJsonDevdependenciesTypesReactDom Condition="$(PackageJsonDevdependenciesTypesReactDom) == ''">^19</PackageJsonDevdependenciesTypesReactDom>
+    <PackageJsonDevdependenciesEslint Condition="$(PackageJsonDevdependenciesEslint) == ''">^9</PackageJsonDevdependenciesEslint>
+    <PackageJsonDevdependenciesEslintConfigNext Condition="$(PackageJsonDevdependenciesEslintConfigNext) == ''">16.1.6</PackageJsonDevdependenciesEslintConfigNext>
+    <PackageJsonDevdependenciesShadcn Condition="$(PackageJsonDevdependenciesShadcn) == ''">^3.8.4</PackageJsonDevdependenciesShadcn>
+    <PackageJsonDevdependenciesTailwindcss Condition="$(PackageJsonDevdependenciesTailwindcss) == ''">^4</PackageJsonDevdependenciesTailwindcss>
+    <PackageJsonDevdependenciesTwAnimateCss Condition="$(PackageJsonDevdependenciesTwAnimateCss) == ''">^1.4.0</PackageJsonDevdependenciesTwAnimateCss>
+    <PackageJsonDevdependenciesTypescript Condition="$(PackageJsonDevdependenciesTypescript) == ''">^5</PackageJsonDevdependenciesTypescript>
+  </PropertyGroup>
+</Project>
