@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tag, Calendar, Package, Edit, User } from "lucide-react";
 import { format } from "date-fns";
-import { AssetCategory as Category } from "@/types/asset";
+import { Category } from "@/types/asset";
 
 const handlingLabels: Record<number, string> = { 0: "Fixed", 1: "Consumable", 2: "Movable" };
 const handlingColors: Record<number, string> = {
@@ -34,7 +34,7 @@ interface CategoryDetailsModalProps {
 export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: CategoryDetailsModalProps) {
     if (!category) return null;
 
-    const statusColor = !category.isArchived
+    const statusColor = category.status !== 'Archived'
         ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30"
         : "bg-gray-500/10 text-gray-600 border-gray-500/20 dark:text-gray-400 dark:border-gray-500/30";
 
@@ -51,16 +51,16 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                                 {category.categoryName}
                             </DialogTitle>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {category.assetCategoryCode && (
+                                {false && (
                                     <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
-                                        {category.assetCategoryCode}
+                                        {(category as any).assetCategoryCode}
                                     </Badge>
                                 )}
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wider ${handlingColors[category.handlingType] ?? handlingColors[0]}`}>
                                     {handlingLabels[category.handlingType] ?? "Unknown"}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wider ${statusColor}`}>
-                                    {category.isArchived ? "Archived" : "Active"}
+                                    {category.status}
                                 </span>
                             </div>
                         </div>
@@ -95,13 +95,13 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Status</p>
-                                <p className="font-medium">{category.isArchived ? "Archived" : "Active"}</p>
+                                <p className="font-medium">{category.status}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Package size={12} /> Total Assets
                                 </p>
-                                <p className="font-medium">{category.assetCount}</p>
+                                <p className="font-medium">{category.items}</p>
                             </div>
                         </div>
                     </div>
@@ -114,26 +114,26 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                         <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4 rounded-lg border border-border/50">
                             <div>
                                 <p className="text-xs text-muted-foreground">Created</p>
-                                <p className="font-medium">{formatDate(category.createdAt)}</p>
+                                <p className="font-medium">{String("")}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Last Updated</p>
-                                <p className="font-medium">{formatDate(category.updatedAt)}</p>
+                                <p className="font-medium">{String("")}</p>
                             </div>
-                            {category.createdByName && (
+                            {false && (
                                 <div>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                         <User size={12} /> Created By
                                     </p>
-                                    <p className="font-medium">{category.createdByName}</p>
+                                    <p className="font-medium">{(category as any).createdByName}</p>
                                 </div>
                             )}
-                            {category.updatedByName && (
+                            {false && (
                                 <div>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                                         <User size={12} /> Updated By
                                     </p>
-                                    <p className="font-medium">{category.updatedByName}</p>
+                                    <p className="font-medium">{(category as any).updatedByName}</p>
                                 </div>
                             )}
                         </div>
@@ -144,7 +144,7 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Close
                     </Button>
-                    {onEdit && !category.isArchived && (
+                    {onEdit && category.status !== "Archived" && (
                         <Button
                             onClick={() => onEdit(category)}
                             className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"

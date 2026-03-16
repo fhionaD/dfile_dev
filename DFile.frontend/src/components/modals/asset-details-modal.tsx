@@ -17,6 +17,7 @@ interface AssetDetailsModalProps {
 
 export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDetailsModalProps) {
     if (!asset) return null;
+    const formatCurrency = (val: number | undefined) => val != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val) : "-";
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -65,7 +66,7 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                         <div className="bg-muted/30  p-4 space-y-3 border border-border/50">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground flex items-center gap-2"><PhilippinePeso size={14} /> Value</span>
-                                <span className="font-semibold">₱{asset.value.toLocaleString()}</span>
+                                <span className="font-semibold">{formatCurrency(asset.value)}</span>
                             </div>
                             <Separator />
                             <div className="flex items-center justify-between text-sm">

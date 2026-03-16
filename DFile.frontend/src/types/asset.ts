@@ -23,6 +23,7 @@ export interface Asset {
     currentBookValue?: number;
     monthlyDepreciation?: number;
     tenantId?: number;
+    permissions?: ModulePermission[];
     archived?: boolean;
 }
 
@@ -68,6 +69,7 @@ export interface User {
     avatar?: string;
     status: string;
     tenantId?: number;
+    permissions?: ModulePermission[];
 }
 
 export type UserRole = 'Super Admin' | 'Admin' | 'Finance' | 'Maintenance';
@@ -239,3 +241,7 @@ export interface RiskIndicators {
     fullyDepreciated: number;
     suspendedTenants: number;
 }
+export type NotificationType = "Info" | "Warning" | "Success" | "Error"; export interface Notification { id: number; type: NotificationType; message: string; isRead: boolean; createdAt: string; link?: string; module?: string; }
+export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }
+
+export interface ModulePermission { moduleId?: string; moduleName: string; accessLevel?: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canApprove?: boolean; canArchive?: boolean; canRestore?: boolean; }

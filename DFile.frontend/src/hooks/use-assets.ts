@@ -133,3 +133,4 @@ export function useUpdateAssetFinancial() {
         },
     });
 }
+export const useAvailableAssets = () => useQuery({ queryKey: ['assets', 'available'], queryFn: async () => { const { data } = await api.get('/api/assets/available'); return data; } });

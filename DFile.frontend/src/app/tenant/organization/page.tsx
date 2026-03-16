@@ -49,12 +49,12 @@ export default function OrganizationPage() {
     // ── Unified "Define Personnel Role" state (create) ──
     const [isUnifiedFormOpen, setIsUnifiedFormOpen] = useState(false);
     const [isCreatingNewDept, setIsCreatingNewDept] = useState(false);
-    const [unifiedForm, setUnifiedForm] = useState({ designation: "", departmentId: "", newDeptName: "", description: "" });
+    const [unifiedForm, setUnifiedForm] = useState({ designation: "", departmentId: "", newDeptName: "", description: "", head: "" });
 
     // ── Role edit state ──
     const [isRoleFormOpen, setIsRoleFormOpen] = useState(false);
-    const [editingRole, setEditingRole] = useState<{ id: string; designation: string; departmentId?: string; description: string } | null>(null);
-    const [roleForm, setRoleForm] = useState({ designation: "", departmentId: "", description: "" });
+    const [editingRole, setEditingRole] = useState<{ id: string; designation: string; department?: string; scope: string } | null>(null);
+    const [roleForm, setRoleForm] = useState({ designation: "", departmentId: "", description: "", head: "" });
     const [isEditCreatingNewDept, setIsEditCreatingNewDept] = useState(false);
     const [editNewDeptName, setEditNewDeptName] = useState("");
 
@@ -81,7 +81,7 @@ export default function OrganizationPage() {
         if (!roleSearch) return roles;
         const q = roleSearch.toLowerCase();
         return roles.filter(r =>
-            r.designation?.toLowerCase().includes(q) || r.departmentName?.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q)
+            r.designation?.toLowerCase().includes(q) || r.department?.toLowerCase().includes(q) || r.scope?.toLowerCase().includes(q)
         );
     }, [roles, roleSearch]);
 
@@ -101,7 +101,7 @@ export default function OrganizationPage() {
     // ── Unified "Define Personnel Role" handler ──
     const openUnifiedCreate = () => {
         setIsCreatingNewDept(allDepartments.length === 0);
-        setUnifiedForm({ designation: "", departmentId: "", newDeptName: "", description: "" });
+        setUnifiedForm({ designation: "", departmentId: "", newDeptName: "", description: "", head: "" });
         setIsUnifiedFormOpen(true);
     };
     const handleUnifiedSave = async () => {
@@ -116,20 +116,20 @@ export default function OrganizationPage() {
             if (existing) {
                 departmentId = existing.id;
             } else {
-                const newDept = await addDeptMutation.mutateAsync({ name: deptName, description: "" });
+                const newDept = await addDeptMutation.mutateAsync({ name: deptName, description: "", head: "" });
                 departmentId = newDept.id;
             }
         }
 
         if (!departmentId) return;
-        await addRoleMutation.mutateAsync({ designation: unifiedForm.designation, departmentId, description: unifiedForm.description });
+        await addRoleMutation.mutateAsync({ designation: unifiedForm.designation, department: departmentId, scope: unifiedForm.description });
         setIsUnifiedFormOpen(false);
     };
 
     // ── Role edit handlers ──
-    const openRoleEdit = (role: { id: string; designation: string; departmentId?: string; description: string }) => {
+    const openRoleEdit = (role: { id: string; designation: string; department?: string; scope: string }) => {
         setEditingRole(role);
-        setRoleForm({ designation: role.designation, departmentId: role.departmentId || "", description: role.description });
+        setRoleForm({ designation: role.designation, departmentId: role.department || "", description: role.scope, head: "" });
         setIsEditCreatingNewDept(false);
         setEditNewDeptName("");
         setIsRoleFormOpen(true);
@@ -146,12 +146,12 @@ export default function OrganizationPage() {
             if (existing) {
                 departmentId = existing.id;
             } else {
-                const newDept = await addDeptMutation.mutateAsync({ name: deptName, description: "" });
+                const newDept = await addDeptMutation.mutateAsync({ name: deptName, description: "", head: "" });
                 departmentId = newDept.id;
             }
         }
 
-        await updateRoleMutation.mutateAsync({ id: editingRole.id, payload: { designation: roleForm.designation, departmentId, description: roleForm.description } });
+        await updateRoleMutation.mutateAsync({ id: editingRole.id, payload: { designation: roleForm.designation, department: departmentId, scope: roleForm.description } });
         setIsRoleFormOpen(false);
     };
 
@@ -258,8 +258,8 @@ export default function OrganizationPage() {
                                             <TableCell className="font-medium">
                                                 <button type="button" className="text-primary hover:underline text-left" onClick={() => openRoleEdit(r)}>{r.designation}</button>
                                             </TableCell>
-                                            <TableCell>{r.departmentName}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{r.description}</TableCell>
+                                            <TableCell>{r.department}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{r.scope}</TableCell>
                                             <TableCell className="text-center">
                                                 {roleShowArchived ? (
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreRoleMutation.mutateAsync(r.id)}>

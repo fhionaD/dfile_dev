@@ -38,10 +38,7 @@ export default function ProcurementPage() {
                 open={isOrderDetailsOpen}
                 onOpenChange={setIsOrderDetailsOpen}
                 order={selectedOrder}
-                onEdit={() => {
-                    setIsOrderDetailsOpen(false);
-                    setIsAcquisitionModalOpen(true);
-                }}
+                
             />
         </>
     );

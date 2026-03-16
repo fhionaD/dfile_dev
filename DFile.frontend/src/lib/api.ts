@@ -35,3 +35,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+export const getErrorMessage = (error: any, fallback?: string) => error?.response?.data?.message || error?.message || fallback || 'An error occurred';

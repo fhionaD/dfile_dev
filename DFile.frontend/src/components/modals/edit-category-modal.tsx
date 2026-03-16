@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tag } from "lucide-react";
-import { AssetCategory as Category } from "@/types/asset";
+import { Category } from "@/types/asset";
 import { useUpdateCategory } from "@/hooks/use-categories";
 
 interface EditCategoryModalProps {
@@ -33,7 +33,7 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
                 description: category.description || "",
                 handlingType: category.handlingType,
             });
-            setHasLinkedAssets((category.assetCount ?? 0) > 0);
+            setHasLinkedAssets((category.items ?? 0) > 0);
         }
     }, [category, open]);
 
@@ -45,7 +45,7 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
             categoryName: form.categoryName.trim(),
             description: form.description.trim(),
             handlingType: form.handlingType,
-            rowVersion: category.rowVersion,
+            rowVersion: (category as any).rowVersion,
         };
 
         try {

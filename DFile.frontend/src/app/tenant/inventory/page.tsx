@@ -21,7 +21,7 @@ export default function InventoryPage() {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
 
-    const activeCategories = assetCategories.filter(c => !c.isArchived);
+    const activeCategories = assetCategories.filter(c => c.status !== 'Archived');
 
     return (
         <>

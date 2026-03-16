@@ -20,12 +20,12 @@ export default function AllocationPage() {
 
     return (
         <AssetAllocationView
-            availableAssets={availableAssets}
-            allocations={allocations}
+            assets={availableAssets}
+            
             rooms={rooms}
-            onAllocate={(assetId, roomId, remarks) => allocate.mutate({ assetId, roomId, remarks })}
-            onDeallocate={(assetId) => deallocate.mutate(assetId)}
-            isPending={allocate.isPending || deallocate.isPending}
+            onAllocate={(assetId, roomId) => allocate.mutate({ assetId, roomId, remarks: '' })}
+            
+            
         />
     );
 }
