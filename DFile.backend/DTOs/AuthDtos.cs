@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 namespace DFile.backend.DTOs
 {
@@ -29,7 +30,7 @@ namespace DFile.backend.DTOs
         public string Password { get; set; } = string.Empty;
 
         [Required]
-        public string Role { get; set; } = "Admin";
+        public int RoleTemplateId { get; set; }
 
         public int? TenantId { get; set; }
     }
@@ -45,5 +46,16 @@ namespace DFile.backend.DTOs
         public string? Avatar { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? TenantId { get; set; }
+        public List<ModulePermissionDto>? Permissions { get; set; }
+    }
+
+    public class ModulePermissionDto
+    {
+        public string ModuleName { get; set; } = string.Empty;
+        public bool CanView { get; set; }
+        public bool CanCreate { get; set; }
+        public bool CanEdit { get; set; }
+        public bool CanApprove { get; set; }
+        public bool CanArchive { get; set; }
     }
 }

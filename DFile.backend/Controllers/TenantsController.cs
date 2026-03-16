@@ -101,11 +101,11 @@ namespace DFile.backend.Controllers
             var activeTenants = await _context.Tenants.CountAsync(t => t.Status == "Active");
             var suspendedTenants = await _context.Tenants.CountAsync(t => t.Status == "Suspended");
             var totalUsers = await _context.Users.CountAsync();
-            var totalAssets = await _context.Assets.CountAsync(a => !a.Archived);
+            var totalAssets = await _context.Assets.CountAsync(a => !a.IsArchived);
             var totalRooms = await _context.Rooms.CountAsync();
             var totalMaintenanceRecords = await _context.MaintenanceRecords.CountAsync();
-            var pendingOrders = await _context.PurchaseOrders.CountAsync(p => p.Status == "Pending" && !p.Archived);
-            var openMaintenanceRecords = await _context.MaintenanceRecords.CountAsync(m => m.Status != "Completed" && !m.Archived);
+            var pendingOrders = await _context.PurchaseOrders.CountAsync(p => p.Status == "Pending" && !p.IsArchived);
+            var openMaintenanceRecords = await _context.MaintenanceRecords.CountAsync(m => m.Status != "Completed" && !m.IsArchived);
 
             return Ok(new
             {
@@ -127,16 +127,16 @@ namespace DFile.backend.Controllers
             var now = DateTime.UtcNow;
 
             var expiredWarranties = await _context.Assets
-                .CountAsync(a => !a.Archived && a.WarrantyExpiry != null && a.WarrantyExpiry < now);
+                .CountAsync(a => !a.IsArchived && a.WarrantyExpiry != null && a.WarrantyExpiry < now);
 
             var overdueMaintenanceCount = await _context.MaintenanceRecords
-                .CountAsync(m => !m.Archived && m.Status != "Completed" && m.EndDate != null && m.EndDate < now);
+                .CountAsync(m => !m.IsArchived && m.Status != "Completed" && m.EndDate != null && m.EndDate < now);
 
             var highPriorityPending = await _context.MaintenanceRecords
-                .CountAsync(m => !m.Archived && m.Priority == "High" && m.Status == "Pending");
+                .CountAsync(m => !m.IsArchived && m.Priority == "High" && m.Status == "Pending");
 
             var fullyDepreciated = await _context.Assets
-                .CountAsync(a => !a.Archived && a.CurrentBookValue <= 0);
+                .CountAsync(a => !a.IsArchived && a.CurrentBookValue <= 0);
 
             var suspendedTenants = await _context.Tenants
                 .CountAsync(t => t.Status == "Suspended");

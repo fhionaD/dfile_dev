@@ -14,10 +14,12 @@ namespace DFile.backend.Data
         public DbSet<AssetCategory> AssetCategories { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<RoomCategory> RoomCategories { get; set; }
+        public DbSet<RoomSubCategory> RoomSubCategories { get; set; }
         public DbSet<Employee> Employees { get; set; }
         public DbSet<Department> Departments { get; set; }
         public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
         public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+        public DbSet<PurchaseOrderItem> PurchaseOrderItems { get; set; }
         public DbSet<TaskItem> Tasks { get; set; }
         public DbSet<Role> Roles { get; set; }
 
@@ -30,6 +32,12 @@ namespace DFile.backend.Data
         // Audit
         public DbSet<AuditLog> AuditLogs { get; set; }
 
+        // Notifications
+        public DbSet<Notification> Notifications { get; set; }
+
+        // Allocations
+        public DbSet<AssetAllocation> AssetAllocations { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -37,25 +45,57 @@ namespace DFile.backend.Data
             // ── Asset ──────────────────────────────────────────────
             modelBuilder.Entity<Asset>(e =>
             {
-                e.Property(a => a.Value).HasColumnType("decimal(18,2)");
+                e.Property(a => a.AcquisitionCost).HasColumnType("decimal(18,2)");
                 e.Property(a => a.PurchasePrice).HasColumnType("decimal(18,2)");
                 e.Property(a => a.CurrentBookValue).HasColumnType("decimal(18,2)");
                 e.Property(a => a.MonthlyDepreciation).HasColumnType("decimal(18,2)");
+                e.Property(a => a.ResidualValue).HasColumnType("decimal(18,2)");
+
+                e.Property(a => a.LifecycleStatus)
+                    .HasConversion<int>()
+                    .HasDefaultValue(LifecycleStatus.Registered);
+
+                e.Property(a => a.CurrentCondition)
+                    .HasConversion<int>()
+                    .HasDefaultValue(AssetCondition.Good);
+
+                e.HasIndex(a => a.AssetCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Assets_AssetCode");
 
                 e.HasIndex(a => new { a.TenantId, a.TagNumber })
                     .IsUnique()
                     .HasFilter("[TagNumber] IS NOT NULL")
                     .HasDatabaseName("IX_Assets_TenantId_TagNumber");
 
+                e.HasIndex(a => a.IsArchived)
+                    .HasDatabaseName("IX_Assets_IsArchived");
+
+                e.HasIndex(a => a.CreatedAt)
+                    .HasDatabaseName("IX_Assets_CreatedAt");
+
+                e.HasIndex(a => a.LifecycleStatus)
+                    .HasDatabaseName("IX_Assets_LifecycleStatus");
+
                 e.HasOne(a => a.Category)
                     .WithMany()
                     .HasForeignKey(a => a.CategoryId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 e.HasOne(a => a.Tenant)
                     .WithMany()
                     .HasForeignKey(a => a.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(a => a.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(a => a.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(a => a.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(a => a.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             // ── AssetCategory ──────────────────────────────────────
@@ -64,6 +104,31 @@ namespace DFile.backend.Data
                 e.Property(c => c.HandlingType)
                     .HasConversion<int>()
                     .HasDefaultValue(HandlingType.Fixed);
+
+                e.HasIndex(c => c.AssetCategoryCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_AssetCategories_AssetCategoryCode");
+
+                e.HasIndex(c => new { c.CategoryName, c.HandlingType, c.TenantId })
+                    .IsUnique()
+                    .HasFilter("[IsArchived] = 0")
+                    .HasDatabaseName("IX_AssetCategories_Name_HandlingType_Tenant");
+
+                e.HasIndex(c => c.IsArchived)
+                    .HasDatabaseName("IX_AssetCategories_IsArchived");
+
+                e.HasOne(c => c.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(c => c.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                // DisplayLabel is a computed C# property, not mapped to DB
+                e.Ignore(c => c.DisplayLabel);
             });
 
             // ── MaintenanceRecord ──────────────────────────────────
@@ -90,16 +155,94 @@ namespace DFile.backend.Data
                     .HasForeignKey(r => r.CategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                e.HasOne(r => r.RoomSubCategory)
+                    .WithMany()
+                    .HasForeignKey(r => r.SubCategoryId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
                 e.HasOne(r => r.Tenant)
                     .WithMany()
                     .HasForeignKey(r => r.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasIndex(r => r.RoomCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Rooms_RoomCode");
+
+                e.HasIndex(r => r.IsArchived)
+                    .HasDatabaseName("IX_Rooms_IsArchived");
+
+                e.HasOne(r => r.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(r => r.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             // ── RoomCategory ───────────────────────────────────────
             modelBuilder.Entity<RoomCategory>(e =>
             {
-                e.Property(r => r.BaseRate).HasColumnType("decimal(18,2)");
+                e.HasIndex(r => r.RoomCategoryCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RoomCategories_RoomCategoryCode");
+
+                e.HasIndex(r => new { r.Name, r.SubCategory, r.TenantId })
+                    .IsUnique()
+                    .HasFilter("[IsArchived] = 0")
+                    .HasDatabaseName("IX_RoomCategories_Name_SubCategory_Tenant");
+
+                e.HasIndex(r => r.IsArchived)
+                    .HasDatabaseName("IX_RoomCategories_IsArchived");
+
+                e.HasOne(r => r.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(r => r.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // ── RoomSubCategory ────────────────────────────────────
+            modelBuilder.Entity<RoomSubCategory>(e =>
+            {
+                e.HasIndex(s => s.SubCategoryCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RoomSubCategories_SubCategoryCode");
+
+                e.HasIndex(s => new { s.RoomCategoryId, s.Name, s.TenantId })
+                    .IsUnique()
+                    .HasFilter("[IsArchived] = 0")
+                    .HasDatabaseName("IX_RoomSubCategories_Category_Name_Tenant");
+
+                e.HasIndex(s => s.IsArchived)
+                    .HasDatabaseName("IX_RoomSubCategories_IsArchived");
+
+                e.HasOne(s => s.RoomCategory)
+                    .WithMany()
+                    .HasForeignKey(s => s.RoomCategoryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(s => s.Tenant)
+                    .WithMany()
+                    .HasForeignKey(s => s.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(s => s.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(s => s.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(s => s.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             // ── PurchaseOrder ──────────────────────────────────────
@@ -107,15 +250,45 @@ namespace DFile.backend.Data
             {
                 e.Property(p => p.PurchasePrice).HasColumnType("decimal(18,2)");
 
+                e.HasIndex(p => p.OrderCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PurchaseOrders_OrderCode");
+
                 e.HasOne(p => p.Tenant)
                     .WithMany()
                     .HasForeignKey(p => p.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(p => p.ApprovedByUser)
+                    .WithMany()
+                    .HasForeignKey(p => p.ApprovedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // ── PurchaseOrderItem ──────────────────────────────────
+            modelBuilder.Entity<PurchaseOrderItem>(e =>
+            {
+                e.Property(i => i.UnitCost).HasColumnType("decimal(18,2)");
+                e.Property(i => i.TotalCost).HasColumnType("decimal(18,2)");
+
+                e.HasOne(i => i.PurchaseOrder)
+                    .WithMany(po => po.Items)
+                    .HasForeignKey(i => i.PurchaseOrderId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(i => i.Category)
+                    .WithMany()
+                    .HasForeignKey(i => i.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // ── Employee ───────────────────────────────────────────
             modelBuilder.Entity<Employee>(e =>
             {
+                e.HasIndex(emp => emp.EmployeeCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Employees_EmployeeCode");
+
                 e.HasOne(emp => emp.Tenant)
                     .WithMany()
                     .HasForeignKey(emp => emp.TenantId)
@@ -125,9 +298,46 @@ namespace DFile.backend.Data
             // ── Department ─────────────────────────────────────────
             modelBuilder.Entity<Department>(e =>
             {
+                e.HasIndex(d => d.DepartmentCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Departments_DepartmentCode");
+
                 e.HasOne(d => d.Tenant)
                     .WithMany()
                     .HasForeignKey(d => d.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(d => d.ParentDepartment)
+                    .WithMany()
+                    .HasForeignKey(d => d.ParentDepartmentId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(d => d.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(d => d.CreatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(d => d.UpdatedByUser)
+                    .WithMany()
+                    .HasForeignKey(d => d.UpdatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            // ── Role ───────────────────────────────────────────────
+            modelBuilder.Entity<Role>(e =>
+            {
+                e.HasIndex(r => r.RoleCode)
+                    .IsUnique()
+                    .HasDatabaseName("IX_Roles_RoleCode");
+
+                e.HasOne(r => r.Department)
+                    .WithMany()
+                    .HasForeignKey(r => r.DepartmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(r => r.Tenant)
+                    .WithMany()
+                    .HasForeignKey(r => r.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -216,11 +426,58 @@ namespace DFile.backend.Data
                     .OnDelete(DeleteBehavior.SetNull);
             });
 
-            // ── Global query filters for tenant isolation ──────────
-            // These ensure tenant-scoped queries never leak data across tenants.
-            // SuperAdmin queries should use .IgnoreQueryFilters() when needed.
-            // Note: Filters are applied to entities that have a TenantId property.
-            // We don't filter entities without TenantId (like RoleTemplate, RolePermission).
+            // ── Notification ──────────────────────────────────────
+            modelBuilder.Entity<Notification>(e =>
+            {
+                e.HasIndex(n => new { n.TenantId, n.IsRead, n.CreatedAt })
+                    .HasDatabaseName("IX_Notifications_Tenant_Read_Created");
+
+                e.HasIndex(n => new { n.UserId, n.IsRead })
+                    .HasDatabaseName("IX_Notifications_User_Read");
+
+                e.HasOne(n => n.User)
+                    .WithMany()
+                    .HasForeignKey(n => n.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(n => n.Tenant)
+                    .WithMany()
+                    .HasForeignKey(n => n.TenantId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── AssetAllocation ────────────────────────────────────
+            modelBuilder.Entity<AssetAllocation>(e =>
+            {
+                e.HasIndex(a => new { a.AssetId, a.Status })
+                    .HasDatabaseName("IX_AssetAllocations_Asset_Status");
+
+                e.HasIndex(a => a.RoomId)
+                    .HasDatabaseName("IX_AssetAllocations_RoomId");
+
+                e.HasIndex(a => a.AllocatedAt)
+                    .HasDatabaseName("IX_AssetAllocations_AllocatedAt");
+
+                e.HasOne(a => a.Asset)
+                    .WithMany()
+                    .HasForeignKey(a => a.AssetId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(a => a.Room)
+                    .WithMany()
+                    .HasForeignKey(a => a.RoomId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(a => a.AllocatedByUser)
+                    .WithMany()
+                    .HasForeignKey(a => a.AllocatedBy)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(a => a.Tenant)
+                    .WithMany()
+                    .HasForeignKey(a => a.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
         }
     }
 }

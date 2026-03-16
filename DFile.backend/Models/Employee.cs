@@ -7,6 +7,10 @@ namespace DFile.backend.Models
     {
         [Key]
         public string Id { get; set; } = string.Empty;
+
+        [Required]
+        public string EmployeeCode { get; set; } = string.Empty;
+
         [Required]
         public string FirstName { get; set; } = string.Empty;
         public string? MiddleName { get; set; }

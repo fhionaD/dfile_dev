@@ -8,7 +8,7 @@ namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Super Admin")]
+    [Authorize]
     public class RoleTemplatesController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -19,10 +19,12 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<object>>> GetRoleTemplates()
+        [Authorize(Roles = "Super Admin")]
+        public async Task<ActionResult<IEnumerable<object>>> GetRoleTemplates([FromQuery] bool showArchived = false)
         {
             var templates = await _context.RoleTemplates
                 .Include(rt => rt.Permissions)
+                .Where(rt => rt.IsArchived == showArchived)
                 .OrderBy(rt => rt.Name)
                 .Select(rt => new
                 {
@@ -30,6 +32,7 @@ namespace DFile.backend.Controllers
                     rt.Name,
                     rt.Description,
                     rt.IsSystem,
+                    rt.IsArchived,
                     rt.CreatedAt,
                     Permissions = rt.Permissions.Select(p => new
                     {
@@ -38,7 +41,6 @@ namespace DFile.backend.Controllers
                         p.CanView,
                         p.CanCreate,
                         p.CanEdit,
-                        p.CanDelete,
                         p.CanApprove,
                         p.CanArchive
                     }),
@@ -49,7 +51,24 @@ namespace DFile.backend.Controllers
             return Ok(templates);
         }
 
+        /// <summary>
+        /// Returns non-archived role templates for tenant-level assignment.
+        /// Available to any authenticated user (not just Super Admin).
+        /// </summary>
+        [HttpGet("available")]
+        [Authorize(Roles = "Super Admin,Admin")]
+        public async Task<ActionResult> GetAvailableTemplates()
+        {
+            var templates = await _context.RoleTemplates
+                .Where(rt => !rt.IsArchived)
+                .Select(rt => new { rt.Id, rt.Name, rt.Description })
+                .OrderBy(rt => rt.Name)
+                .ToListAsync();
+            return Ok(templates);
+        }
+
         [HttpGet("{id}")]
+        [Authorize(Roles = "Super Admin")]
         public async Task<ActionResult<object>> GetRoleTemplate(int id)
         {
             var template = await _context.RoleTemplates
@@ -61,6 +80,7 @@ namespace DFile.backend.Controllers
                     rt.Name,
                     rt.Description,
                     rt.IsSystem,
+                    rt.IsArchived,
                     rt.CreatedAt,
                     Permissions = rt.Permissions.Select(p => new
                     {
@@ -69,7 +89,6 @@ namespace DFile.backend.Controllers
                         p.CanView,
                         p.CanCreate,
                         p.CanEdit,
-                        p.CanDelete,
                         p.CanApprove,
                         p.CanArchive
                     }),
@@ -82,9 +101,10 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Super Admin")]
         public async Task<ActionResult> CreateRoleTemplate([FromBody] CreateRoleTemplateDto dto)
         {
-            if (await _context.RoleTemplates.AnyAsync(rt => rt.Name == dto.Name))
+            if (await _context.RoleTemplates.AnyAsync(rt => rt.Name == dto.Name && !rt.IsArchived))
                 return BadRequest("A role template with this name already exists.");
 
             var template = new RoleTemplate
@@ -109,7 +129,6 @@ namespace DFile.backend.Controllers
                         CanView = perm.CanView,
                         CanCreate = perm.CanCreate,
                         CanEdit = perm.CanEdit,
-                        CanDelete = perm.CanDelete,
                         CanApprove = perm.CanApprove,
                         CanArchive = perm.CanArchive
                     });
@@ -121,6 +140,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Super Admin")]
         public async Task<IActionResult> UpdateRoleTemplate(int id, [FromBody] CreateRoleTemplateDto dto)
         {
             var template = await _context.RoleTemplates
@@ -148,7 +168,6 @@ namespace DFile.backend.Controllers
                         CanView = perm.CanView,
                         CanCreate = perm.CanCreate,
                         CanEdit = perm.CanEdit,
-                        CanDelete = perm.CanDelete,
                         CanApprove = perm.CanApprove,
                         CanArchive = perm.CanArchive
                     });
@@ -159,20 +178,28 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRoleTemplate(int id)
+        [HttpPut("{id}/archive")]
+        [Authorize(Roles = "Super Admin")]
+        public async Task<IActionResult> ArchiveRoleTemplate(int id)
         {
-            var template = await _context.RoleTemplates
-                .Include(rt => rt.TenantRoles)
-                .FirstOrDefaultAsync(rt => rt.Id == id);
-
+            var template = await _context.RoleTemplates.FindAsync(id);
             if (template == null) return NotFound();
             if (template.IsSystem)
-                return BadRequest("System role templates cannot be deleted.");
-            if (template.TenantRoles.Any())
-                return BadRequest("Cannot delete a role template that is assigned to tenants.");
+                return BadRequest("System role templates cannot be archived.");
 
-            _context.RoleTemplates.Remove(template);
+            template.IsArchived = true;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPut("{id}/restore")]
+        [Authorize(Roles = "Super Admin")]
+        public async Task<IActionResult> RestoreRoleTemplate(int id)
+        {
+            var template = await _context.RoleTemplates.FindAsync(id);
+            if (template == null) return NotFound();
+
+            template.IsArchived = false;
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -191,7 +218,6 @@ namespace DFile.backend.Controllers
         public bool CanView { get; set; }
         public bool CanCreate { get; set; }
         public bool CanEdit { get; set; }
-        public bool CanDelete { get; set; }
         public bool CanApprove { get; set; }
         public bool CanArchive { get; set; }
     }

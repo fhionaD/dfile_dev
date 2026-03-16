@@ -15,11 +15,14 @@ export function useRooms(showArchived: boolean = false) {
     });
 }
 
-export function useRoomCategories() {
+export function useRoomCategories(archivedOnly?: boolean) {
     return useQuery({
-        queryKey: ['room-categories', 'all'],
+        queryKey: ['room-categories', archivedOnly],
         queryFn: async () => {
-            const { data } = await api.get<RoomCategory[]>('/api/roomcategories?includeArchived=true');
+            const endpoint = archivedOnly !== undefined 
+                ? `/api/roomcategories?archivedOnly=${archivedOnly}` 
+                : '/api/roomcategories?includeArchived=true';
+            const { data } = await api.get<RoomCategory[]>(endpoint);
             return data;
         },
     });
@@ -117,7 +120,7 @@ export function useUpdateRoomCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy: number; archived?: boolean; status?: string } }) => {
+        mutationFn: async ({ id, payload }: { id: string; payload: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy: number; archived?: boolean; status?: string; rowVersion?: string } }) => {
             const { data } = await api.put<RoomCategory>(`/api/roomcategories/${id}`, payload);
             return data;
         },

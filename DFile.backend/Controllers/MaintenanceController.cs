@@ -1,3 +1,4 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DFile.backend.Controllers
 {
-    [Authorize(Roles = "Admin,Finance,Maintenance,Super Admin")]
+    [Authorize]
     [Route("api/maintenance")]
     [ApiController]
     public class MaintenanceController : TenantAwareController
@@ -20,10 +21,11 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
+        [RequirePermission("Maintenance", "CanView")]
         public async Task<ActionResult<IEnumerable<MaintenanceRecord>>> GetMaintenanceRecords([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
-            var query = _context.MaintenanceRecords.Where(r => r.Archived == showArchived);
+            var query = _context.MaintenanceRecords.Where(r => r.IsArchived == showArchived);
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
@@ -34,6 +36,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("{id}")]
+        [RequirePermission("Maintenance", "CanView")]
         public async Task<ActionResult<MaintenanceRecord>> GetMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -46,6 +49,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
+        [RequirePermission("Maintenance", "CanCreate")]
         public async Task<ActionResult<MaintenanceRecord>> PostMaintenanceRecord(CreateMaintenanceRecordDto dto)
         {
             var tenantId = GetCurrentTenantId();
@@ -55,6 +59,10 @@ namespace DFile.backend.Controllers
             if (asset == null) return BadRequest(new { message = "Asset not found." });
             if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId)
                 return BadRequest(new { message = "Asset does not belong to your organization." });
+            if (asset.LifecycleStatus == LifecycleStatus.Disposed)
+                return BadRequest(new { message = "Cannot create maintenance records for disposed assets." });
+            if (asset.IsArchived)
+                return BadRequest(new { message = "Cannot create maintenance records for archived assets." });
 
             var record = new MaintenanceRecord
             {
@@ -71,8 +79,9 @@ namespace DFile.backend.Controllers
                 Attachments = dto.Attachments,
                 DateReported = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 TenantId = IsSuperAdmin() ? null : tenantId,
-                Archived = false
+                IsArchived = false
             };
 
             _context.MaintenanceRecords.Add(record);
@@ -82,6 +91,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("{id}")]
+        [RequirePermission("Maintenance", "CanEdit")]
         public async Task<IActionResult> PutMaintenanceRecord(string id, UpdateMaintenanceRecordDto dto)
         {
             var tenantId = GetCurrentTenantId();
@@ -106,12 +116,14 @@ namespace DFile.backend.Controllers
             existing.EndDate = dto.EndDate;
             existing.Cost = dto.Cost;
             existing.Attachments = dto.Attachments;
+            existing.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("archive/{id}")]
+        [RequirePermission("Maintenance", "CanArchive")]
         public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -120,12 +132,14 @@ namespace DFile.backend.Controllers
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
 
-            record.Archived = true;
+            record.IsArchived = true;
+            record.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("restore/{id}")]
+        [RequirePermission("Maintenance", "CanArchive")]
         public async Task<IActionResult> RestoreMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -134,12 +148,14 @@ namespace DFile.backend.Controllers
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
 
-            record.Archived = false;
+            record.IsArchived = false;
+            record.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpDelete("{id}")]
+        [RequirePermission("Maintenance", "CanArchive")]
         public async Task<IActionResult> DeleteMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();

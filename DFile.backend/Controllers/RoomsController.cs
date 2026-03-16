@@ -1,15 +1,17 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
+using System.Text.Json;
 
 namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Super Admin")]
+    [Authorize]
     public class RoomsController : TenantAwareController
     {
         private readonly AppDbContext _context;
@@ -19,29 +21,29 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Room>>> GetRooms(
-            [FromQuery] string? search = null, 
+        [RequirePermission("Rooms", "CanView")]
+        public async Task<ActionResult<IEnumerable<RoomResponseDto>>> GetRooms(
+            [FromQuery] string? search = null,
             [FromQuery] string? categoryId = null,
-            [FromQuery] string? status = null,
             [FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
-            var query = _context.Rooms.Include(r => r.RoomCategory).AsQueryable();
+            var query = _context.Rooms
+                .Include(r => r.RoomCategory)
+                .Include(r => r.CreatedByUser)
+                .Include(r => r.UpdatedByUser)
+                .Where(r => r.IsArchived == showArchived);
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
                 query = query.Where(r => r.TenantId == tenantId);
-            }
-
-            // By default exclude archived rooms
-            if (showArchived)
-            {
-                query = query.Where(r => r.Archived);
-            }
-            else
-            {
-                query = query.Where(r => !r.Archived);
             }
 
             if (!string.IsNullOrEmpty(categoryId))
@@ -49,142 +51,263 @@ namespace DFile.backend.Controllers
                 query = query.Where(r => r.CategoryId == categoryId);
             }
 
-            if (!string.IsNullOrEmpty(status))
-            {
-                if (status.Contains(','))
-                {
-                    var statuses = status.Split(',').Select(s => s.Trim()).ToList();
-                    query = query.Where(r => statuses.Contains(r.Status));
-                }
-                else
-                {
-                    query = query.Where(r => r.Status == status);
-                }
-            }
-
             if (!string.IsNullOrEmpty(search))
             {
                 search = search.ToLower();
-                query = query.Where(r => 
-                    r.Name.ToLower().Contains(search) || 
-                    r.UnitId.ToLower().Contains(search) ||
+                query = query.Where(r =>
+                    r.Name.ToLower().Contains(search) ||
+                    r.RoomCode.ToLower().Contains(search) ||
                     (r.Floor != null && r.Floor.ToLower().Contains(search)));
             }
 
-            return await query.ToListAsync();
+            var rooms = await query.ToListAsync();
+
+            var result = rooms.Select(r => new RoomResponseDto
+            {
+                Id = r.Id,
+                RoomCode = r.RoomCode,
+                Name = r.Name,
+                Floor = r.Floor,
+                CategoryId = r.CategoryId,
+                CategoryName = r.RoomCategory?.Name,
+                SubCategoryName = r.RoomCategory?.SubCategory,
+                IsArchived = r.IsArchived,
+                TenantId = r.TenantId,
+                CreatedByName = r.CreatedByUser != null ? r.CreatedByUser.FirstName + " " + r.CreatedByUser.LastName : null,
+                UpdatedByName = r.UpdatedByUser != null ? r.UpdatedByUser.FirstName + " " + r.UpdatedByUser.LastName : null,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                RowVersion = r.RowVersion
+            }).ToList();
+
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Room>> GetRoom(string id)
+        [RequirePermission("Rooms", "CanView")]
+        public async Task<ActionResult<RoomResponseDto>> GetRoom(string id)
         {
             var tenantId = GetCurrentTenantId();
-            var room = await _context.Rooms.Include(r => r.RoomCategory).FirstOrDefaultAsync(r => r.Id == id);
+            var room = await _context.Rooms
+                .Include(r => r.RoomCategory)
+                .Include(r => r.CreatedByUser)
+                .Include(r => r.UpdatedByUser)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (room == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
-            return room;
+            return Ok(new RoomResponseDto
+            {
+                Id = room.Id,
+                RoomCode = room.RoomCode,
+                Name = room.Name,
+                Floor = room.Floor,
+                CategoryId = room.CategoryId,
+                CategoryName = room.RoomCategory?.Name,
+                SubCategoryName = room.RoomCategory?.SubCategory,
+                IsArchived = room.IsArchived,
+                TenantId = room.TenantId,
+                CreatedByName = room.CreatedByUser != null ? room.CreatedByUser.FirstName + " " + room.CreatedByUser.LastName : null,
+                UpdatedByName = room.UpdatedByUser != null ? room.UpdatedByUser.FirstName + " " + room.UpdatedByUser.LastName : null,
+                CreatedAt = room.CreatedAt,
+                UpdatedAt = room.UpdatedAt,
+                RowVersion = room.RowVersion
+            });
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin,Super Admin")]
-        public async Task<ActionResult<Room>> PostRoom(CreateRoomDto dto)
+        [RequirePermission("Rooms", "CanCreate")]
+        public async Task<ActionResult<RoomResponseDto>> PostRoom(CreateRoomDto dto)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            RoomCategory? category = null;
+
+            if (!string.IsNullOrEmpty(dto.CategoryId))
+            {
+                category = await _context.RoomCategories.FirstOrDefaultAsync(c => c.Id == dto.CategoryId && !c.IsArchived);
+                if (category == null)
+                    return BadRequest(new { message = "Room category not found or is archived." });
+            }
 
             var room = new Room
             {
                 Id = Guid.NewGuid().ToString(),
-                UnitId = dto.UnitId,
+                RoomCode = await RecordCodeGenerator.GenerateRoomCodeAsync(_context),
                 Name = dto.Name,
                 Floor = dto.Floor,
                 CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId,
-                Status = dto.Status,
-                MaxOccupancy = dto.MaxOccupancy,
+                IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
-                Archived = false
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                UpdatedBy = userId
             };
 
             _context.Rooms.Add(room);
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Create",
+                EntityType = "Room",
+                EntityId = room.Id,
+                Module = "Locations",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { room.RoomCode, room.Name, room.Floor, room.CategoryId }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetRoom", new { id = room.Id }, room);
+            return CreatedAtAction("GetRoom", new { id = room.Id }, new RoomResponseDto
+            {
+                Id = room.Id,
+                RoomCode = room.RoomCode,
+                Name = room.Name,
+                Floor = room.Floor,
+                CategoryId = room.CategoryId,
+                CategoryName = category?.Name,
+                SubCategoryName = category?.SubCategory,
+                IsArchived = room.IsArchived,
+                TenantId = room.TenantId,
+                CreatedAt = room.CreatedAt,
+                UpdatedAt = room.UpdatedAt,
+                RowVersion = room.RowVersion
+            });
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Rooms", "CanEdit")]
         public async Task<IActionResult> PutRoom(string id, UpdateRoomDto dto)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var existing = await _context.Rooms.FindAsync(id);
 
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
 
-            existing.UnitId = dto.UnitId;
+            if (!string.IsNullOrEmpty(dto.CategoryId))
+            {
+                var categoryExists = await _context.RoomCategories.AnyAsync(c => c.Id == dto.CategoryId && !c.IsArchived);
+                if (!categoryExists)
+                    return BadRequest(new { message = "Room category not found or is archived." });
+            }
+
+            if (dto.RowVersion != null)
+            {
+                _context.Entry(existing).Property(p => p.RowVersion).OriginalValue = dto.RowVersion;
+            }
+
+            var oldValues = JsonSerializer.Serialize(new { existing.Name, existing.Floor, existing.CategoryId });
+
             existing.Name = dto.Name;
             existing.Floor = dto.Floor;
             existing.CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId;
-            existing.Status = dto.Status;
-            existing.MaxOccupancy = dto.MaxOccupancy;
-            existing.Archived = dto.Archived;
+            existing.UpdatedAt = DateTime.UtcNow;
+            existing.UpdatedBy = userId;
 
-            await _context.SaveChangesAsync();
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Update",
+                EntityType = "Room",
+                EntityId = id,
+                Module = "Locations",
+                UserId = userId,
+                TenantId = tenantId,
+                OldValues = oldValues,
+                NewValues = JsonSerializer.Serialize(new { dto.Name, dto.Floor, dto.CategoryId }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
+            }
+
             return NoContent();
         }
 
         [HttpPut("archive/{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Rooms", "CanArchive")]
         public async Task<IActionResult> ArchiveRoom(string id)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var room = await _context.Rooms.FindAsync(id);
 
             if (room == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
-            room.Archived = true;
-            room.Status = "Deactivated";
+            room.IsArchived = true;
+            room.UpdatedAt = DateTime.UtcNow;
+            room.UpdatedBy = userId;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Archive",
+                EntityType = "Room",
+                EntityId = id,
+                Module = "Locations",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { room.Name, IsArchived = true }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("restore/{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Rooms", "CanArchive")]
         public async Task<IActionResult> RestoreRoom(string id)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var room = await _context.Rooms.FindAsync(id);
 
             if (room == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
-            room.Archived = false;
-            room.Status = "Available";
-            await _context.SaveChangesAsync();
-            return NoContent();
-        }
+            room.IsArchived = false;
+            room.UpdatedAt = DateTime.UtcNow;
+            room.UpdatedBy = userId;
 
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
-        public async Task<IActionResult> DeleteRoom(string id)
-        {
-            var tenantId = GetCurrentTenantId();
-            var room = await _context.Rooms.FindAsync(id);
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Restore",
+                EntityType = "Room",
+                EntityId = id,
+                Module = "Locations",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { room.Name, IsArchived = false }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
 
-            if (room == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
-
-            _context.Rooms.Remove(room);
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpGet("stats")]
+        [RequirePermission("Rooms", "CanView")]
         public async Task<ActionResult<object>> GetRoomStats()
         {
             var tenantId = GetCurrentTenantId();
-            var query = _context.Rooms.AsQueryable();
+            var query = _context.Rooms.Where(r => !r.IsArchived).AsQueryable();
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
@@ -192,11 +315,15 @@ namespace DFile.backend.Controllers
             }
 
             var totalRooms = await query.CountAsync();
-            var occupied = await query.CountAsync(r => r.Status == "Occupied");
-            var available = await query.CountAsync(r => r.Status == "Available");
-            var maintenance = await query.CountAsync(r => r.Status == "Maintenance");
 
-            return new { Total = totalRooms, Occupied = occupied, Available = available, Maintenance = maintenance };
+            // Count rooms that have active allocations
+            var roomsWithAllocations = await _context.AssetAllocations
+                .Where(a => a.Status == "Active")
+                .Select(a => a.RoomId)
+                .Distinct()
+                .CountAsync();
+
+            return new { Total = totalRooms, Occupied = roomsWithAllocations, Available = totalRooms - roomsWithAllocations };
         }
     }
 }

@@ -1,3 +1,4 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -9,7 +10,7 @@ namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Maintenance,Super Admin")]
+    [Authorize]
     public class TasksController : TenantAwareController
     {
         private readonly AppDbContext _context;
@@ -20,6 +21,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
+        [RequirePermission("Tasks", "CanView")]
         public async Task<ActionResult<IEnumerable<TaskItem>>> GetTasks([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
@@ -34,6 +36,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("{id}")]
+        [RequirePermission("Tasks", "CanView")]
         public async Task<ActionResult<TaskItem>> GetTask(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -46,6 +49,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
+        [RequirePermission("Tasks", "CanCreate")]
         public async Task<ActionResult<TaskItem>> PostTask(CreateTaskDto dto)
         {
             var tenantId = GetCurrentTenantId();
@@ -71,6 +75,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("{id}")]
+        [RequirePermission("Tasks", "CanEdit")]
         public async Task<IActionResult> PutTask(string id, UpdateTaskDto dto)
         {
             var tenantId = GetCurrentTenantId();
@@ -92,6 +97,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("archive/{id}")]
+        [RequirePermission("Tasks", "CanArchive")]
         public async Task<IActionResult> ArchiveTask(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -106,6 +112,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("restore/{id}")]
+        [RequirePermission("Tasks", "CanArchive")]
         public async Task<IActionResult> RestoreTask(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -120,6 +127,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpDelete("{id}")]
+        [RequirePermission("Tasks", "CanArchive")]
         public async Task<IActionResult> DeleteTask(string id)
         {
             var tenantId = GetCurrentTenantId();

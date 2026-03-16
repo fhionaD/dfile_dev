@@ -1,15 +1,17 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Maintenance,Super Admin")]
+    [Authorize]
     public class EmployeesController : TenantAwareController
     {
         private readonly AppDbContext _context;
@@ -19,7 +21,14 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
         [HttpGet]
+        [RequirePermission("Employees", "CanView")]
         public async Task<ActionResult<IEnumerable<Employee>>> GetEmployees([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
@@ -43,6 +52,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("{id}")]
+        [RequirePermission("Employees", "CanView")]
         public async Task<ActionResult<Employee>> GetEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -55,14 +65,18 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Employees", "CanCreate")]
         public async Task<ActionResult<Employee>> PostEmployee(CreateEmployeeDto dto)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            var defaultPassword = dto.LastName + "123";
 
             var employee = new Employee
             {
                 Id = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+                EmployeeCode = await RecordCodeGenerator.GenerateEmployeeCodeAsync(_context),
                 FirstName = dto.FirstName,
                 MiddleName = dto.MiddleName,
                 LastName = dto.LastName,
@@ -76,20 +90,52 @@ namespace DFile.backend.Controllers
             };
 
             _context.Employees.Add(employee);
+
+            if (!await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            {
+                var user = new User
+                {
+                    FirstName = dto.FirstName,
+                    LastName = dto.LastName,
+                    Email = dto.Email,
+                    Role = "Employee",
+                    RoleLabel = dto.Role,
+                    TenantId = IsSuperAdmin() ? null : tenantId,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword)
+                };
+                _context.Users.Add(user);
+            }
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Create",
+                EntityType = "Employee",
+                EntityId = employee.Id,
+                Module = "Personnel",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Department, dto.Role, dto.HireDate }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Employees", "CanEdit")]
         public async Task<IActionResult> PutEmployee(string id, UpdateEmployeeDto dto)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var existing = await _context.Employees.FindAsync(id);
 
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
+
+            var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Department, existing.Role, existing.HireDate, existing.Status });
 
             existing.FirstName = dto.FirstName;
             existing.MiddleName = dto.MiddleName;
@@ -101,51 +147,80 @@ namespace DFile.backend.Controllers
             existing.HireDate = dto.HireDate;
             existing.Status = dto.Status;
 
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Update",
+                EntityType = "Employee",
+                EntityId = id,
+                Module = "Personnel",
+                UserId = userId,
+                TenantId = tenantId,
+                OldValues = oldValues,
+                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Department, dto.Role, dto.HireDate, dto.Status }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("archive/{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Employees", "CanArchive")]
         public async Task<IActionResult> ArchiveEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var employee = await _context.Employees.FindAsync(id);
 
             if (employee == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
 
             employee.Status = "Archived";
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Archive",
+                EntityType = "Employee",
+                EntityId = id,
+                Module = "Personnel",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Archived" }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("restore/{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
+        [RequirePermission("Employees", "CanArchive")]
         public async Task<IActionResult> RestoreEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
             var employee = await _context.Employees.FindAsync(id);
 
             if (employee == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
 
             employee.Status = "Active";
-            await _context.SaveChangesAsync();
-            return NoContent();
-        }
 
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin,Super Admin")]
-        public async Task<IActionResult> DeleteEmployee(string id)
-        {
-            var tenantId = GetCurrentTenantId();
-            var employee = await _context.Employees.FindAsync(id);
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Action = "Restore",
+                EntityType = "Employee",
+                EntityId = id,
+                Module = "Personnel",
+                UserId = userId,
+                TenantId = tenantId,
+                NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Active" }),
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = Request.Headers.UserAgent.ToString()
+            });
 
-            if (employee == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
-
-            _context.Employees.Remove(employee);
             await _context.SaveChangesAsync();
             return NoContent();
         }

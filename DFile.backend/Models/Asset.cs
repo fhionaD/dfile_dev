@@ -8,17 +8,26 @@ namespace DFile.backend.Models
         [Key]
         public string Id { get; set; } = string.Empty;
 
+        [Required]
+        public string AssetCode { get; set; } = string.Empty;
+
         public string? TagNumber { get; set; }
 
         [Required]
-        public string Desc { get; set; } = string.Empty;
+        public string AssetName { get; set; } = string.Empty;
 
-        public string? CategoryId { get; set; }
+        [Required]
+        public string CategoryId { get; set; } = string.Empty;
 
         [ForeignKey("CategoryId")]
         public AssetCategory? Category { get; set; }
 
-        public string Status { get; set; } = string.Empty;
+        public LifecycleStatus LifecycleStatus { get; set; } = LifecycleStatus.Registered;
+
+        public AssetCondition CurrentCondition { get; set; } = AssetCondition.Good;
+
+        public string? HandlingTypeSnapshot { get; set; }
+
         public string? Room { get; set; }
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }
@@ -26,9 +35,10 @@ namespace DFile.backend.Models
         public string? SerialNumber { get; set; }
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }
-        public decimal Value { get; set; }
+        public decimal AcquisitionCost { get; set; }
         public int UsefulLifeYears { get; set; }
         public decimal PurchasePrice { get; set; }
+        public decimal? ResidualValue { get; set; }
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
         public int? TenantId { get; set; }
@@ -39,6 +49,20 @@ namespace DFile.backend.Models
         public DateTime? WarrantyExpiry { get; set; }
         public string? Notes { get; set; }
         public string? Documents { get; set; }
-        public bool Archived { get; set; } = false;
+        public bool IsArchived { get; set; } = false;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public int? CreatedBy { get; set; }
+        public int? UpdatedBy { get; set; }
+
+        [ForeignKey("CreatedBy")]
+        public User? CreatedByUser { get; set; }
+
+        [ForeignKey("UpdatedBy")]
+        public User? UpdatedByUser { get; set; }
+
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
     }
 }

@@ -1,3 +1,4 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -9,7 +10,7 @@ namespace DFile.backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Finance,Super Admin")]
+    [Authorize]
     public class PurchaseOrdersController : TenantAwareController
     {
         private readonly AppDbContext _context;
@@ -19,49 +20,67 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PurchaseOrder>>> GetPurchaseOrders([FromQuery] bool showArchived = false)
+        [RequirePermission("PurchaseOrders", "CanView")]
+        public async Task<ActionResult<IEnumerable<PurchaseOrderResponseDto>>> GetPurchaseOrders([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
-            var query = _context.PurchaseOrders.AsQueryable();
+            var query = _context.PurchaseOrders.Include(p => p.Items).AsQueryable();
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
                 query = query.Where(p => p.TenantId == tenantId);
             }
 
-            if (showArchived)
-            {
-                query = query.Where(p => p.Archived);
-            }
-            else
-            {
-                query = query.Where(p => !p.Archived);
-            }
+            query = query.Where(p => p.IsArchived == showArchived);
 
-            return await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
+            var orders = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
+
+            // Gather approver names
+            var approverIds = orders.Where(o => o.ApprovedBy.HasValue).Select(o => o.ApprovedBy!.Value).Distinct().ToList();
+            var approverNames = approverIds.Any()
+                ? await _context.Users.Where(u => approverIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName)
+                : new Dictionary<int, string>();
+
+            return Ok(orders.Select(o => MapToResponseDto(o, approverNames)));
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<PurchaseOrder>> GetPurchaseOrder(string id)
+        [RequirePermission("PurchaseOrders", "CanView")]
+        public async Task<ActionResult<PurchaseOrderResponseDto>> GetPurchaseOrder(string id)
         {
             var tenantId = GetCurrentTenantId();
-            var order = await _context.PurchaseOrders.FindAsync(id);
+            var order = await _context.PurchaseOrders.Include(p => p.Items).FirstOrDefaultAsync(p => p.Id == id);
 
             if (order == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && order.TenantId != tenantId) return NotFound();
 
-            return order;
+            var approverNames = new Dictionary<int, string>();
+            if (order.ApprovedBy.HasValue)
+            {
+                var user = await _context.Users.FindAsync(order.ApprovedBy.Value);
+                if (user != null) approverNames[user.Id] = $"{user.FirstName} {user.LastName}";
+            }
+
+            return Ok(MapToResponseDto(order, approverNames));
         }
 
         [HttpPost]
-        public async Task<ActionResult<PurchaseOrder>> CreatePurchaseOrder(CreatePurchaseOrderDto dto)
+        [RequirePermission("PurchaseOrders", "CanCreate")]
+        public async Task<ActionResult<PurchaseOrderResponseDto>> CreatePurchaseOrder(CreatePurchaseOrderDto dto)
         {
             var tenantId = GetCurrentTenantId();
 
             var order = new PurchaseOrder
             {
                 Id = $"PO-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+                OrderCode = await RecordCodeGenerator.GenerateOrderCodeAsync(_context),
                 AssetName = dto.AssetName,
                 Category = dto.Category,
                 Vendor = dto.Vendor,
@@ -74,21 +93,41 @@ namespace DFile.backend.Controllers
                 Status = "Pending",
                 RequestedBy = dto.RequestedBy,
                 CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 TenantId = IsSuperAdmin() ? null : tenantId,
-                Archived = false
+                IsArchived = false
             };
+
+            // Add line items if provided
+            if (dto.Items != null)
+            {
+                foreach (var itemDto in dto.Items)
+                {
+                    order.Items.Add(new PurchaseOrderItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        PurchaseOrderId = order.Id,
+                        Description = itemDto.Description,
+                        CategoryId = itemDto.CategoryId,
+                        Quantity = itemDto.Quantity,
+                        UnitCost = itemDto.UnitCost,
+                        TotalCost = itemDto.TotalCost
+                    });
+                }
+            }
 
             _context.PurchaseOrders.Add(order);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetPurchaseOrder), new { id = order.Id }, order);
+            return CreatedAtAction(nameof(GetPurchaseOrder), new { id = order.Id }, MapToResponseDto(order, new Dictionary<int, string>()));
         }
 
         [HttpPut("{id}")]
+        [RequirePermission("PurchaseOrders", "CanEdit")]
         public async Task<IActionResult> UpdatePurchaseOrder(string id, UpdatePurchaseOrderDto dto)
         {
             var tenantId = GetCurrentTenantId();
-            var existing = await _context.PurchaseOrders.FindAsync(id);
+            var existing = await _context.PurchaseOrders.Include(p => p.Items).FirstOrDefaultAsync(p => p.Id == id);
 
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
@@ -105,12 +144,57 @@ namespace DFile.backend.Controllers
             existing.Status = dto.Status;
             existing.RequestedBy = dto.RequestedBy;
             existing.AssetId = dto.AssetId;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            // Update line items
+            if (dto.Items != null)
+            {
+                // Remove existing items and replace
+                _context.PurchaseOrderItems.RemoveRange(existing.Items);
+                foreach (var itemDto in dto.Items)
+                {
+                    existing.Items.Add(new PurchaseOrderItem
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        PurchaseOrderId = existing.Id,
+                        Description = itemDto.Description,
+                        CategoryId = itemDto.CategoryId,
+                        Quantity = itemDto.Quantity,
+                        UnitCost = itemDto.UnitCost,
+                        TotalCost = itemDto.TotalCost
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPatch("{id}/approve")]
+        [RequirePermission("PurchaseOrders", "CanApprove")]
+        public async Task<IActionResult> ApprovePurchaseOrder(string id)
+        {
+            var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+            var order = await _context.PurchaseOrders.FindAsync(id);
+
+            if (order == null) return NotFound();
+            if (!IsSuperAdmin() && tenantId.HasValue && order.TenantId != tenantId) return NotFound();
+
+            if (order.Status != "Pending")
+                return BadRequest(new { message = $"Only pending orders can be approved. Current status: {order.Status}" });
+
+            order.Status = "Approved";
+            order.ApprovedBy = userId;
+            order.ApprovedAt = DateTime.UtcNow;
+            order.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("archive/{id}")]
+        [RequirePermission("PurchaseOrders", "CanArchive")]
         public async Task<IActionResult> ArchivePurchaseOrder(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -119,12 +203,14 @@ namespace DFile.backend.Controllers
             if (order == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && order.TenantId != tenantId) return NotFound();
 
-            order.Archived = true;
+            order.IsArchived = true;
+            order.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpPut("restore/{id}")]
+        [RequirePermission("PurchaseOrders", "CanArchive")]
         public async Task<IActionResult> RestorePurchaseOrder(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -133,9 +219,44 @@ namespace DFile.backend.Controllers
             if (order == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && order.TenantId != tenantId) return NotFound();
 
-            order.Archived = false;
+            order.IsArchived = false;
+            order.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
+        private static PurchaseOrderResponseDto MapToResponseDto(PurchaseOrder o, Dictionary<int, string> approverNames) => new()
+        {
+            Id = o.Id,
+            OrderCode = o.OrderCode,
+            AssetName = o.AssetName,
+            Category = o.Category,
+            Vendor = o.Vendor,
+            Manufacturer = o.Manufacturer,
+            Model = o.Model,
+            SerialNumber = o.SerialNumber,
+            PurchasePrice = o.PurchasePrice,
+            PurchaseDate = o.PurchaseDate,
+            UsefulLifeYears = o.UsefulLifeYears,
+            Status = o.Status,
+            RequestedBy = o.RequestedBy,
+            AssetId = o.AssetId,
+            ApprovedBy = o.ApprovedBy,
+            ApprovedByName = o.ApprovedBy.HasValue && approverNames.TryGetValue(o.ApprovedBy.Value, out var n) ? n : null,
+            ApprovedAt = o.ApprovedAt,
+            IsArchived = o.IsArchived,
+            CreatedAt = o.CreatedAt,
+            UpdatedAt = o.UpdatedAt,
+            TenantId = o.TenantId,
+            Items = o.Items.Select(i => new PurchaseOrderItemDto
+            {
+                Id = i.Id,
+                Description = i.Description,
+                CategoryId = i.CategoryId,
+                Quantity = i.Quantity,
+                UnitCost = i.UnitCost,
+                TotalCost = i.TotalCost
+            }).ToList()
+        };
     }
 }

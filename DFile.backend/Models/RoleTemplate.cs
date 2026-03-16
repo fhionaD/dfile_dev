@@ -24,6 +24,8 @@ namespace DFile.backend.Models
         /// </summary>
         public bool IsSystem { get; set; } = false;
 
+        public bool IsArchived { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<RolePermission> Permissions { get; set; } = new List<RolePermission>();

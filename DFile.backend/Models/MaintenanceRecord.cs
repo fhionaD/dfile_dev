@@ -25,8 +25,9 @@ namespace DFile.backend.Models
         public DateTime DateReported { get; set; } = DateTime.UtcNow;
         public string? Attachments { get; set; } // Comma separated string for simplicity in SQL
 
-        public bool Archived { get; set; } = false;
+        public bool IsArchived { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]

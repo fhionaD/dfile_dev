@@ -24,7 +24,6 @@ namespace DFile.backend.Models
         public bool CanView { get; set; } = false;
         public bool CanCreate { get; set; } = false;
         public bool CanEdit { get; set; } = false;
-        public bool CanDelete { get; set; } = false;
         public bool CanApprove { get; set; } = false;
         public bool CanArchive { get; set; } = false;
     }

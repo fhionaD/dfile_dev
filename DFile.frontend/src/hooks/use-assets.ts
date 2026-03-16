@@ -8,10 +8,15 @@ export function useAssets(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['assets', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<Asset[]>('/api/assets', {
+            const { data } = await api.get<any[]>('/api/assets', {
                 params: { showArchived }
             });
-            return data;
+            return data.map(a => ({
+                ...a,
+                desc: a.assetName || a.desc || "—",
+                value: typeof a.purchasePrice === 'number' ? a.purchasePrice : (a.value || 0),
+                room: a.roomName ? `${a.roomCode} (${a.roomName})` : (a.room || "—")
+            })) as Asset[];
         },
     });
 }
@@ -20,8 +25,13 @@ export function useAsset(id: string) {
     return useQuery({
         queryKey: ['assets', id],
         queryFn: async () => {
-            const { data } = await api.get<Asset>(`/api/assets/${id}`);
-            return data;
+            const { data } = await api.get<any>(`/api/assets/${id}`);
+            return {
+                ...data,
+                desc: data.assetName || data.desc || "—",
+                value: typeof data.purchasePrice === 'number' ? data.purchasePrice : (data.value || 0),
+                room: data.roomName ? `${data.roomCode} (${data.roomName})` : (data.room || "—")
+            } as Asset;
         },
         enabled: !!id,
     });
@@ -133,4 +143,15 @@ export function useUpdateAssetFinancial() {
         },
     });
 }
-export const useAvailableAssets = () => useQuery({ queryKey: ['assets', 'available'], queryFn: async () => { const { data } = await api.get('/api/assets/available'); return data; } });
+export const useAvailableAssets = () => useQuery({
+    queryKey: ['assets', 'available'],
+    queryFn: async () => {
+        const { data } = await api.get<any[]>('/api/assets/available');
+        return data.map(a => ({
+            ...a,
+            desc: a.assetName || a.desc || "—",
+            value: typeof a.purchasePrice === 'number' ? a.purchasePrice : (a.value || 0),
+            room: a.roomName ? `${a.roomCode} (${a.roomName})` : (a.room || "—")
+        })) as Asset[];
+    }
+});

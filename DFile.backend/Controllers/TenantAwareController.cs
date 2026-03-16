@@ -26,12 +26,14 @@ namespace DFile.backend.Controllers
     [ServiceFilter(typeof(RequireTenantFilter))]
     public abstract class TenantAwareController : ControllerBase
     {
+        [NonAction]
         public int? GetCurrentTenantId()
         {
             var tenantClaim = User.FindFirst("TenantId")?.Value;
             return string.IsNullOrEmpty(tenantClaim) ? null : int.Parse(tenantClaim);
         }
 
+        [NonAction]
         public bool IsSuperAdmin()
         {
             return User.IsInRole("Super Admin");

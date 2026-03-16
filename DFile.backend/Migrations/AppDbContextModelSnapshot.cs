@@ -27,11 +27,22 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
+                    b.Property<string>("AssetCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("AssetStatus")
+                        .HasColumnType("int");
 
                     b.Property<string>("CategoryId")
+                        .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("CurrentBookValue")
                         .HasColumnType("decimal(18,2)");
@@ -43,8 +54,14 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Documents")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("HandlingTypeSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Image")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Manufacturer")
                         .HasColumnType("nvarchar(max)");
@@ -67,17 +84,24 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Room")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("SerialNumber")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
+                    b.Property<string>("SerialNumber")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TagNumber")
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
                         .HasColumnType("int");
 
                     b.Property<int>("UsefulLifeYears")
@@ -94,14 +118,88 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssetCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Assets_AssetCode");
+
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Assets_CreatedAt");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsArchived")
+                        .HasDatabaseName("IX_Assets_IsArchived");
+
+                    b.HasIndex("UpdatedBy");
 
                     b.HasIndex("TenantId", "TagNumber")
                         .IsUnique()
                         .HasDatabaseName("IX_Assets_TenantId_TagNumber")
                         .HasFilter("[TagNumber] IS NOT NULL");
 
-                    b.ToTable("Assets");
+                    b.ToTable("Assets", (string)null);
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.AssetAllocation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("AllocatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("AllocatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AssetId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("DeallocatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeallocatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PreviousRoomId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoomId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("Active");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocatedAt")
+                        .HasDatabaseName("IX_AssetAllocations_AllocatedAt");
+
+                    b.HasIndex("AllocatedBy")
+                        .HasDatabaseName("IX_AssetAllocations_AllocatedBy");
+
+                    b.HasIndex("RoomId")
+                        .HasDatabaseName("IX_AssetAllocations_RoomId");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_AssetAllocations_TenantId");
+
+                    b.HasIndex("AssetId", "Status")
+                        .HasDatabaseName("IX_AssetAllocations_Asset_Status");
+
+                    b.ToTable("AssetAllocations", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.AssetCategory", b =>
@@ -109,13 +207,20 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
+                    b.Property<string>("CategoryCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CategoryName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)")
+                        .HasColumnType("nvarchar(450)")
                         .HasColumnName("Name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -126,18 +231,44 @@ namespace dfile.backend.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AssetCategories_CategoryCode");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsArchived")
+                        .HasDatabaseName("IX_AssetCategories_IsArchived");
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("AssetCategories");
+                    b.HasIndex("UpdatedBy");
+
+                    b.HasIndex("CategoryName", "HandlingType", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AssetCategories_Name_HandlingType_Tenant")
+                        .HasFilter("[IsArchived] = 0");
+
+                    b.ToTable("AssetCategories", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.AuditLog", b =>
@@ -165,6 +296,9 @@ namespace dfile.backend.Migrations
                     b.Property<string>("IpAddress")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Module")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("NewValues")
                         .HasColumnType("nvarchar(max)");
 
@@ -173,6 +307,9 @@ namespace dfile.backend.Migrations
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("int");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("UserId")
                         .HasColumnType("int");
@@ -187,7 +324,7 @@ namespace dfile.backend.Migrations
                     b.HasIndex("TenantId", "EntityType")
                         .HasDatabaseName("IX_AuditLogs_Tenant_Entity");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Department", b =>
@@ -195,16 +332,19 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DepartmentCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Head")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -219,9 +359,13 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartmentCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Departments_DepartmentCode");
+
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Departments");
+                    b.ToTable("Departments", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Employee", b =>
@@ -243,6 +387,10 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmployeeCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -271,9 +419,13 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmployeeCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Employees_EmployeeCode");
+
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Employees");
+                    b.ToTable("Employees", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.MaintenanceRecord", b =>
@@ -334,7 +486,66 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("MaintenanceRecords");
+                    b.ToTable("MaintenanceRecords", (string)null);
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.Notification", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EntityId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Module")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetRole")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsRead")
+                        .HasDatabaseName("IX_Notifications_User_Read");
+
+                    b.HasIndex("TenantId", "IsRead", "CreatedAt")
+                        .HasDatabaseName("IX_Notifications_Tenant_Read_Created");
+
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.PurchaseOrder", b =>
@@ -365,6 +576,10 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Model")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("OrderCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime?>("PurchaseDate")
                         .HasColumnType("datetime2");
 
@@ -392,9 +607,13 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrderCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PurchaseOrders_OrderCode");
+
                     b.HasIndex("TenantId");
 
-                    b.ToTable("PurchaseOrders");
+                    b.ToTable("PurchaseOrders", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Role", b =>
@@ -402,10 +621,13 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
-                    b.Property<string>("Department")
+                    b.Property<string>("DepartmentId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -413,9 +635,12 @@ namespace dfile.backend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Scope")
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RoleCode")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -426,9 +651,15 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("RoleCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Roles_RoleCode");
+
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.RolePermission", b =>
@@ -446,9 +677,6 @@ namespace dfile.backend.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("CanCreate")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("CanDelete")
                         .HasColumnType("bit");
 
                     b.Property<bool>("CanEdit")
@@ -471,7 +699,7 @@ namespace dfile.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_RolePermissions_Template_Module");
 
-                    b.ToTable("RolePermissions");
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.RoleTemplate", b =>
@@ -489,6 +717,9 @@ namespace dfile.backend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsSystem")
                         .HasColumnType("bit");
 
@@ -499,7 +730,7 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("RoleTemplates");
+                    b.ToTable("RoleTemplates", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Room", b =>
@@ -507,15 +738,21 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
-
                     b.Property<string>("CategoryId")
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
 
                     b.Property<string>("Floor")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
 
                     b.Property<int>("MaxOccupancy")
                         .HasColumnType("int");
@@ -524,9 +761,21 @@ namespace dfile.backend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("RoomCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubCategoryId")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("int");
@@ -535,13 +784,32 @@ namespace dfile.backend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
 
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsArchived")
+                        .HasDatabaseName("IX_Rooms_IsArchived");
+
+                    b.HasIndex("RoomCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Rooms_RoomCode");
+
+                    b.HasIndex("SubCategoryId");
+
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Rooms");
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("Rooms", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.RoomCategory", b =>
@@ -549,39 +817,137 @@ namespace dfile.backend.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<bool>("Archived")
-                        .HasColumnType("bit");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
-                    b.Property<decimal>("BaseRate")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
 
                     b.Property<int>("MaxOccupancy")
                         .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("Status")
+                    b.Property<string>("RoomCategoryCode")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("SubCategory")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsArchived")
+                        .HasDatabaseName("IX_RoomCategories_IsArchived");
+
+                    b.HasIndex("RoomCategoryCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RoomCategories_RoomCategoryCode");
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("RoomCategories");
+                    b.HasIndex("UpdatedBy");
+
+                    b.HasIndex("Name", "SubCategory", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RoomCategories_Name_SubCategory_Tenant")
+                        .HasFilter("[IsArchived] = 0");
+
+                    b.ToTable("RoomCategories", (string)null);
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.RoomSubCategory", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RoomCategoryId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SubCategoryCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsArchived")
+                        .HasDatabaseName("IX_RoomSubCategories_IsArchived");
+
+                    b.HasIndex("SubCategoryCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RoomSubCategories_SubCategoryCode");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.HasIndex("RoomCategoryId", "Name", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RoomSubCategories_Category_Name_Tenant")
+                        .HasFilter("[IsArchived] = 0");
+
+                    b.ToTable("RoomSubCategories", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.TaskItem", b =>
@@ -624,7 +990,7 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Tasks");
+                    b.ToTable("Tasks", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Tenant", b =>
@@ -677,7 +1043,7 @@ namespace dfile.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tenants");
+                    b.ToTable("Tenants", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.TenantRole", b =>
@@ -706,7 +1072,7 @@ namespace dfile.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_TenantRoles_Tenant_Template");
 
-                    b.ToTable("TenantRoles");
+                    b.ToTable("TenantRoles", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.User", b =>
@@ -758,7 +1124,7 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.UserRoleAssignment", b =>
@@ -786,7 +1152,7 @@ namespace dfile.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_UserRoleAssignment_User_TenantRole");
 
-                    b.ToTable("UserRoleAssignments");
+                    b.ToTable("UserRoleAssignments", (string)null);
                 });
 
             modelBuilder.Entity("DFile.backend.Models.Asset", b =>
@@ -794,25 +1160,87 @@ namespace dfile.backend.Migrations
                     b.HasOne("DFile.backend.Models.AssetCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DFile.backend.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("DFile.backend.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Category");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.AssetAllocation", b =>
+                {
+                    b.HasOne("DFile.backend.Models.User", "AllocatedByUser")
+                        .WithMany()
+                        .HasForeignKey("AllocatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("DFile.backend.Models.Asset", "Asset")
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DFile.backend.Models.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DFile.backend.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AllocatedByUser");
+
+                    b.Navigation("Asset");
+
+                    b.Navigation("Room");
 
                     b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.AssetCategory", b =>
                 {
+                    b.HasOne("DFile.backend.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId");
 
+                    b.HasOne("DFile.backend.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CreatedByUser");
+
                     b.Navigation("Tenant");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.AuditLog", b =>
@@ -870,6 +1298,23 @@ namespace dfile.backend.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("DFile.backend.Models.Notification", b =>
+                {
+                    b.HasOne("DFile.backend.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("DFile.backend.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("DFile.backend.Models.PurchaseOrder", b =>
                 {
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
@@ -882,9 +1327,17 @@ namespace dfile.backend.Migrations
 
             modelBuilder.Entity("DFile.backend.Models.Role", b =>
                 {
+                    b.HasOne("DFile.backend.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
-                        .HasForeignKey("TenantId");
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Department");
 
                     b.Navigation("Tenant");
                 });
@@ -907,23 +1360,90 @@ namespace dfile.backend.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("DFile.backend.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("DFile.backend.Models.RoomSubCategory", "RoomSubCategory")
+                        .WithMany()
+                        .HasForeignKey("SubCategoryId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("DFile.backend.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CreatedByUser");
+
                     b.Navigation("RoomCategory");
 
+                    b.Navigation("RoomSubCategory");
+
                     b.Navigation("Tenant");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.RoomCategory", b =>
                 {
+                    b.HasOne("DFile.backend.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId");
 
+                    b.HasOne("DFile.backend.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CreatedByUser");
+
                     b.Navigation("Tenant");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("DFile.backend.Models.RoomSubCategory", b =>
+                {
+                    b.HasOne("DFile.backend.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("DFile.backend.Models.RoomCategory", "RoomCategory")
+                        .WithMany()
+                        .HasForeignKey("RoomCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DFile.backend.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DFile.backend.Models.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("RoomCategory");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.TaskItem", b =>

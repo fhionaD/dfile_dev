@@ -29,7 +29,11 @@ namespace DFile.backend.Models
         public string? OldValues { get; set; } // JSON snapshot before change
         public string? NewValues { get; set; } // JSON snapshot after change
 
+        public string? Module { get; set; }
+
         public string? IpAddress { get; set; }
+
+        public string? UserAgent { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

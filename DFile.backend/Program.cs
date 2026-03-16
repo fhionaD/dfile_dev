@@ -7,8 +7,13 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<DFile.backend.Authorization.PermissionAuthorizationFilter>();
+});
 builder.Services.AddScoped<DFile.backend.Controllers.RequireTenantFilter>();
+builder.Services.AddScoped<DFile.backend.Services.PermissionService>();
+builder.Services.AddScoped<DFile.backend.Authorization.PermissionAuthorizationFilter>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

@@ -17,6 +17,8 @@ interface RoomListViewProps {
     rooms: Room[];
     roomCategories: { id: string; name: string; subCategory?: string }[];
     showArchived: boolean;
+    archivedCount?: number;
+    activeCount?: number;
     onToggleArchived: () => void;
     onCreateRoom?: () => void;
     onManageCategories?: () => void;
@@ -26,7 +28,7 @@ interface RoomListViewProps {
     readOnly?: boolean;
 }
 
-export function RoomListView({ rooms, roomCategories, showArchived, onToggleArchived, onCreateRoom, onManageCategories, onRoomClick, onArchiveRoom, onRestoreRoom, readOnly = false }: RoomListViewProps) {
+export function RoomListView({ rooms, roomCategories, showArchived, archivedCount, activeCount, onToggleArchived, onCreateRoom, onManageCategories, onRoomClick, onArchiveRoom, onRestoreRoom, readOnly = false }: RoomListViewProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [floorFilter, setFloorFilter] = useState<string>("all");
     

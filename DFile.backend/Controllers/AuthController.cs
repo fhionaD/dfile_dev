@@ -1,6 +1,7 @@
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -17,11 +18,13 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly PermissionService _permissionService;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, PermissionService permissionService)
         {
             _context = context;
             _configuration = configuration;
+            _permissionService = permissionService;
         }
 
         [HttpPost("login")]
@@ -49,7 +52,7 @@ namespace DFile.backend.Controllers
             }
 
             var token = GenerateJwtToken(user);
-            var userResponse = MapToResponse(user);
+            var userResponse = await MapToResponseWithPermissions(user);
             return Ok(new { token, user = userResponse });
         }
 
@@ -58,13 +61,13 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> GetCurrentUser()
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId)) 
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
                 return Unauthorized();
 
             var user = await _context.Users.FindAsync(userId);
             if (user == null) return Unauthorized();
 
-            return Ok(MapToResponse(user));
+            return Ok(await MapToResponseWithPermissions(user));
         }
 
         [HttpPost("register")]
@@ -73,6 +76,13 @@ namespace DFile.backend.Controllers
         {
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 return BadRequest(new { message = "User with this email already exists." });
+
+            // Resolve the role template
+            var roleTemplate = await _context.RoleTemplates.FindAsync(dto.RoleTemplateId);
+            if (roleTemplate == null)
+                return BadRequest(new { message = "Invalid role template." });
+            if (roleTemplate.IsArchived)
+                return BadRequest(new { message = "Cannot assign an archived role template." });
 
             var callerRole = User.FindFirst(ClaimTypes.Role)?.Value;
             var callerTenantClaim = User.FindFirst("TenantId")?.Value;
@@ -93,14 +103,40 @@ namespace DFile.backend.Controllers
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
                 Email = dto.Email,
-                Role = dto.Role,
-                RoleLabel = dto.Role,
+                Role = roleTemplate.Name,
+                RoleLabel = roleTemplate.Name,
                 TenantId = newUserTenantId,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            // Create UserRoleAssignment if user has a tenant
+            if (newUserTenantId.HasValue)
+            {
+                // Find or create TenantRole for this tenant + template
+                var tenantRole = await _context.TenantRoles
+                    .FirstOrDefaultAsync(tr => tr.TenantId == newUserTenantId.Value && tr.RoleTemplateId == dto.RoleTemplateId);
+
+                if (tenantRole == null)
+                {
+                    tenantRole = new TenantRole
+                    {
+                        TenantId = newUserTenantId.Value,
+                        RoleTemplateId = dto.RoleTemplateId
+                    };
+                    _context.TenantRoles.Add(tenantRole);
+                    await _context.SaveChangesAsync();
+                }
+
+                _context.UserRoleAssignments.Add(new UserRoleAssignment
+                {
+                    UserId = user.Id,
+                    TenantRoleId = tenantRole.Id
+                });
+                await _context.SaveChangesAsync();
+            }
 
             return Ok(new { message = "User created", userId = user.Id });
         }
@@ -109,19 +145,19 @@ namespace DFile.backend.Controllers
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!);
-            
+
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
             };
-            
+
             if (user.TenantId.HasValue)
             {
                 claims.Add(new Claim("TenantId", user.TenantId.Value.ToString()));
             }
-            
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
@@ -132,17 +168,28 @@ namespace DFile.backend.Controllers
             return tokenHandler.WriteToken(token);
         }
 
-        private static UserResponseDto MapToResponse(User user) => new()
+        private async Task<UserResponseDto> MapToResponseWithPermissions(User user)
         {
-            Id = user.Id,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Email = user.Email,
-            Role = user.Role,
-            RoleLabel = user.RoleLabel,
-            Avatar = user.Avatar,
-            Status = user.Status,
-            TenantId = user.TenantId
-        };
+            var response = new UserResponseDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Role = user.Role,
+                RoleLabel = user.RoleLabel,
+                Avatar = user.Avatar,
+                Status = user.Status,
+                TenantId = user.TenantId
+            };
+
+            // Resolve permissions for tenant users
+            if (user.TenantId.HasValue && user.Role != "Super Admin")
+            {
+                response.Permissions = await _permissionService.GetUserPermissions(user.Id, user.TenantId.Value);
+            }
+
+            return response;
+        }
     }
 }

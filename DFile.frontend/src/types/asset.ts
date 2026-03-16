@@ -25,6 +25,9 @@ export interface Asset {
     tenantId?: number;
     permissions?: ModulePermission[];
     archived?: boolean;
+    assetStatus?: number;
+    assetCode?: string;
+    isArchived?: boolean;
 }
 
 export interface CreateAssetPayload {
@@ -84,6 +87,11 @@ export interface Category {
     items: number;
     status: "Active" | "Archived";
     tenantId?: number;
+    assetCount?: number;
+    updatedAt?: string;
+    createdByName?: string;
+    updatedByName?: string;
+    isArchived?: boolean;
 }
 
 export interface CreateCategoryPayload {
@@ -103,6 +111,7 @@ export interface Room {
     maxOccupancy: number;
     status: "Available" | "Occupied" | "Maintenance" | "Deactivated";
     archived?: boolean;
+    isArchived?: boolean;
 }
 
 export interface MaintenanceRecord {
@@ -161,6 +170,12 @@ export interface RoomCategory {
     maxOccupancy: number;
     status: "Active" | "Archived";
     archived?: boolean;
+    rowVersion?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    createdByName?: string;
+    updatedByName?: string;
+    isArchived?: boolean;
 }
 
 export interface Role {
@@ -245,3 +260,5 @@ export type NotificationType = "Info" | "Warning" | "Success" | "Error"; export 
 export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }
 
 export interface ModulePermission { moduleId?: string; moduleName: string; accessLevel?: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canApprove?: boolean; canArchive?: boolean; canRestore?: boolean; }
+
+export type HandlingType = 'Fixed' | 'Moveable' | 'Consumable';
