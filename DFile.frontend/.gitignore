@@ -40,3 +40,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# .NET
+**/bin/
+**/obj/
+
+# Backend generated static output
+DFile.backend/wwwroot/error/
+DFile.backend/wwwroot/forbidden/
+
+# Visual Studio
+.vs/
