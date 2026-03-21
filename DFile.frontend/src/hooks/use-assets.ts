@@ -5,6 +5,20 @@ import { Asset, CreateAssetPayload, UpdateAssetPayload, UpdateAssetFinancialPayl
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 
+const resolveApiErrorMessage = (error: Error, fallback: string) => {
+    const axiosErr = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+    const msg = axiosErr.response?.data?.message;
+    if (msg) return msg;
+
+    const validation = axiosErr.response?.data?.errors;
+    if (validation) {
+        const firstField = Object.keys(validation)[0];
+        const firstIssue = firstField ? validation[firstField]?.[0] : undefined;
+        if (firstIssue) return firstIssue;
+    }
+    return fallback;
+};
+
 export function useAssets(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['assets', showArchived],
@@ -51,9 +65,7 @@ export function useAddAsset() {
             toast.success('Asset added successfully');
         },
         onError: (error: Error) => {
-            const axiosErr = error as AxiosError<{ message?: string }>;
-            const msg = axiosErr.response?.data?.message || 'Failed to add asset';
-            toast.error(msg);
+            toast.error(resolveApiErrorMessage(error, 'Failed to add asset'));
         },
     });
 }
@@ -72,9 +84,7 @@ export function useUpdateAsset() {
             toast.success('Asset updated successfully');
         },
         onError: (error: Error) => {
-            const axiosErr = error as AxiosError<{ message?: string }>;
-            const msg = axiosErr.response?.data?.message || 'Failed to update asset';
-            toast.error(msg);
+            toast.error(resolveApiErrorMessage(error, 'Failed to update asset'));
         },
     });
 }

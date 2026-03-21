@@ -71,6 +71,7 @@ namespace DFile.backend.Controllers
                 Floor = r.Floor,
                 CategoryId = r.CategoryId,
                 CategoryName = r.RoomCategory?.Name,
+                SubCategoryId = r.SubCategoryId,
                 SubCategoryName = r.RoomSubCategory?.Name,
                 IsArchived = r.IsArchived,
                 TenantId = r.TenantId,
@@ -107,6 +108,7 @@ namespace DFile.backend.Controllers
                 Floor = room.Floor,
                 CategoryId = room.CategoryId,
                 CategoryName = room.RoomCategory?.Name,
+                SubCategoryId = room.SubCategoryId,
                 SubCategoryName = room.RoomSubCategory?.Name,
                 IsArchived = room.IsArchived,
                 TenantId = room.TenantId,
@@ -156,6 +158,7 @@ namespace DFile.backend.Controllers
                 Name = trimmedName,
                 Floor = trimmedFloor,
                 CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId,
+                SubCategoryId = string.IsNullOrEmpty(dto.SubCategoryId) ? null : dto.SubCategoryId,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
                 CreatedAt = DateTime.UtcNow,
@@ -196,6 +199,7 @@ namespace DFile.backend.Controllers
                 Floor = room.Floor,
                 CategoryId = room.CategoryId,
                 CategoryName = category?.Name,
+                SubCategoryId = room.SubCategoryId,
                 SubCategoryName = null,
                 IsArchived = room.IsArchived,
                 TenantId = room.TenantId,
@@ -233,6 +237,7 @@ namespace DFile.backend.Controllers
             existing.Name = dto.Name;
             existing.Floor = dto.Floor;
             existing.CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId;
+            existing.SubCategoryId = string.IsNullOrEmpty(dto.SubCategoryId) ? null : dto.SubCategoryId;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
 

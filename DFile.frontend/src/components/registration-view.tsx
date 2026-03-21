@@ -26,6 +26,8 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
     const [activeTab, setActiveTab] = useState<string>("inventory");
 
     const selectedAsset = assets.find(a => a.id === selectedAssetId);
+    const getHandlingTypeLabel = (handlingType?: number) =>
+        handlingType === 0 ? "Fixed" : handlingType === 1 ? "Consumable" : handlingType === 2 ? "Movable" : "Unknown";
 
     // Filter out archived assets for tagging dropdown
     const activeAssets = assets.filter(a => a.status !== 'Archived');
@@ -98,8 +100,10 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
                                             <div className="p-5 bg-muted/30 rounded-xl space-y-4">
                                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                                         <div>
-                                                            <span className="text-muted-foreground block text-xs font-medium mb-1">Category</span>
-                                                            <span className="font-medium">{selectedAsset.categoryName}</span>
+                                                            <span className="text-muted-foreground block text-xs font-medium mb-1">Category - Handling Type</span>
+                                                            <span className="font-medium">
+                                                                {selectedAsset.categoryName} - {getHandlingTypeLabel(selectedAsset.handlingType)}
+                                                            </span>
                                                         </div>
                                                         <div>
                                                             <span className="text-muted-foreground block text-xs font-medium mb-1">Status</span>

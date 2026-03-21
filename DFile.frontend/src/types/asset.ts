@@ -12,6 +12,7 @@ export interface Asset {
     roomName?: string;
     allocationState?: string;
     lifecycleStatus?: number;
+    currentCondition?: number;
     conditionLabel?: string;
     image?: string;
     manufacturer?: string;
@@ -34,6 +35,7 @@ export interface Asset {
     assetStatus?: number;
     assetCode?: string;
     isArchived?: boolean;
+    rowVersion?: string;
 }
 
 export interface CreateAssetPayload {
@@ -112,6 +114,7 @@ export interface Room {
     name: string;
     categoryId: string;
     categoryName?: string;
+    subCategoryId?: string;
     subCategoryName?: string;
     floor: string;
     maxOccupancy: number;
@@ -291,6 +294,7 @@ export interface RiskIndicators {
 }
 export type NotificationType = "Info" | "Warning" | "Success" | "Error"; export interface Notification { id: number; type: NotificationType; message: string; isRead: boolean; createdAt: string; link?: string; module?: string; }
 export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }
+export interface AllocatedAssetForMaintenance { assetId: string; assetCode?: string; assetName?: string; tagNumber?: string; categoryName?: string; roomId: string; roomCode?: string; roomName?: string; allocatedAt: string; tenantId?: number; }
 
 export interface ModulePermission { moduleId?: string; moduleName: string; accessLevel?: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canApprove?: boolean; canArchive?: boolean; canRestore?: boolean; }
 

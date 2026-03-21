@@ -2,6 +2,7 @@ using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +16,12 @@ namespace DFile.backend.Controllers
     public class AllocationsController : TenantAwareController
     {
         private readonly AppDbContext _context;
+        private readonly PermissionService _permissionService;
 
-        public AllocationsController(AppDbContext context)
+        public AllocationsController(AppDbContext context, PermissionService permissionService)
         {
             _context = context;
+            _permissionService = permissionService;
         }
 
         private int? GetCurrentUserId()
@@ -177,11 +180,24 @@ namespace DFile.backend.Controllers
 
         // ── GET /api/allocations/active ────────────────────────────
         // Get all active allocations for the tenant.
+        // Maintenance staff need this list for scheduling even when a tenant role hides Assets.CanView.
         [HttpGet("active")]
-        [RequirePermission("Assets", "CanView")]
         public async Task<ActionResult<IEnumerable<AssetAllocationResponseDto>>> GetActiveAllocations()
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue)
+                    return Forbid();
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var canMaintenance = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Maintenance", "CanView");
+                if (!canAssets && !canMaintenance)
+                {
+                    return StatusCode(403, new { message = "You do not have permission to view allocations." });
+                }
+            }
 
             var query = _context.AssetAllocations
                 .Include(a => a.Asset)
@@ -190,7 +206,15 @@ namespace DFile.backend.Controllers
                 .Where(a => a.Status == "Active");
 
             if (!IsSuperAdmin() && tenantId.HasValue)
-                query = query.Where(a => a.TenantId == tenantId);
+            {
+                // Include legacy rows where allocation tenant is null but linked entities belong to tenant.
+                query = query.Where(a =>
+                    a.TenantId == tenantId ||
+                    (a.TenantId == null && (
+                        (a.Asset != null && a.Asset.TenantId == tenantId) ||
+                        (a.Room != null && a.Room.TenantId == tenantId)
+                    )));
+            }
 
             var allocations = await query.OrderByDescending(a => a.AllocatedAt).ToListAsync();
 

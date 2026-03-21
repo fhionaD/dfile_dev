@@ -22,7 +22,7 @@ export function useAddRoom() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (room: { unitId: string; name: string; floor: string; categoryId?: string; status?: string; maxOccupancy?: number }) => {
+        mutationFn: async (room: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number }) => {
             const { data } = await api.post<Room>('/api/rooms', room);
             return data;
         },
@@ -44,7 +44,7 @@ export function useUpdateRoom() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: { unitId: string; name: string; floor: string; categoryId?: string; status?: string; maxOccupancy?: number; archived?: boolean } }) => {
+        mutationFn: async ({ id, payload }: { id: string; payload: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number; archived?: boolean } }) => {
             const { data } = await api.put<Room>(`/api/rooms/${id}`, payload);
             return data;
         },

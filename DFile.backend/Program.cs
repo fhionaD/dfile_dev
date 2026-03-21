@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,7 @@ builder.Services.AddScoped<DFile.backend.Services.PermissionService>();
 builder.Services.AddScoped<DFile.backend.Authorization.PermissionAuthorizationFilter>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache();
 
 // Database Context
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -62,6 +65,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+var duplicateRequestLocks = new ConcurrentDictionary<string, DateTime>();
 
 // Configure the HTTP request pipeline.
 
@@ -159,6 +163,69 @@ app.UseCors("AllowAll");
 // 4. Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Global duplicate-submit protection for non-GET API calls.
+// Prevents accidental double-click create/update/archive requests across modules.
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+    {
+        await next();
+        return;
+    }
+
+    var method = context.Request.Method;
+    if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
+    {
+        await next();
+        return;
+    }
+
+    context.Request.EnableBuffering();
+    string body = string.Empty;
+    if (context.Request.ContentLength.GetValueOrDefault() > 0)
+    {
+        using var reader = new StreamReader(context.Request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+        body = await reader.ReadToEndAsync();
+        context.Request.Body.Position = 0;
+    }
+
+    var bodyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
+    var userId = context.User.FindFirst("UserId")?.Value
+                 ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                 ?? "anonymous";
+    var lockKey = $"{userId}:{method}:{context.Request.Path.Value}:{bodyHash}";
+
+    // Cleanup stale keys.
+    var now = DateTime.UtcNow;
+    foreach (var item in duplicateRequestLocks)
+    {
+        if ((now - item.Value).TotalSeconds > 15)
+        {
+            duplicateRequestLocks.TryRemove(item.Key, out _);
+        }
+    }
+
+    if (!duplicateRequestLocks.TryAdd(lockKey, now))
+    {
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        await context.Response.WriteAsJsonAsync(new { message = "Duplicate request detected. Please wait before submitting again." });
+        return;
+    }
+
+    try
+    {
+        await next();
+    }
+    finally
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            duplicateRequestLocks.TryRemove(lockKey, out _);
+        });
+    }
+});
 
 // 5. Health endpoint (always-on, no sensitive data)
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));

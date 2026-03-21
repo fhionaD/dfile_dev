@@ -70,7 +70,7 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                              </div>
                              <div>
                                 <span className="text-xs text-muted-foreground block mb-1">Sub-category</span>
-                                <span className="text-sm font-medium text-foreground">{category?.subCategory || "—"}</span>
+                                <span className="text-sm font-medium text-foreground">{room.subCategoryName || "—"}</span>
                              </div>
                         </div>
                     </div>

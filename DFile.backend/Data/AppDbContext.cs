@@ -50,6 +50,7 @@ namespace DFile.backend.Data
                 e.Property(a => a.CurrentBookValue).HasColumnType("decimal(18,2)");
                 e.Property(a => a.MonthlyDepreciation).HasColumnType("decimal(18,2)");
                 e.Property(a => a.ResidualValue).HasColumnType("decimal(18,2)");
+                e.Property(a => a.SerialNumber).HasMaxLength(450);
 
                 e.Property(a => a.LifecycleStatus)
                     .HasConversion<int>()
@@ -67,6 +68,11 @@ namespace DFile.backend.Data
                     .IsUnique()
                     .HasFilter("[TagNumber] IS NOT NULL")
                     .HasDatabaseName("IX_Assets_TenantId_TagNumber");
+
+                e.HasIndex(a => new { a.TenantId, a.SerialNumber })
+                    .IsUnique()
+                    .HasFilter("[SerialNumber] IS NOT NULL")
+                    .HasDatabaseName("IX_Assets_TenantId_SerialNumber");
 
                 e.HasIndex(a => a.IsArchived)
                     .HasDatabaseName("IX_Assets_IsArchived");

@@ -48,7 +48,52 @@ namespace DFile.backend.Controllers
                 query = query.Where(e => e.Status != "Archived");
             }
 
-            return await query.ToListAsync();
+            var list = await query.ToListAsync();
+
+            // Include login accounts (Users) not yet represented as Employees (e.g. created outside Personnel flow).
+            if (!IsSuperAdmin() && tenantId.HasValue)
+            {
+                var seenEmails = new HashSet<string>(list.Select(e => e.Email), StringComparer.OrdinalIgnoreCase);
+                var users = await _context.Users
+                    .Where(u => u.TenantId == tenantId)
+                    .ToListAsync();
+
+                foreach (var u in users)
+                {
+                    if (seenEmails.Contains(u.Email))
+                        continue;
+
+                    if (showArchived)
+                    {
+                        if (u.Status != "Archived") continue;
+                    }
+                    else
+                    {
+                        if (u.Status == "Archived") continue;
+                    }
+
+                    list.Add(new Employee
+                    {
+                        Id = $"EMP-USER-{u.Id}",
+                        EmployeeCode = $"USR-{u.Id:D4}",
+                        FirstName = u.FirstName,
+                        LastName = u.LastName,
+                        Email = u.Email,
+                        ContactNumber = "—",
+                        Department = "Organization",
+                        Role = string.IsNullOrWhiteSpace(u.RoleLabel) ? u.Role : u.RoleLabel,
+                        HireDate = u.CreatedAt,
+                        Status = u.Status == "Archived" ? "Archived" : (u.Status == "Inactive" ? "Inactive" : "Active"),
+                        TenantId = u.TenantId
+                    });
+                    seenEmails.Add(u.Email);
+                }
+            }
+
+            return list
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToList();
         }
 
         [HttpGet("{id}")]

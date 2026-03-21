@@ -17,6 +17,7 @@ namespace DFile.backend.DTOs
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }
         public string? Model { get; set; }
+        public string? SerialNumber { get; set; }
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }
 
@@ -48,6 +49,7 @@ namespace DFile.backend.DTOs
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }
         public string? Model { get; set; }
+        public string? SerialNumber { get; set; }
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }
 
@@ -140,6 +142,7 @@ namespace DFile.backend.DTOs
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }
         public string? Model { get; set; }
+        public string? SerialNumber { get; set; }
 
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }

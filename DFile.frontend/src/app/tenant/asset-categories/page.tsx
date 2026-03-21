@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +18,11 @@ import { CategoryDetailsModal } from "@/components/modals/category-details-modal
 import { Category } from "@/types/asset";
 
 const handlingLabels: Record<number, string> = { 0: "Fixed", 1: "Consumable", 2: "Movable" };
+const handlingTextColors: Record<number, string> = {
+    0: "text-blue-700 dark:text-blue-400",
+    1: "text-amber-700 dark:text-amber-400",
+    2: "text-emerald-700 dark:text-emerald-400",
+};
 
 export default function AssetCategoriesPage() {
     const [showArchived, setShowArchived] = useState(false);
@@ -154,7 +158,11 @@ export default function AssetCategoriesPage() {
                                 <TableRow key={c.id} className="cursor-pointer" onClick={() => openDetailModal(c)}>
                                     <TableCell className="font-medium">{c.categoryName}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{c.description}</TableCell>
-                                    <TableCell><Badge variant="muted">{handlingLabels[c.handlingType] ?? "Unknown"}</Badge></TableCell>
+                                    <TableCell>
+                                        <span className={`text-xs font-semibold ${handlingTextColors[c.handlingType] ?? "text-foreground"}`}>
+                                            {handlingLabels[c.handlingType] ?? "Unknown"}
+                                        </span>
+                                    </TableCell>
                                     <TableCell>{c.assetCount}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : "—"}</TableCell>
                                     <TableCell className="text-center">

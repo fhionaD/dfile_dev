@@ -2,6 +2,7 @@ using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,16 @@ namespace DFile.backend.Controllers
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            if (ex.InnerException is SqlException sqlEx)
+            {
+                return sqlEx.Number == 2601 || sqlEx.Number == 2627;
+            }
+
+            return false;
         }
 
         [HttpGet]
@@ -118,9 +129,12 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Sub-category name is required." });
 
             // Validate parent category exists
-            var parentCategory = await _context.RoomCategories.FindAsync(dto.RoomCategoryId);
+            var parentCategory = await _context.RoomCategories.FirstOrDefaultAsync(c =>
+                c.Id == dto.RoomCategoryId &&
+                !c.IsArchived &&
+                (IsSuperAdmin() ? c.TenantId == null : c.TenantId == tenantId));
             if (parentCategory == null)
-                return BadRequest(new { message = "Invalid room category." });
+                return BadRequest(new { message = "Invalid or archived room category." });
 
             var nameLower = trimmedName.ToLower();
 
@@ -166,7 +180,7 @@ namespace DFile.backend.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 return Conflict(new { message = "This sub-category name already exists under this category." });
             }
@@ -251,7 +265,7 @@ namespace DFile.backend.Controllers
             {
                 return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 return Conflict(new { message = "This sub-category name already exists under this category." });
             }

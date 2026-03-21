@@ -5,6 +5,7 @@ using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.Text.Json;
 
 namespace DFile.backend.Controllers
@@ -25,6 +26,16 @@ namespace DFile.backend.Controllers
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            if (ex.InnerException is SqlException sqlEx)
+            {
+                return sqlEx.Number == 2601 || sqlEx.Number == 2627;
+            }
+
+            return false;
         }
 
         [HttpGet]
@@ -166,6 +177,7 @@ namespace DFile.backend.Controllers
                 Id = await RecordCodeGenerator.GenerateRoomCategoryIdAsync(_context),
                 RoomCategoryCode = await RecordCodeGenerator.GenerateRoomCategoryCodeAsync(_context),
                 Name = trimmedName,
+                SubCategory = string.Empty,
                 Description = dto.Description?.Trim() ?? string.Empty,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
@@ -194,7 +206,7 @@ namespace DFile.backend.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 return Conflict(new { message = "This category name already exists." });
             }
@@ -252,6 +264,7 @@ namespace DFile.backend.Controllers
             var oldValues = JsonSerializer.Serialize(new { existing.Name, existing.Description });
 
             existing.Name = trimmedName;
+            existing.SubCategory = existing.SubCategory ?? string.Empty;
             existing.Description = dto.Description?.Trim() ?? string.Empty;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
@@ -278,7 +291,7 @@ namespace DFile.backend.Controllers
             {
                 return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 return Conflict(new { message = "This category name already exists." });
             }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Package, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { Asset, Category } from "@/types/asset";
 
 interface AddAssetFormProps {
     categories: Category[];
+    existingSerialNumbers?: string[];
     onCancel?: () => void;
     onSuccess?: () => void;
     onAddAsset?: (asset: Asset) => void;
@@ -22,29 +23,45 @@ interface AddAssetFormProps {
     initialData?: Asset;
 }
 
-export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
+export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const getHandlingTypeLabel = (handlingType: number) => (
+        handlingType === 0 ? "Fixed" : handlingType === 1 ? "Consumable" : "Movable"
+    );
     
     // Resolve handling type from category
     const initialCat = initialData ? categories.find(c => c.id === initialData.categoryId) : undefined;
-    const initialHandlingType = initialCat ? (initialCat.handlingType === 0 ? "Fixed" : initialCat.handlingType === 1 ? "Consumable" : "Movable") : "Fixed";
-    
-    const [selectedHandlingType, setSelectedHandlingType] = useState<string>(initialHandlingType);
     const [isManufacturerOpen, setIsManufacturerOpen] = useState(!!initialData?.manufacturer);
     const [isGenInfoOpen, setIsGenInfoOpen] = useState(true);
     const [isDocOpen, setIsDocOpen] = useState(false);
     // Using refs for file inputs to programmatically click them
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const initialCategoryId = initialData ? categories.find(c => c.categoryName === initialData.categoryId)?.id : undefined;
+    const initialCategoryId = initialData ? categories.find(c => c.id === initialData.categoryId)?.id : undefined;
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialCategoryId ?? "");
+
+    useEffect(() => {
+        if (!initialData) return;
+        const resolved = categories.find(c => c.id === initialData.categoryId)?.id ?? "";
+        setSelectedCategoryId(resolved);
+    }, [initialData, categories]);
 
     const todayStr = new Date().toISOString().split("T")[0];
 
     const handleCalculate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (isSubmitting) {
+            toast.error("Request already in progress. Please wait.");
+            return;
+        }
         const form = e.currentTarget;
         const formData = new FormData(form);
-        const catId = formData.get("category") as string;
+        const catId = selectedCategoryId || (formData.get("category") as string);
+        if (!catId) {
+            toast.error("Category is required.");
+            return;
+        }
         const category = categories.find(c => c.id === catId);
 
         // Validate purchase date is not in the future
@@ -54,12 +71,23 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
             return;
         }
 
+        const serialNumber = String(formData.get("serialNumber") ?? "").trim();
+        if (serialNumber) {
+            const currentSerial = (initialData?.serialNumber ?? "").trim().toLowerCase();
+            const exists = existingSerialNumbers.some(s => s.trim().toLowerCase() === serialNumber.toLowerCase() && s.trim().toLowerCase() !== currentSerial);
+            if (exists) {
+                toast.error("Serial Number already exists. Please use a unique Serial Number.");
+                return;
+            }
+        }
+
         if (onAddAsset) {
             const purchasePrice = Number(formData.get("purchasePrice")) || 0;
             const usefulLifeYears = Number(formData.get("usefulLifeYears")) || 0;
             const newAsset: Asset = {
                 id: initialData?.id || (formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`),
                 desc: formData.get("name") as string,
+                rowVersion: initialData?.rowVersion,
                 categoryId: catId,
                 categoryName: category?.categoryName || "Unknown",
                 status: initialData ? initialData.status : "Available", // Default to Available if new
@@ -67,7 +95,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                 image: previewUrl || undefined,
                 manufacturer: formData.get("manufacturer") as string,
                 model: formData.get("model") as string,
-                serialNumber: formData.get("serialNumber") as string,
+                serialNumber: serialNumber,
                 purchaseDate: formData.get("purchaseDate") as string,
                 vendor: formData.get("vendor") as string,
                 warrantyExpiry: formData.get("warrantyExpiry") as string,
@@ -77,8 +105,15 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                 purchasePrice: purchasePrice,
                 usefulLifeYears: usefulLifeYears > 0 ? usefulLifeYears : undefined,
             };
-            onAddAsset(newAsset);
-            if (onSuccess) onSuccess();
+            try {
+                setIsSubmitting(true);
+                await onAddAsset(newAsset);
+                if (onSuccess) onSuccess();
+            } catch {
+                // Mutation-level toast is already shown; keep modal open for correction/retry.
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -117,57 +152,45 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/10">
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Name <span className="text-destructive">*</span></Label>
-                                <Input name="name" defaultValue={initialData?.desc} required placeholder="e.g. Executive Desk" className="h-10" />
+                                <Input name="name" defaultValue={initialData?.desc} required placeholder="e.g. Executive Desk" className="h-10 w-full" />
                             </div>
 
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category <span className="text-destructive">*</span></Label>
-                                <Select name="category" defaultValue={initialCategoryId} onValueChange={(val) => {
-                                    const cat = categories.find(c => c.id === val);
-                                    if (cat) {
-                                        setSelectedHandlingType(cat.handlingType === 0 ? "Fixed" : cat.handlingType === 1 ? "Consumable" : "Movable");
-                                    }
-                                }}>
+                                <input type="hidden" name="category" value={selectedCategoryId} readOnly />
+                                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
                                     <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select Category..." /></SelectTrigger>
                                     <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
                                         {categories.map((c) => (
-                                            <SelectItem key={c.id} value={c.id}>{c.categoryName}</SelectItem>
+                                            <SelectItem key={c.id} value={c.id}>
+                                                {c.categoryName} - {getHandlingTypeLabel(c.handlingType)}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             <div className="space-y-2.5">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Handling Type</Label>
-                                <div className="flex items-center gap-3 h-10 px-3 rounded-md border bg-muted/30 text-muted-foreground text-sm font-medium">
-                                    <Layers size={14} className="text-primary/70" />
-                                    {selectedHandlingType}
-                                </div>
-                            </div>
-                            
-                            {/* Status Dropdown Removed - Defaulting to 'Available' in backend or via form submission logic if needed */}
-                            
-                            <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Serial Number</Label>
-                                <Input name="serialNumber" defaultValue={initialData?.serialNumber} placeholder="SN-12345678" className="h-10 font-mono text-sm" />
+                                <Input name="serialNumber" defaultValue={initialData?.serialNumber} placeholder="SN-12345678" className="h-10 w-full font-mono text-sm" />
                             </div>
                             
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Purchase Date</Label>
-                                <Input name="purchaseDate" defaultValue={initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : ''} type="date" max={todayStr} className="h-10" />
+                                <Input name="purchaseDate" defaultValue={initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : ''} type="date" max={todayStr} className="h-10 w-full" />
                             </div>
 
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</Label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₱</span>
-                                    <Input name="purchasePrice" defaultValue={initialData?.purchasePrice} type="number" placeholder="0.00" className="pl-7 h-10 font-mono" />
+                                    <Input name="purchasePrice" defaultValue={initialData?.purchasePrice} type="number" placeholder="0.00" className="pl-7 h-10 w-full font-mono" />
                                 </div>
                             </div>
 
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years)</Label>
-                                <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10" />
+                                <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10 w-full" />
                             </div>
                                 </div>
                             </CollapsibleContent>
@@ -189,11 +212,11 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <Separator />
-                                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8 bg-muted/10">
-                            <div className="md:col-span-1 space-y-2.5">
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 bg-muted/10">
+                            <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset Image</Label>
                                 <div 
-                                    className="group relative border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50  h-[200px] flex flex-col items-center justify-center p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-background"
+                                    className="group relative border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 aspect-square w-full max-w-[360px] flex flex-col items-center justify-center p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-background"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     {previewUrl ? (
@@ -238,13 +261,13 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 )}
                             </div>
 
-                            <div className="md:col-span-2 space-y-2.5">
+                            <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes & Description</Label>
                                 <Textarea 
                                     name="notes"
                                     defaultValue={initialData?.notes}
                                     placeholder="Enter detailed description, condition notes, or location specifics..." 
-                                    className="resize-none h-[200px] font-sans leading-relaxed" 
+                                    className="resize-none h-24 w-full font-sans leading-relaxed" 
                                 />
                             </div>
                         </div>
@@ -271,19 +294,19 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/10">
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Manufacturer">Manufacturer</Label>
-                                        <Input name="manufacturer" defaultValue={initialData?.manufacturer} placeholder="e.g. Herman Miller" className="h-9 bg-background" />
+                                        <Input name="manufacturer" defaultValue={initialData?.manufacturer} placeholder="e.g. Herman Miller" className="h-10 w-full bg-background" />
                                     </div>
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Model Number">Model Number</Label>
-                                        <Input name="model" defaultValue={initialData?.model} placeholder="Model X" className="h-9 bg-background" />
+                                        <Input name="model" defaultValue={initialData?.model} placeholder="Model X" className="h-10 w-full bg-background" />
                                     </div>
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Vendor">Vendor</Label>
-                                        <Input name="vendor" defaultValue={initialData?.vendor} placeholder="Vendor Inc." className="h-9 bg-background" />
+                                        <Input name="vendor" defaultValue={initialData?.vendor} placeholder="Vendor Inc." className="h-10 w-full bg-background" />
                                     </div>
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide truncate block" title="Warranty Expiry">Warranty Expiry</Label>
-                                        <Input name="warrantyExpiry" defaultValue={initialData?.warrantyExpiry ? new Date(initialData.warrantyExpiry).toISOString().split('T')[0] : ''} type="date" className="h-9 bg-background" />
+                                        <Input name="warrantyExpiry" defaultValue={initialData?.warrantyExpiry ? new Date(initialData.warrantyExpiry).toISOString().split('T')[0] : ''} type="date" className="h-10 w-full bg-background" />
                                     </div>
                                     {/* Next Maintenance field removed */}
                                 </div>
@@ -297,12 +320,12 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                 <div />
                 <div className="flex items-center gap-3">
                     {onCancel && (
-                        <Button type="button" variant="outline" onClick={onCancel}>
+                        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
                             Cancel
                         </Button>
                     )}
-                    <Button type="submit" className="h-10 text-sm px-8 shadow-sm">
-                        {initialData ? "Update Asset" : "Register Asset"}
+                    <Button type="submit" className="h-10 text-sm px-8 shadow-sm" disabled={isSubmitting}>
+                        {isSubmitting ? "Saving..." : initialData ? "Update Asset" : "Register Asset"}
                     </Button>
                 </div>
             </div>

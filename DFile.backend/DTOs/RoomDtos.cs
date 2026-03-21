@@ -11,6 +11,7 @@ namespace DFile.backend.DTOs
         [MaxLength(50)]
         public string Floor { get; set; } = string.Empty;
         public string? CategoryId { get; set; }
+        public string? SubCategoryId { get; set; }
     }
 
     public class UpdateRoomDto
@@ -22,6 +23,7 @@ namespace DFile.backend.DTOs
         [MaxLength(50)]
         public string Floor { get; set; } = string.Empty;
         public string? CategoryId { get; set; }
+        public string? SubCategoryId { get; set; }
         public byte[]? RowVersion { get; set; }
     }
 
@@ -33,6 +35,7 @@ namespace DFile.backend.DTOs
         public string Floor { get; set; } = string.Empty;
         public string? CategoryId { get; set; }
         public string? CategoryName { get; set; }
+        public string? SubCategoryId { get; set; }
         public string? SubCategoryName { get; set; }
         public bool IsArchived { get; set; }
         public DateTime? ArchivedAt { get; set; }

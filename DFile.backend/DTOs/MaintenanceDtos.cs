@@ -71,4 +71,18 @@ namespace DFile.backend.DTOs
         public DateTime UpdatedAt { get; set; }
         public int? TenantId { get; set; }
     }
+
+    public class AllocatedAssetForMaintenanceDto
+    {
+        public string AssetId { get; set; } = string.Empty;
+        public string? AssetCode { get; set; }
+        public string? AssetName { get; set; }
+        public string? TagNumber { get; set; }
+        public string? CategoryName { get; set; }
+        public string RoomId { get; set; } = string.Empty;
+        public string? RoomCode { get; set; }
+        public string? RoomName { get; set; }
+        public DateTime AllocatedAt { get; set; }
+        public int? TenantId { get; set; }
+    }
 }

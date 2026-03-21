@@ -21,13 +21,13 @@ interface MaintenanceViewProps {
 }
 
 export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }: MaintenanceViewProps) {
-    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
+    const [showArchived, setShowArchived] = useState(false);
+    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
     // Mutations
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const archiveRecordMutation = useArchiveMaintenanceRecord();
 
-    const [showArchived, setShowArchived] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Request Filters
@@ -64,7 +64,6 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     }
 
     const filteredRecords = records.filter(record => {
-        if (showArchived !== !!record.isArchived) return false;
         const query = searchQuery.toLowerCase();
         const assetName = (record.assetName || record.assetId).toLowerCase();
         const roomDisplay = record.roomName ? `${record.roomCode} (${record.roomName})` : "";
@@ -351,7 +350,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                             record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700' :
                                             'bg-emerald-500/10 text-emerald-700'
                                         }`}>
-                                           {record.priority!.charAt(0)}
+                                           {(record.priority || "N/A").charAt(0)}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">

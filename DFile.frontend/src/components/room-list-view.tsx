@@ -82,7 +82,10 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
         const category = getRoomCategory(room.categoryId);
         const categoryName = category ? category.name.toLowerCase() : "";
         
-        return name.includes(query) || unitId.includes(query) || categoryName.includes(query);
+        // Sub-category Search
+        const subCatName = room.subCategoryName ? room.subCategoryName.toLowerCase() : "";
+        
+        return name.includes(query) || unitId.includes(query) || categoryName.includes(query) || subCatName.includes(query);
     });
 
 
@@ -183,7 +186,7 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
                                             {category?.name || "—"}
                                         </TableCell>
                                         <TableCell className="w-[20%] text-muted-foreground">
-                                            {category?.subCategory || "—"}
+                                            {room.subCategoryName || "—"}
                                         </TableCell>
                                         <TableCell className="w-[20%] text-muted-foreground">
                                             {room.floor}

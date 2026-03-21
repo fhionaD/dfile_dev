@@ -10,6 +10,8 @@ namespace DFile.backend.Controllers
 {
     [Authorize]
     [Route("api/maintenance")]
+[Route("api/maintenance-records")]
+[Route("api/maintenance-manager")]
     [ApiController]
     public class MaintenanceController : TenantAwareController
     {
@@ -32,7 +34,8 @@ namespace DFile.backend.Controllers
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
-                query = query.Where(r => r.TenantId == tenantId);
+                // Include legacy rows where record tenant is null but linked asset belongs to tenant.
+                query = query.Where(r => r.TenantId == tenantId || (r.TenantId == null && r.Asset != null && r.Asset.TenantId == tenantId));
             }
 
             var records = await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
@@ -48,15 +51,63 @@ namespace DFile.backend.Controllers
             return Ok(result);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("allocated-assets")]
         [RequirePermission("Maintenance", "CanView")]
-        public async Task<ActionResult<MaintenanceRecordResponseDto>> GetMaintenanceRecord(string id)
+        public async Task<ActionResult<IEnumerable<AllocatedAssetForMaintenanceDto>>> GetAllocatedAssetsForMaintenance()
         {
+            var tenantId = GetCurrentTenantId();
+
+            // Same tenant + status rules as AllocationsController.GetActiveAllocations.
+            // Do not require Room != null — orphaned FKs or soft issues would hide rows that tenant admin still sees via assets.
+            var query = _context.AssetAllocations
+                .Include(a => a.Asset)
+                    .ThenInclude(asset => asset!.Category)
+                .Include(a => a.Room)
+                .Where(a => a.Status == "Active" && a.Asset != null && !a.Asset.IsArchived);
+
+            if (!IsSuperAdmin() && tenantId.HasValue)
+            {
+                // Include legacy rows where allocation tenant is null but linked records are tenant-owned.
+                query = query.Where(a =>
+                    a.TenantId == tenantId ||
+                    (a.TenantId == null && (
+                        (a.Asset != null && a.Asset.TenantId == tenantId) ||
+                        (a.Room != null && a.Room.TenantId == tenantId)
+                    )));
+            }
+
+            var allocations = await query
+                .OrderByDescending(a => a.AllocatedAt)
+                .ToListAsync();
+
+            var result = allocations.Select(a => new AllocatedAssetForMaintenanceDto
+            {
+                AssetId = a.AssetId,
+                AssetCode = a.Asset?.AssetCode,
+                AssetName = a.Asset?.AssetName,
+                TagNumber = a.Asset?.TagNumber,
+                CategoryName = a.Asset?.Category?.CategoryName,
+                RoomId = a.RoomId,
+                RoomCode = a.Room?.RoomCode,
+                RoomName = a.Room?.Name,
+                AllocatedAt = a.AllocatedAt,
+                TenantId = a.TenantId
+            }).ToList();
+
+            return Ok(result);
+        }
+
+        // Guid constraint so paths like "allocated-assets" are never captured as an id.
+        [HttpGet("{id:guid}")]
+        [RequirePermission("Maintenance", "CanView")]
+        public async Task<ActionResult<MaintenanceRecordResponseDto>> GetMaintenanceRecord(Guid id)
+        {
+            var idStr = id.ToString();
             var tenantId = GetCurrentTenantId();
             var record = await _context.MaintenanceRecords
                 .Include(r => r.Asset)
                     .ThenInclude(a => a!.Category)
-                .FirstOrDefaultAsync(r => r.Id == id);
+                .FirstOrDefaultAsync(r => r.Id == idStr);
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
@@ -157,12 +208,13 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpPut("archive/{id}")]
+        [HttpPut("archive/{id:guid}")]
         [RequirePermission("Maintenance", "CanArchive")]
-        public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
+        public async Task<IActionResult> ArchiveMaintenanceRecord(Guid id)
         {
+            var idStr = id.ToString();
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var record = await _context.MaintenanceRecords.FindAsync(idStr);
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
@@ -189,12 +241,13 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpDelete("{id}")]
+        [HttpDelete("{id:guid}")]
         [RequirePermission("Maintenance", "CanArchive")]
-        public async Task<IActionResult> DeleteMaintenanceRecord(string id)
+        public async Task<IActionResult> DeleteMaintenanceRecord(Guid id)
         {
+            var idStr = id.ToString();
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var record = await _context.MaintenanceRecords.FindAsync(idStr);
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();

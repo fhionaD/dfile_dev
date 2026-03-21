@@ -2,7 +2,6 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tag, Calendar, Package, Edit, User } from "lucide-react";
 import { format } from "date-fns";
@@ -10,9 +9,9 @@ import { Category } from "@/types/asset";
 
 const handlingLabels: Record<number, string> = { 0: "Fixed", 1: "Consumable", 2: "Movable" };
 const handlingColors: Record<number, string> = {
-    0: "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400 dark:border-blue-500/30",
-    1: "bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-400 dark:border-amber-500/30",
-    2: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30",
+    0: "text-blue-700 dark:text-blue-400",
+    1: "text-amber-700 dark:text-amber-400",
+    2: "text-emerald-700 dark:text-emerald-400",
 };
 
 function formatDate(dateString: string | undefined | null): string {
@@ -51,11 +50,6 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                                 {category.categoryName}
                             </DialogTitle>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {false && (
-                                    <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
-                                        {(category as any).assetCategoryCode}
-                                    </Badge>
-                                )}
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wider ${handlingColors[category.handlingType] ?? handlingColors[0]}`}>
                                     {handlingLabels[category.handlingType] ?? "Unknown"}
                                 </span>
