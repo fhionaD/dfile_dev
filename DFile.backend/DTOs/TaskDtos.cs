@@ -24,6 +24,6 @@ namespace DFile.backend.DTOs
         public string Status { get; set; } = "Pending";
         public string? AssignedTo { get; set; }
         public DateTime? DueDate { get; set; }
-        public bool Archived { get; set; }
+        public bool IsArchived { get; set; }
     }
 }

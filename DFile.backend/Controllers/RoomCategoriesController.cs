@@ -279,7 +279,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpPut("archive/{id}")]
+        [HttpPatch("{id}/archive")]
         [RequirePermission("RoomCategories", "CanArchive")]
         public async Task<IActionResult> ArchiveRoomCategory(string id)
         {
@@ -300,6 +300,8 @@ namespace DFile.backend.Controllers
                 return Conflict(new { message = "This room category cannot be archived because active room units are assigned to it." });
 
             category.IsArchived = true;
+            category.ArchivedAt = DateTime.UtcNow;
+            category.ArchivedBy = userId?.ToString();
             category.UpdatedAt = DateTime.UtcNow;
             category.UpdatedBy = userId;
 
@@ -320,7 +322,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpPut("restore/{id}")]
+        [HttpPatch("{id}/restore")]
         [RequirePermission("RoomCategories", "CanArchive")]
         public async Task<IActionResult> RestoreRoomCategory(string id)
         {
@@ -341,6 +343,8 @@ namespace DFile.backend.Controllers
                 return Conflict(new { message = "Cannot restore: this category name and sub-category combination already exists as an active record." });
 
             category.IsArchived = false;
+            category.ArchivedAt = null;
+            category.ArchivedBy = null;
             category.UpdatedAt = DateTime.UtcNow;
             category.UpdatedBy = userId;
 

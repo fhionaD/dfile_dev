@@ -35,6 +35,8 @@ namespace DFile.backend.DTOs
         public string? CategoryName { get; set; }
         public string? SubCategoryName { get; set; }
         public bool IsArchived { get; set; }
+        public DateTime? ArchivedAt { get; set; }
+        public string? ArchivedBy { get; set; }
         public int? TenantId { get; set; }
         public string? CreatedByName { get; set; }
         public string? UpdatedByName { get; set; }
@@ -80,6 +82,8 @@ namespace DFile.backend.DTOs
         public string SubCategory { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsArchived { get; set; }
+        public DateTime? ArchivedAt { get; set; }
+        public string? ArchivedBy { get; set; }
         public int? TenantId { get; set; }
         public int RoomCount { get; set; }
         public string? CreatedByName { get; set; }

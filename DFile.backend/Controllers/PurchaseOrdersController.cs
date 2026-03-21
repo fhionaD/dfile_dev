@@ -77,6 +77,9 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
 
+            if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
+                return BadRequest(new { message = "Purchase date cannot be in the future." });
+
             var order = new PurchaseOrder
             {
                 Id = $"PO-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
@@ -131,6 +134,9 @@ namespace DFile.backend.Controllers
 
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
+
+            if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
+                return BadRequest(new { message = "Purchase date cannot be in the future." });
 
             existing.AssetName = dto.AssetName;
             existing.Category = dto.Category;

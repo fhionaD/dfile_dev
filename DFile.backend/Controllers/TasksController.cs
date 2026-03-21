@@ -25,7 +25,7 @@ namespace DFile.backend.Controllers
         public async Task<ActionResult<IEnumerable<TaskItem>>> GetTasks([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
-            var query = _context.Tasks.Where(t => t.Archived == showArchived);
+            var query = _context.Tasks.Where(t => t.IsArchived == showArchived);
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
@@ -65,7 +65,7 @@ namespace DFile.backend.Controllers
                 DueDate = dto.DueDate,
                 CreatedAt = DateTime.UtcNow,
                 TenantId = IsSuperAdmin() ? null : tenantId,
-                Archived = false
+                IsArchived = false
             };
 
             _context.Tasks.Add(task);
@@ -90,7 +90,7 @@ namespace DFile.backend.Controllers
             existing.Status = dto.Status;
             existing.AssignedTo = dto.AssignedTo;
             existing.DueDate = dto.DueDate;
-            existing.Archived = dto.Archived;
+            existing.IsArchived = dto.IsArchived;
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -106,7 +106,7 @@ namespace DFile.backend.Controllers
             if (task == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && task.TenantId != tenantId) return NotFound();
 
-            task.Archived = true;
+            task.IsArchived = true;
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -121,7 +121,7 @@ namespace DFile.backend.Controllers
             if (task == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && task.TenantId != tenantId) return NotFound();
 
-            task.Archived = false;
+            task.IsArchived = false;
             await _context.SaveChangesAsync();
             return NoContent();
         }

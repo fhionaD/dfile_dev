@@ -443,7 +443,10 @@ namespace DFile.backend.Data
                 MkMaint("MNT-080", "AST-0112", "Grundfos pump impeller wear inspection",                                 "Completed",    "High",   "Inspection",  "Yearly",  now.AddMonths(-6),  now.AddMonths(-6).AddDays(3),    9500m, t2),
             };
 
-            context.MaintenanceRecords.AddRange(records);
+            // Only insert records whose referenced AssetId actually exists
+            var existingAssetIds = new HashSet<string>(context.Assets.Select(a => a.Id));
+            context.MaintenanceRecords.AddRange(
+                records.Where(r => existingAssetIds.Contains(r.AssetId)));
         }
 
         // ======================================================================
@@ -713,7 +716,17 @@ namespace DFile.backend.Data
         {
             if (!context.Rooms.Any(r => r.Id == id))
             {
-                var seq = context.Rooms.Count() + 1;
+                // Include both persisted and tracked-but-unsaved codes
+                var existingCodes = context.Rooms.Select(r => r.RoomCode).ToList();
+                var trackedCodes = context.ChangeTracker.Entries<Room>()
+                    .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
+                    .Select(e => e.Entity.RoomCode)
+                    .ToList();
+                existingCodes.AddRange(trackedCodes);
+
+                int seq = existingCodes.Count + 1;
+                while (existingCodes.Contains($"RM-{seq:D4}")) { seq++; }
+
                 context.Rooms.Add(new Room
                 {
                     Id = id,
@@ -726,6 +739,7 @@ namespace DFile.backend.Data
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 });
+                context.SaveChanges();
             }
         }
 

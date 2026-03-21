@@ -26,29 +26,12 @@ namespace DFile.backend.Data
         }
 
         /// <summary>
-        /// Generates a sequential Asset Code in format AST-0001, AST-0002, etc.
-        /// Tenant-scoped and globally unique.
+        /// Generates a unique Asset Code in format AST-#### with random 4 digits.
+        /// Retries up to 20 times, then falls back to 5 digits.
         /// </summary>
-        public static async Task<string> GenerateAssetCodeAsync(AppDbContext context, int? tenantId)
-        {
-            var prefix = "AST-";
-
-            var maxCode = await context.Assets
-                .Where(a => a.AssetCode != null && a.AssetCode.StartsWith(prefix) && a.TenantId == tenantId)
-                .Select(a => a.AssetCode!)
-                .OrderByDescending(c => c)
-                .FirstOrDefaultAsync();
-
-            int nextSeq = 1;
-            if (maxCode != null)
-            {
-                var parts = maxCode.Split('-');
-                if (parts.Length == 2 && int.TryParse(parts[1], out var lastSeq))
-                    nextSeq = lastSeq + 1;
-            }
-
-            return $"{prefix}{nextSeq:D4}";
-        }
+        public static Task<string> GenerateAssetCodeAsync(AppDbContext context, int? tenantId) =>
+            GenerateUniqueCodeAsync(context, "AST",
+                async (ctx, code) => await ctx.Assets.AnyAsync(a => a.AssetCode == code));
 
         /// <summary>
         /// Generates a unique Tag Number in format TAG-#### with random 4 digits.
@@ -71,7 +54,7 @@ namespace DFile.backend.Data
         }
 
         public static Task<string> GenerateCategoryCodeAsync(AppDbContext context) =>
-            GenerateUniqueCodeAsync(context, "ACAT",
+            GenerateUniqueCodeAsync(context, "ASTC",
                 async (ctx, code) => await ctx.AssetCategories.AnyAsync(c => c.AssetCategoryCode == code));
 
         public static Task<string> GenerateEmployeeCodeAsync(AppDbContext context) =>

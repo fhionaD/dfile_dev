@@ -169,6 +169,11 @@ namespace DFile.backend.Data
                     .IsUnique()
                     .HasDatabaseName("IX_Rooms_RoomCode");
 
+                e.HasIndex(r => new { r.Name, r.Floor, r.TenantId })
+                    .IsUnique()
+                    .HasFilter("[IsArchived] = 0")
+                    .HasDatabaseName("IX_Rooms_Name_Floor_Tenant");
+
                 e.HasIndex(r => r.IsArchived)
                     .HasDatabaseName("IX_Rooms_IsArchived");
 

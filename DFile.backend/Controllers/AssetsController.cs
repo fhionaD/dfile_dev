@@ -191,6 +191,9 @@ namespace DFile.backend.Controllers
             if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
             if (category.IsArchived) return BadRequest(new { message = "The selected asset category is archived and cannot be used." });
 
+            if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
+                return BadRequest(new { message = "Purchase date cannot be in the future." });
+
             var generatedTag = await RecordCodeGenerator.GenerateTagNumberAsync(_context);
 
             var asset = new Asset
@@ -262,6 +265,9 @@ namespace DFile.backend.Controllers
             var category = await _context.AssetCategories.FindAsync(dto.CategoryId);
             if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
             if (category.IsArchived) return BadRequest(new { message = "The selected asset category is archived and cannot be used." });
+
+            if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
+                return BadRequest(new { message = "Purchase date cannot be in the future." });
 
             // Lifecycle transition validation
             if (existing.LifecycleStatus == LifecycleStatus.Disposed && dto.LifecycleStatus != LifecycleStatus.Disposed)

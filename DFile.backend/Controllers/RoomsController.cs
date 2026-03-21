@@ -123,6 +123,21 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
 
+            var trimmedName = dto.Name?.Trim() ?? string.Empty;
+            var trimmedFloor = dto.Floor?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(trimmedName))
+                return BadRequest(new { message = "Room name is required." });
+
+            // Duplicate check: same Name + Floor + TenantId among active rooms
+            var duplicateExists = await _context.Rooms.AnyAsync(r =>
+                r.Name.ToLower() == trimmedName.ToLower() &&
+                r.Floor.ToLower() == trimmedFloor.ToLower() &&
+                !r.IsArchived &&
+                (IsSuperAdmin() ? r.TenantId == null : r.TenantId == tenantId));
+            if (duplicateExists)
+                return Conflict(new { message = "A room with this name already exists on this floor." });
+
             RoomCategory? category = null;
 
             if (!string.IsNullOrEmpty(dto.CategoryId))
@@ -136,8 +151,8 @@ namespace DFile.backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 RoomCode = await RecordCodeGenerator.GenerateRoomCodeAsync(_context),
-                Name = dto.Name,
-                Floor = dto.Floor,
+                Name = trimmedName,
+                Floor = trimmedFloor,
                 CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
@@ -162,7 +177,14 @@ namespace DFile.backend.Controllers
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return Conflict(new { message = "A room with this name already exists on this floor." });
+            }
 
             return CreatedAtAction("GetRoom", new { id = room.Id }, new RoomResponseDto
             {
@@ -238,7 +260,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpPut("archive/{id}")]
+        [HttpPatch("{id}/archive")]
         [RequirePermission("Rooms", "CanArchive")]
         public async Task<IActionResult> ArchiveRoom(string id)
         {
@@ -250,6 +272,8 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
             room.IsArchived = true;
+            room.ArchivedAt = DateTime.UtcNow;
+            room.ArchivedBy = userId?.ToString();
             room.UpdatedAt = DateTime.UtcNow;
             room.UpdatedBy = userId;
 
@@ -270,7 +294,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpPut("restore/{id}")]
+        [HttpPatch("{id}/restore")]
         [RequirePermission("Rooms", "CanArchive")]
         public async Task<IActionResult> RestoreRoom(string id)
         {
@@ -282,6 +306,8 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
             room.IsArchived = false;
+            room.ArchivedAt = null;
+            room.ArchivedBy = null;
             room.UpdatedAt = DateTime.UtcNow;
             room.UpdatedBy = userId;
 

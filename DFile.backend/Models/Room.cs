@@ -26,6 +26,8 @@ namespace DFile.backend.Models
         public string? SubCategoryId { get; set; }
 
         public bool IsArchived { get; set; }
+        public DateTime? ArchivedAt { get; set; }
+        public string? ArchivedBy { get; set; }
 
         public int? TenantId { get; set; }
 
