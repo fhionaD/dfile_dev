@@ -7,5 +7,5 @@ export interface Task {
     assignedTo?: string; // Employee ID or Name
     dueDate?: string;
     createdAt: string;
-    archived?: boolean;
+    isArchived?: boolean;
 }

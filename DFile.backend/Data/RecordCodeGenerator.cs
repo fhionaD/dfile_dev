@@ -81,6 +81,10 @@ namespace DFile.backend.Data
             GenerateUniqueCodeAsync(context, "RSC",
                 async (ctx, code) => await ctx.RoomSubCategories.AnyAsync(r => r.SubCategoryCode == code));
 
+        public static Task<string> GenerateRoomSubCategoryIdAsync(AppDbContext context) =>
+            GenerateUniqueCodeAsync(context, "RSC",
+                async (ctx, code) => await ctx.RoomSubCategories.AnyAsync(r => r.Id == code));
+
         public static Task<string> GenerateDepartmentCodeAsync(AppDbContext context) =>
             GenerateUniqueCodeAsync(context, "DPT",
                 async (ctx, code) => await ctx.Departments.AnyAsync(d => d.DepartmentCode == code));

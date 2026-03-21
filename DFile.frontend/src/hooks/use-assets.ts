@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Asset, CreateAssetPayload, UpdateAssetPayload, UpdateAssetFinancialPayload } from '@/types/asset';
 import { toast } from 'sonner';
+import { AxiosError } from 'axios';
 
 export function useAssets(showArchived: boolean = false) {
     return useQuery({
@@ -49,8 +50,10 @@ export function useAddAsset() {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             toast.success('Asset added successfully');
         },
-        onError: () => {
-            toast.error('Failed to add asset');
+        onError: (error: Error) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Failed to add asset';
+            toast.error(msg);
         },
     });
 }
@@ -68,8 +71,10 @@ export function useUpdateAsset() {
             queryClient.invalidateQueries({ queryKey: ['assets', variables.id] });
             toast.success('Asset updated successfully');
         },
-        onError: () => {
-            toast.error('Failed to update asset');
+        onError: (error: Error) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Failed to update asset';
+            toast.error(msg);
         },
     });
 }

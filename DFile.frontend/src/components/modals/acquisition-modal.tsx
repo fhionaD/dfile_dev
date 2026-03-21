@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PurchaseOrder, Asset } from "@/types/asset";
 import { useCategories } from "@/hooks/use-categories";
 import { useCreateOrder } from "@/hooks/use-procurement";
+import { toast } from "sonner";
 
 interface AcquisitionModalProps {
     open: boolean;
@@ -45,6 +46,8 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
         }
     };
 
+    const todayStr = new Date().toISOString().split("T")[0];
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -53,6 +56,12 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
         const purchasePrice = Number(formData.get("purchasePrice")) || 0;
         const usefulLifeYears = Number(formData.get("usefulLife")) || 0;
         const purchaseDate = formData.get("purchaseDate") as string;
+
+        // Validate purchase date is not in the future
+        if (purchaseDate && new Date(purchaseDate) > new Date()) {
+            toast.error("Purchase date cannot be in the future.");
+            return;
+        }
         const assetName = formData.get("assetName") as string;
         const manufacturer = formData.get("manufacturer") as string;
         const model = formData.get("model") as string;
@@ -70,8 +79,9 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
             purchasePrice,
             purchaseDate: purchaseDate || undefined,
             usefulLifeYears: usefulLifeYears > 0 ? usefulLifeYears : undefined,
+        }, {
+            onSuccess: () => onOpenChange(false),
         });
-        onOpenChange(false);
     };
 
     return (
@@ -153,7 +163,7 @@ export function AcquisitionModal({ open, onOpenChange, replacementAsset }: Acqui
                                 <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                     <Calendar size={12} /> Purchase Date <span className="text-destructive">*</span>
                                 </Label>
-                                <Input name="purchaseDate" type="date" required className="h-10 bg-background text-sm" />
+                                <Input name="purchaseDate" type="date" required max={todayStr} className="h-10 bg-background text-sm" />
                             </div>
                         </div>
 

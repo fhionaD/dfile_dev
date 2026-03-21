@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { DoorOpen, Layers, Building2, Plus, Search, Archive, RotateCcw, Filter, Eye, Pencil, MoreHorizontal } from "lucide-react";
+import { DoorOpen, Layers, Building2, Plus, Search, Archive, RotateCcw, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Room } from "@/types/asset";
@@ -7,9 +7,6 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { RoomDetailsModal } from "./modals/room-details-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -171,7 +168,11 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
                             filteredRooms.map((room) => {
                                 const category = getRoomCategory(room.categoryId);
                                 return (
-                                    <TableRow key={room.id}>
+                                    <TableRow 
+                                        key={room.id}
+                                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                                        onClick={() => handleRowClick(room)}
+                                    >
                                         <TableCell className="font-medium w-[20%]">
                                             <div className="flex flex-col">
                                                 <span>{room.name || "—"}</span>
@@ -189,32 +190,27 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
                                         </TableCell>
                                         {!readOnly && (
                                             <TableCell className="w-[20%] text-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-40">
-                                                        <DropdownMenuItem onClick={() => handleRowClick(room)} className="gap-2 cursor-pointer">
-                                                            <Eye className="h-4 w-4" /> View
-                                                        </DropdownMenuItem>
-                                                        {onRoomClick && (
-                                                            <DropdownMenuItem onClick={() => onRoomClick(room)} className="gap-2 cursor-pointer">
-                                                                <Pencil className="h-4 w-4" /> Edit
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        {showArchived ? (
-                                                            <DropdownMenuItem onClick={() => onRestoreRoom?.(room.id)} className="gap-2 cursor-pointer text-emerald-600 focus:text-emerald-600 focus:bg-emerald-500/10">
-                                                                <RotateCcw className="h-4 w-4" /> Restore
-                                                            </DropdownMenuItem>
-                                                        ) : (
-                                                            <DropdownMenuItem onClick={() => setArchiveTarget(room.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                                <Archive className="h-4 w-4" /> Archive
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                {showArchived ? (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10" 
+                                                        title="Restore"
+                                                        onClick={(e) => { e.stopPropagation(); onRestoreRoom?.(room.id); }}
+                                                    >
+                                                        <RotateCcw className="h-4 w-4" />
+                                                    </Button>
+                                                ) : (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10" 
+                                                        title="Archive"
+                                                        onClick={(e) => { e.stopPropagation(); setArchiveTarget(room.id); }}
+                                                    >
+                                                        <Archive className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </TableCell>
                                         )}
                                     </TableRow>

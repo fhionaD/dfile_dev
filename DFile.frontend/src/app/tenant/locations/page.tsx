@@ -245,7 +245,7 @@ export default function LocationsPage() {
                 <TabsContent value="units" className="space-y-4 mt-4">
                     <RoomListView
                         rooms={rooms}
-                        roomCategories={allCategories.map(c => ({ id: c.id, name: c.subCategory ? `${c.name} — ${c.subCategory}` : c.name }))}
+                        roomCategories={allCategories.map(c => ({ id: c.id, name: c.name, subCategory: c.subCategory }))}
                         showArchived={showArchived}
                         archivedCount={archivedCount}
                         activeCount={activeCount}

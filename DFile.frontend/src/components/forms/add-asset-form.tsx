@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 import { Asset, Category } from "@/types/asset";
 
@@ -37,12 +38,21 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
 
     const initialCategoryId = initialData ? categories.find(c => c.categoryName === initialData.categoryId)?.id : undefined;
 
+    const todayStr = new Date().toISOString().split("T")[0];
+
     const handleCalculate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const form = e.currentTarget;
         const formData = new FormData(form);
         const catId = formData.get("category") as string;
         const category = categories.find(c => c.id === catId);
+
+        // Validate purchase date is not in the future
+        const purchaseDateStr = formData.get("purchaseDate") as string;
+        if (purchaseDateStr && new Date(purchaseDateStr) > new Date()) {
+            toast.error("Purchase date cannot be in the future.");
+            return;
+        }
 
         if (onAddAsset) {
             const purchasePrice = Number(formData.get("purchasePrice")) || 0;
@@ -144,7 +154,7 @@ export function AddAssetForm({ categories, onCancel, onSuccess, onAddAsset, isMo
                             
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Purchase Date</Label>
-                                <Input name="purchaseDate" defaultValue={initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : ''} type="date" className="h-10" />
+                                <Input name="purchaseDate" defaultValue={initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : ''} type="date" max={todayStr} className="h-10" />
                             </div>
 
                             <div className="space-y-2.5">

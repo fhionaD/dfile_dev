@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import {
     ColumnDef,
     SortingState,
-    VisibilityState,
     flexRender,
     getCoreRowModel,
     getPaginationRowModel,
@@ -13,18 +12,13 @@ import {
 } from "@tanstack/react-table";
 import {
     QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
-    Archive, RotateCcw, Search, Filter, Package, SlidersHorizontal,
+    Archive, RotateCcw, Search, Filter, Package,
     ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-    MoreHorizontal, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-    DropdownMenu, DropdownMenuCheckboxItem,
-    DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { QRCodeModal } from "@/components/modals/qr-code-modal";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -76,7 +70,6 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
     const [statusFilter, setStatusFilter] = useState("All");
     const [categoryFilter, setCategoryFilter] = useState("All");
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [selectedAssetForQR, setSelectedAssetForQR] = useState<Asset | null>(null);
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
     const [pageInput, setPageInput] = useState("");
@@ -92,6 +85,7 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                 const q = searchQuery.toLowerCase();
                 const match =
                     asset.desc.toLowerCase().includes(q) ||
+                    asset.assetCode?.toLowerCase().includes(q) ||
                     asset.id.toLowerCase().includes(q) ||
                     asset.model?.toLowerCase().includes(q) ||
                     asset.serialNumber?.toLowerCase().includes(q);
@@ -108,11 +102,11 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
     const columns = useMemo<ColumnDef<Asset>[]>(
         () => [
             {
-                accessorKey: "id",
+                accessorKey: "assetCode",
                 header: ({ column }) => <SortableHeader column={column}>Asset ID</SortableHeader>,
                 cell: ({ row }) => (
                     <span className="font-mono text-xs text-muted-foreground">
-                        {row.getValue("id")}
+                        {row.original.assetCode || row.original.id}
                     </span>
                 ),
             },
@@ -129,14 +123,6 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                 cell: ({ row }) => (
                     <span className="text-sm text-muted-foreground">{row.getValue("categoryName")}</span>
                 ),
-            },
-            {
-                accessorKey: "status",
-                header: ({ column }) => <SortableHeader column={column}>Status</SortableHeader>,
-                cell: ({ row }) => {
-                    const status = row.getValue("status") as string;
-                    return <StatusText variant={statusVariant[status] ?? "muted"}>{status}</StatusText>;
-                },
             },
             {
                 accessorKey: "room",
@@ -164,31 +150,37 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                     const asset = row.original;
                     const isArchived = asset.status === "Archived";
                     return (
-                        <div className="text-center">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions" onClick={(e) => e.stopPropagation()}>
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssetClick?.(asset); }} className="gap-2 cursor-pointer">
-                                        <Eye className="h-4 w-4" /> View
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedAssetForQR(asset); }} className="gap-2 cursor-pointer">
-                                        <QrCode className="h-4 w-4" /> QR Code
-                                    </DropdownMenuItem>
-                                    {isArchived ? (
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); restoreAssetMutation.mutate(asset.id); }} className="gap-2 cursor-pointer">
-                                            <RotateCcw className="h-4 w-4" /> Restore
-                                        </DropdownMenuItem>
-                                    ) : (
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setArchiveTarget(asset.id); }} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                                            <Archive className="h-4 w-4" /> Archive
-                                        </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                        <div className="flex items-center justify-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="QR Code"
+                                onClick={(e) => { e.stopPropagation(); setSelectedAssetForQR(asset); }}
+                            >
+                                <QrCode className="h-4 w-4" />
+                            </Button>
+                            {isArchived ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10"
+                                    title="Restore"
+                                    onClick={(e) => { e.stopPropagation(); restoreAssetMutation.mutate(asset.id); }}
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                    title="Archive"
+                                    onClick={(e) => { e.stopPropagation(); setArchiveTarget(asset.id); }}
+                                >
+                                    <Archive className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     );
                 },
@@ -204,15 +196,14 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         onSortingChange: setSorting,
-        onColumnVisibilityChange: setColumnVisibility,
-        state: { sorting, columnVisibility },
+        state: { sorting },
         initialState: { pagination: { pageSize: 10 } },
     });
 
     const handleExportCSV = () => {
         const rows = table.getSortedRowModel().rows.map((row) => {
             const a = row.original;
-            return [a.id, `"${a.desc.replace(/"/g, '""')}"`, a.categoryName, a.status, a.room, a.value.toFixed(2)];
+            return [a.assetCode || a.id, `"${a.desc.replace(/"/g, '""')}"`, a.categoryName, a.status, a.room, a.value.toFixed(2)];
         });
         const csv = [
             "Asset ID,Asset Name,Category,Status,Room,Value",
@@ -314,29 +305,6 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                         </Select>
                     </div>
                     <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-10">
-                                    <SlidersHorizontal className="mr-2 h-4 w-4" />
-                                    Columns
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                                {table
-                                    .getAllColumns()
-                                    .filter((col) => col.getCanHide())
-                                    .map((column) => (
-                                        <DropdownMenuCheckboxItem
-                                            key={column.id}
-                                            className="capitalize"
-                                            checked={column.getIsVisible()}
-                                            onCheckedChange={(v) => column.toggleVisibility(!!v)}
-                                        >
-                                            {column.id}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
                         <Button variant="outline" size="sm" className="h-10" onClick={handleExportCSV}>
                             <FileBarChart size={16} className="mr-2" />
                             Export

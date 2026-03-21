@@ -83,7 +83,7 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
                                                 <SelectContent className="max-h-[300px]">
                                                     {activeAssets.map(asset => (
                                                         <SelectItem key={asset.id} value={asset.id}>
-                                                            <span className="font-mono mr-2 text-muted-foreground">{asset.id}</span>
+                                                            <span className="font-mono mr-2 text-muted-foreground">{asset.assetCode || asset.id}</span>
                                                             {asset.desc}
                                                         </SelectItem>
                                                     ))}
@@ -133,7 +133,7 @@ export function RegistrationView({ onRegister, onManageCategories, onAssetClick 
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <h4 className="font-mono text-xl font-bold tracking-tight text-primary">{selectedAsset.id}</h4>
+                                                    <h4 className="font-mono text-xl font-bold tracking-tight text-primary">{selectedAsset.assetCode || selectedAsset.id}</h4>
                                                     <p className="text-sm text-muted-foreground max-w-[200px] mx-auto line-clamp-2">{selectedAsset.desc}</p>
                                                 </div>
                                                 <div className="w-full pt-4 mt-auto">

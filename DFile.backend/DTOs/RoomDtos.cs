@@ -51,11 +51,7 @@ namespace DFile.backend.DTOs
         [MaxLength(50)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(50)]
-        public string SubCategory { get; set; } = string.Empty;
-
-        [MaxLength(50)]
+        [MaxLength(200)]
         public string Description { get; set; } = string.Empty;
     }
 
@@ -65,11 +61,7 @@ namespace DFile.backend.DTOs
         [MaxLength(50)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
-        [MaxLength(50)]
-        public string SubCategory { get; set; } = string.Empty;
-
-        [MaxLength(50)]
+        [MaxLength(200)]
         public string Description { get; set; } = string.Empty;
         public byte[]? RowVersion { get; set; }
     }
@@ -79,13 +71,56 @@ namespace DFile.backend.DTOs
         public string Id { get; set; } = string.Empty;
         public string RoomCategoryCode { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public string SubCategory { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public bool IsArchived { get; set; }
         public DateTime? ArchivedAt { get; set; }
         public string? ArchivedBy { get; set; }
         public int? TenantId { get; set; }
         public int RoomCount { get; set; }
+        public int SubCategoryCount { get; set; }
+        public string? CreatedByName { get; set; }
+        public string? UpdatedByName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public byte[]? RowVersion { get; set; }
+    }
+
+    // ── RoomSubCategory DTOs ──────────────────────────────────
+
+    public class CreateRoomSubCategoryDto
+    {
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(200)]
+        public string Description { get; set; } = string.Empty;
+
+        [Required]
+        public string RoomCategoryId { get; set; } = string.Empty;
+    }
+
+    public class UpdateRoomSubCategoryDto
+    {
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(200)]
+        public string Description { get; set; } = string.Empty;
+        public byte[]? RowVersion { get; set; }
+    }
+
+    public class RoomSubCategoryResponseDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string SubCategoryCode { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string RoomCategoryId { get; set; } = string.Empty;
+        public string? CategoryName { get; set; }
+        public bool IsArchived { get; set; }
+        public int? TenantId { get; set; }
         public string? CreatedByName { get; set; }
         public string? UpdatedByName { get; set; }
         public DateTime CreatedAt { get; set; }

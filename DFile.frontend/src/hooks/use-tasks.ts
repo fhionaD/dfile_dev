@@ -13,7 +13,7 @@ interface CreateTaskPayload {
 }
 
 interface UpdateTaskPayload extends CreateTaskPayload {
-    archived?: boolean;
+    isArchived?: boolean;
 }
 
 export function useTasks(showArchived: boolean = false) {

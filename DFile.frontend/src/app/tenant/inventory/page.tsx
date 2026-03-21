@@ -53,16 +53,21 @@ export default function InventoryPage() {
                 onAddAsset={async (asset) => {
                     const payload: any = {
                         ...asset,
+                        assetName: asset.desc,
                         tagNumber: asset.tagNumber || asset.assetCode || asset.id || `AST-${Date.now()}`
                     };
-                    if (isEditMode && selectedAsset) {
-                        await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as any });
-                    } else {
-                        await addAssetMutation.mutateAsync(payload as any);
+                    try {
+                        if (isEditMode && selectedAsset) {
+                            await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as any });
+                        } else {
+                            await addAssetMutation.mutateAsync(payload as any);
+                        }
+                        setIsAddModalOpen(false);
+                        setIsEditMode(false);
+                        setSelectedAsset(null);
+                    } catch {
+                        // Error is already handled by the mutation's onError (toast displayed)
                     }
-                    setIsAddModalOpen(false);
-                    setIsEditMode(false);
-                    setSelectedAsset(null);
                 }}
             />
 

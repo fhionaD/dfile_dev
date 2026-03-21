@@ -13,10 +13,6 @@ namespace DFile.backend.Models
         [Required]
         public string Name { get; set; } = string.Empty;
         
-        [Required]
-        [MaxLength(450)]
-        public string SubCategory { get; set; } = string.Empty;
-        
         public string Description { get; set; } = string.Empty;
 
         public bool IsArchived { get; set; }

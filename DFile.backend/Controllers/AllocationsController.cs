@@ -209,11 +209,7 @@ namespace DFile.backend.Controllers
             RoomId = a.RoomId,
             RoomCode = room?.RoomCode ?? string.Empty,
             RoomName = room?.Name ?? string.Empty,
-            RoomCategoryName = room?.RoomCategory != null
-                ? (string.IsNullOrEmpty(room.RoomCategory.SubCategory)
-                    ? room.RoomCategory.Name
-                    : $"{room.RoomCategory.Name} \u2014 {room.RoomCategory.SubCategory}")
-                : null,
+            RoomCategoryName = room?.RoomCategory?.Name,
             PreviousRoomId = a.PreviousRoomId,
             Status = a.Status,
             Remarks = a.Remarks,

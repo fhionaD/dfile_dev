@@ -195,10 +195,10 @@ namespace DFile.backend.Data
                     .IsUnique()
                     .HasDatabaseName("IX_RoomCategories_RoomCategoryCode");
 
-                e.HasIndex(r => new { r.Name, r.SubCategory, r.TenantId })
+                e.HasIndex(r => new { r.Name, r.TenantId })
                     .IsUnique()
                     .HasFilter("[IsArchived] = 0")
-                    .HasDatabaseName("IX_RoomCategories_Name_SubCategory_Tenant");
+                    .HasDatabaseName("IX_RoomCategories_Name_Tenant");
 
                 e.HasIndex(r => r.IsArchived)
                     .HasDatabaseName("IX_RoomCategories_IsArchived");
