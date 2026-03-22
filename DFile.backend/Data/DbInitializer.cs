@@ -658,12 +658,12 @@ namespace DFile.backend.Data
             {
                 var existingCodes = context.AssetCategories.Select(c => c.AssetCategoryCode).ToList();
                 int seq = context.AssetCategories.Count() + 1;
-                while (existingCodes.Contains($"ACAT-{seq:D4}")) { seq++; }
+                while (existingCodes.Contains($"ASTC-{seq:D4}")) { seq++; }
                 
                 context.AssetCategories.Add(new AssetCategory
                 {
                     Id = id,
-                    AssetCategoryCode = $"ACAT-{seq:D4}",
+                    AssetCategoryCode = $"ASTC-{seq:D4}",
                     CategoryName = name,
                     HandlingType = ht,
                     Description = desc,
@@ -748,7 +748,17 @@ namespace DFile.backend.Data
         {
             if (!context.Departments.Any(d => d.Id == id))
             {
-                var seq = context.Departments.Count() + 1;
+                // Include both persisted and tracked-but-unsaved codes
+                var existingCodes = context.Departments.Select(d => d.DepartmentCode).ToList();
+                var trackedCodes = context.ChangeTracker.Entries<Department>()
+                    .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
+                    .Select(e => e.Entity.DepartmentCode)
+                    .ToList();
+                existingCodes.AddRange(trackedCodes);
+
+                int seq = existingCodes.Count + 1;
+                while (existingCodes.Contains($"DPT-{seq:D4}")) { seq++; }
+
                 context.Departments.Add(new Department
                 {
                     Id = id,
@@ -758,6 +768,7 @@ namespace DFile.backend.Data
                     IsArchived = false,
                     TenantId = tenantId
                 });
+                context.SaveChanges();
             }
         }
     }

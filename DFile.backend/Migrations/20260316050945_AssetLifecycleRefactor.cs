@@ -11,9 +11,9 @@ namespace dfile.backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "EditedAt",
-                table: "Departments");
+            // migrationBuilder.DropColumn(
+            //     name: "EditedAt",
+            //     table: "Departments");
 
             migrationBuilder.DropColumn(
                 name: "Status",
