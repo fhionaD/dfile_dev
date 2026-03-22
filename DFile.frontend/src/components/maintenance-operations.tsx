@@ -182,7 +182,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                             </TableRow>
                         ) : (
                             filteredRecords.map((record) => (
-                                <TableRow key={record.id} className="border-b last:border-0">
+                                <TableRow key={record.id} className="border-b last:border-0 cursor-pointer hover:bg-muted/50" onClick={() => onRecordClick(record)}>
                                     <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
                                     <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
                                         <div className="flex flex-col items-start">
@@ -198,7 +198,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                                     <TableCell className="px-6 py-4 align-middle text-center">
                                         <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
                                     </TableCell>
-                                    <TableCell className="px-6 py-4 align-middle text-center">
+                                    <TableCell className="px-6 py-4 align-middle text-center" onClick={e => e.stopPropagation()}>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
@@ -213,11 +213,11 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                                                     <DropdownMenuItem onClick={() => restoreRecordMutation.mutateAsync(record.id)} className="gap-2 cursor-pointer">
                                                         <RotateCcw className="h-4 w-4" /> Restore
                                                     </DropdownMenuItem>
-                                                ) : (
+                                                ) : record.status === "Completed" ? (
                                                     <DropdownMenuItem onClick={() => setArchiveTarget(record.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                                                         <Archive className="h-4 w-4" /> Archive
                                                     </DropdownMenuItem>
-                                                )}
+                                                ) : null}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
