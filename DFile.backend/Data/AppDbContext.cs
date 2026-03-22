@@ -38,6 +38,9 @@ namespace DFile.backend.Data
         // Allocations
         public DbSet<AssetAllocation> AssetAllocations { get; set; }
 
+        // Asset Condition History
+        public DbSet<AssetConditionLog> AssetConditionLogs { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -488,6 +491,27 @@ namespace DFile.backend.Data
                     .WithMany()
                     .HasForeignKey(a => a.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+            // ── AssetConditionLog ─────────────────────────────────
+            modelBuilder.Entity<AssetConditionLog>(e =>
+            {
+                e.Property(l => l.PreviousCondition)
+                    .HasConversion<int>();
+                e.Property(l => l.NewCondition)
+                    .HasConversion<int>();
+
+                e.HasIndex(l => new { l.AssetId, l.CreatedAt })
+                    .HasDatabaseName("IX_AssetConditionLogs_Asset_Created");
+
+                e.HasOne(l => l.Asset)
+                    .WithMany()
+                    .HasForeignKey(l => l.AssetId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(l => l.Tenant)
+                    .WithMany()
+                    .HasForeignKey(l => l.TenantId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

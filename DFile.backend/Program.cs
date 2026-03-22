@@ -151,6 +151,16 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 // 2. Swagger — development only
+
+// Serve uploaded maintenance attachments from /uploads
+var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+Directory.CreateDirectory(uploadsDir);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsDir),
+    RequestPath = "/uploads"
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

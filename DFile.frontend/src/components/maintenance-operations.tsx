@@ -34,10 +34,14 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     const [priorityFilter, setPriorityFilter] = useState("All");
     const [dateFilter, setDateFilter] = useState("All Time");
 
-    const statusVariant: Record<string, "warning" | "info" | "success" | "muted"> = {
-        Pending: "warning",
-        "In Progress": "info",
+    const statusVariant: Record<string, "warning" | "info" | "success" | "muted" | "danger"> = {
+        Open: "info",
+        Inspection: "warning",
+        Quoted: "muted",
+        "In Progress": "warning",
         Completed: "success",
+        Scheduled: "info",
+        Pending: "warning",
     };
 
     const priorityVariant: Record<string, "danger" | "warning" | "success" | "muted"> = {
@@ -47,7 +51,6 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     };
 
     const filteredRecords = records.filter(record => {
-        // if (showArchived !== !!record.isArchived) return false; // Handled by API
         const query = searchQuery.toLowerCase();
         const assetName = (record.assetName || record.assetId).toLowerCase();
         const roomDisplay = record.roomName ? `${record.roomCode} (${record.roomName})` : "";
@@ -77,7 +80,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
             }
         }
         return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt || b.dateReported).getTime() - new Date(a.createdAt || a.dateReported).getTime());
 
     const activeRecordsCount = records.filter(r => !r.isArchived).length;
     const archivedRecordsCount = records.filter(r => r.isArchived).length;
@@ -108,7 +111,9 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="All">All Status</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Open">Open</SelectItem>
+                            <SelectItem value="Inspection">Inspection</SelectItem>
+                            <SelectItem value="Quoted">Quoted</SelectItem>
                             <SelectItem value="In Progress">In Progress</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
                         </SelectContent>

@@ -24,6 +24,9 @@ namespace DFile.backend.Models
         public decimal? Cost { get; set; }
         public DateTime DateReported { get; set; } = DateTime.UtcNow;
         public string? Attachments { get; set; } // Comma separated string for simplicity in SQL
+        public string? DiagnosisOutcome { get; set; } // "Repairable", "Not Repairable", null
+        public string? InspectionNotes { get; set; }
+        public string? QuotationNotes { get; set; }
 
         public bool IsArchived { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

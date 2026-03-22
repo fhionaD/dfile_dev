@@ -4,6 +4,7 @@ using DFile.backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace dfile.backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260322101308_AddInspectionFieldsToMaintenance")]
+    partial class AddInspectionFieldsToMaintenance
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -288,48 +291,6 @@ namespace dfile.backend.Migrations
                     b.ToTable("AssetCategories");
                 });
 
-            modelBuilder.Entity("DFile.backend.Models.AssetConditionLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("AssetId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ChangedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("NewCondition")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("PreviousCondition")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TenantId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("AssetId", "CreatedAt")
-                        .HasDatabaseName("IX_AssetConditionLogs_Asset_Created");
-
-                    b.ToTable("AssetConditionLogs");
-                });
-
             modelBuilder.Entity("DFile.backend.Models.AuditLog", b =>
                 {
                     b.Property<long>("Id")
@@ -543,9 +504,6 @@ namespace dfile.backend.Migrations
 
                     b.Property<string>("Priority")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("QuotationNotes")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("StartDate")
@@ -1373,24 +1331,6 @@ namespace dfile.backend.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("UpdatedByUser");
-                });
-
-            modelBuilder.Entity("DFile.backend.Models.AssetConditionLog", b =>
-                {
-                    b.HasOne("DFile.backend.Models.Asset", "Asset")
-                        .WithMany()
-                        .HasForeignKey("AssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DFile.backend.Models.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Asset");
-
-                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.AuditLog", b =>

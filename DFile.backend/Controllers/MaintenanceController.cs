@@ -122,6 +122,25 @@ namespace DFile.backend.Controllers
             return Ok(MapToDto(record, allocDict));
         }
 
+        // ── Status transition rules ──────────────────────────────
+        private static readonly Dictionary<string, string[]> ValidTransitions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Open"]        = new[] { "Inspection" },
+            ["Inspection"]  = new[] { "Quoted", "In Progress" },
+            ["Quoted"]      = new[] { "In Progress" },
+            ["In Progress"] = new[] { "Completed" },
+            ["Scheduled"]   = new[] { "Inspection", "In Progress", "Completed" },
+            // Legacy statuses that existing data may have
+            ["Pending"]     = new[] { "Open", "Inspection", "In Progress" },
+        };
+
+        private static bool IsValidTransition(string from, string to)
+        {
+            if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return true;
+            return ValidTransitions.TryGetValue(from, out var targets)
+                && targets.Any(t => string.Equals(t, to, StringComparison.OrdinalIgnoreCase));
+        }
+
         [HttpPost]
         [RequirePermission("Maintenance", "CanCreate")]
         public async Task<ActionResult<MaintenanceRecordResponseDto>> PostMaintenanceRecord(CreateMaintenanceRecordDto dto)
@@ -153,6 +172,9 @@ namespace DFile.backend.Controllers
                 EndDate = dto.EndDate,
                 Cost = dto.Cost,
                 Attachments = dto.Attachments,
+                DiagnosisOutcome = dto.DiagnosisOutcome,
+                InspectionNotes = dto.InspectionNotes,
+                QuotationNotes = dto.QuotationNotes,
                 DateReported = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
@@ -186,6 +208,10 @@ namespace DFile.backend.Controllers
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
 
+            // Validate status transition
+            if (!IsValidTransition(existing.Status, dto.Status))
+                return BadRequest(new { message = $"Cannot transition from '{existing.Status}' to '{dto.Status}'." });
+
             // Validate AssetId exists and belongs to same tenant
             var asset = await _context.Assets.FindAsync(dto.AssetId);
             if (asset == null) return BadRequest(new { message = "Asset not found." });
@@ -202,19 +228,21 @@ namespace DFile.backend.Controllers
             existing.EndDate = dto.EndDate;
             existing.Cost = dto.Cost;
             existing.Attachments = dto.Attachments;
+            existing.DiagnosisOutcome = dto.DiagnosisOutcome;
+            existing.InspectionNotes = dto.InspectionNotes;
+            existing.QuotationNotes = dto.QuotationNotes;
             existing.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        [HttpPut("archive/{id:guid}")]
+        [HttpPut("archive/{id}")]
         [RequirePermission("Maintenance", "CanArchive")]
-        public async Task<IActionResult> ArchiveMaintenanceRecord(Guid id)
+        public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
         {
-            var idStr = id.ToString();
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(idStr);
+            var record = await _context.MaintenanceRecords.FindAsync(id);
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
@@ -241,13 +269,12 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        [HttpDelete("{id:guid}")]
+        [HttpDelete("{id}")]
         [RequirePermission("Maintenance", "CanArchive")]
-        public async Task<IActionResult> DeleteMaintenanceRecord(Guid id)
+        public async Task<IActionResult> DeleteMaintenanceRecord(string id)
         {
-            var idStr = id.ToString();
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(idStr);
+            var record = await _context.MaintenanceRecords.FindAsync(id);
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
@@ -255,6 +282,115 @@ namespace DFile.backend.Controllers
             _context.MaintenanceRecords.Remove(record);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // ── File Upload ───────────────────────────────────────────
+
+        [HttpPost("upload")]
+        [RequirePermission("Maintenance", "CanCreate")]
+        public async Task<IActionResult> UploadAttachment(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file provided." });
+
+            if (file.Length > 10 * 1024 * 1024) // 10MB limit
+                return BadRequest(new { message = "File size exceeds 10MB limit." });
+
+            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads", "maintenance");
+            Directory.CreateDirectory(uploadsDir);
+
+            var uniqueName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(uploadsDir, uniqueName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var url = $"/uploads/maintenance/{uniqueName}";
+            return Ok(new { url, fileName = file.FileName, size = file.Length });
+        }
+
+        // ── Mark Asset Beyond Repair ──────────────────────────────
+
+        [HttpPut("mark-beyond-repair/{maintenanceId}")]
+        [RequirePermission("Maintenance", "CanEdit")]
+        public async Task<IActionResult> MarkAssetBeyondRepair(string maintenanceId)
+        {
+            var tenantId = GetCurrentTenantId();
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == maintenanceId);
+
+            if (record == null) return NotFound();
+            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+
+            var asset = record.Asset;
+            if (asset == null) return BadRequest(new { message = "Associated asset not found." });
+
+            // Log condition change
+            _context.AssetConditionLogs.Add(new AssetConditionLog
+            {
+                AssetId = asset.Id,
+                PreviousCondition = asset.CurrentCondition,
+                NewCondition = AssetCondition.Critical,
+                Notes = $"Marked as beyond repair from maintenance ticket {record.Id}",
+                ChangedBy = User.Identity?.Name ?? "System",
+                TenantId = tenantId,
+            });
+
+            // Update asset
+            asset.LifecycleStatus = LifecycleStatus.ForReplacement;
+            asset.CurrentCondition = AssetCondition.Critical;
+            asset.UpdatedAt = DateTime.UtcNow;
+
+            // Update maintenance record
+            record.DiagnosisOutcome = "Not Repairable";
+            record.UpdatedAt = DateTime.UtcNow;
+
+            // Create notification for tenant admin
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"Asset '{asset.AssetName}' ({asset.AssetCode}) has been marked as beyond repair and needs replacement.",
+                Type = "Warning",
+                Module = "Maintenance",
+                EntityType = "Asset",
+                EntityId = asset.Id,
+                TargetRole = "Admin",
+                TenantId = tenantId,
+            });
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Asset marked as beyond repair. Admin has been notified." });
+        }
+
+        // ── Asset Condition History ───────────────────────────────
+
+        [HttpGet("condition-history/{assetId}")]
+        [RequirePermission("Maintenance", "CanView")]
+        public async Task<IActionResult> GetAssetConditionHistory(string assetId)
+        {
+            var tenantId = GetCurrentTenantId();
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId) return NotFound();
+
+            var logs = await _context.AssetConditionLogs
+                .Where(l => l.AssetId == assetId)
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(50)
+                .Select(l => new
+                {
+                    l.Id,
+                    PreviousCondition = l.PreviousCondition.ToString(),
+                    NewCondition = l.NewCondition.ToString(),
+                    l.Notes,
+                    l.ChangedBy,
+                    l.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(logs);
         }
 
         // ── Helpers ───────────────────────────────────────────────
@@ -283,6 +419,9 @@ namespace DFile.backend.Controllers
                 EndDate = r.EndDate,
                 Cost = r.Cost,
                 Attachments = r.Attachments,
+                DiagnosisOutcome = r.DiagnosisOutcome,
+                InspectionNotes = r.InspectionNotes,
+                QuotationNotes = r.QuotationNotes,
                 DateReported = r.DateReported,
                 IsArchived = r.IsArchived,
                 CreatedAt = r.CreatedAt,

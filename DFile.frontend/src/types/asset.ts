@@ -134,7 +134,7 @@ export interface MaintenanceRecord {
     roomCode?: string;
     roomName?: string;
     description: string;
-    status: "Pending" | "In Progress" | "Completed" | "Scheduled";
+    status: "Open" | "Inspection" | "Quoted" | "In Progress" | "Completed" | "Scheduled" | "Pending";
     priority: "Low" | "Medium" | "High";
     type: "Preventive" | "Corrective" | "Upgrade" | "Inspection";
     frequency?: "One-time" | "Daily" | "Weekly" | "Monthly" | "Yearly";
@@ -142,6 +142,9 @@ export interface MaintenanceRecord {
     endDate?: string;
     cost?: number;
     attachments?: string;
+    diagnosisOutcome?: "Repairable" | "Not Repairable" | null;
+    inspectionNotes?: string;
+    quotationNotes?: string;
     dateReported: string;
     archived?: boolean;
     isArchived?: boolean;

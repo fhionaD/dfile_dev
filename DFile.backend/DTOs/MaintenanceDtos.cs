@@ -10,7 +10,7 @@ namespace DFile.backend.DTOs
         [Required]
         public string Description { get; set; } = string.Empty;
 
-        public string Status { get; set; } = "Pending";
+        public string Status { get; set; } = "Open";
         public string Priority { get; set; } = "Medium";
         public string Type { get; set; } = "Corrective";
         public string? Frequency { get; set; }
@@ -18,6 +18,9 @@ namespace DFile.backend.DTOs
         public DateTime? EndDate { get; set; }
         public decimal? Cost { get; set; }
         public string? Attachments { get; set; }
+        public string? DiagnosisOutcome { get; set; }
+        public string? InspectionNotes { get; set; }
+        public string? QuotationNotes { get; set; }
     }
 
     public class UpdateMaintenanceRecordDto
@@ -28,7 +31,7 @@ namespace DFile.backend.DTOs
         [Required]
         public string Description { get; set; } = string.Empty;
 
-        public string Status { get; set; } = "Pending";
+        public string Status { get; set; } = "Open";
         public string Priority { get; set; } = "Medium";
         public string Type { get; set; } = "Corrective";
         public string? Frequency { get; set; }
@@ -37,6 +40,9 @@ namespace DFile.backend.DTOs
         public decimal? Cost { get; set; }
         public DateTime? DateReported { get; set; }
         public string? Attachments { get; set; }
+        public string? DiagnosisOutcome { get; set; }
+        public string? InspectionNotes { get; set; }
+        public string? QuotationNotes { get; set; }
     }
 
     public class MaintenanceRecordResponseDto
@@ -57,7 +63,7 @@ namespace DFile.backend.DTOs
 
         // Maintenance record fields
         public string Description { get; set; } = string.Empty;
-        public string Status { get; set; } = "Pending";
+        public string Status { get; set; } = "Open";
         public string Priority { get; set; } = "Medium";
         public string Type { get; set; } = "Corrective";
         public string? Frequency { get; set; }
@@ -65,6 +71,9 @@ namespace DFile.backend.DTOs
         public DateTime? EndDate { get; set; }
         public decimal? Cost { get; set; }
         public string? Attachments { get; set; }
+        public string? DiagnosisOutcome { get; set; }
+        public string? InspectionNotes { get; set; }
+        public string? QuotationNotes { get; set; }
         public DateTime DateReported { get; set; }
         public bool IsArchived { get; set; }
         public DateTime CreatedAt { get; set; }

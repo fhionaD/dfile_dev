@@ -4,8 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Package, Calendar, PhilippinePeso, Tag, MapPin, Warehouse, Wrench, Building2, User, FileText } from "lucide-react";
+import { Package, Calendar, PhilippinePeso, Tag, MapPin, Warehouse, Wrench, Building2, User, FileText, History, ArrowRight } from "lucide-react";
 import { Asset } from "@/types/asset";
+import { useAssetConditionHistory } from "@/hooks/use-maintenance";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusText } from "@/components/ui/status-text";
 
 
 interface AssetDetailsModalProps {
@@ -16,8 +19,9 @@ interface AssetDetailsModalProps {
 }
 
 export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDetailsModalProps) {
-    if (!asset) return null;
+    const { data: conditionHistory = [], isLoading: historyLoading } = useAssetConditionHistory(asset?.id);
     const formatCurrency = (val: number | undefined) => val != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val) : "-";
+    if (!asset) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,6 +125,57 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                                 <p className="text-sm text-muted-foreground bg-muted/10 p-3 rounded-lg border border-border/50">
                                     {asset.notes}
                                 </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Condition History Timeline */}
+                    <div className="md:col-span-2">
+                        <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <History size={16} className="text-primary" /> Condition History
+                        </h4>
+                        {historyLoading ? (
+                            <div className="space-y-2">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </div>
+                        ) : conditionHistory.length === 0 ? (
+                            <p className="text-xs text-muted-foreground bg-muted/10 p-3 rounded-lg border border-border/50">No condition changes recorded yet.</p>
+                        ) : (
+                            <div className="space-y-0 relative">
+                                <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
+                                {conditionHistory.map((log, i) => {
+                                    const conditionColor: Record<string, string> = {
+                                        Good: "bg-emerald-500",
+                                        Fair: "bg-blue-500",
+                                        Poor: "bg-amber-500",
+                                        Critical: "bg-red-500",
+                                        Unknown: "bg-gray-400",
+                                    };
+                                    const conditionVariant: Record<string, "success" | "info" | "warning" | "danger" | "muted"> = {
+                                        Good: "success",
+                                        Fair: "info",
+                                        Poor: "warning",
+                                        Critical: "danger",
+                                        Unknown: "muted",
+                                    };
+                                    return (
+                                        <div key={log.id} className="flex items-start gap-3 py-2.5 relative">
+                                            <div className={`h-[22px] w-[22px] rounded-full ${conditionColor[log.newCondition] ?? "bg-gray-400"} border-2 border-background shrink-0 z-10`} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 text-xs">
+                                                    <StatusText variant={conditionVariant[log.previousCondition] ?? "muted"}>{log.previousCondition}</StatusText>
+                                                    <ArrowRight size={10} className="text-muted-foreground" />
+                                                    <StatusText variant={conditionVariant[log.newCondition] ?? "muted"}>{log.newCondition}</StatusText>
+                                                </div>
+                                                {log.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.notes}</p>}
+                                                <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                                    {new Date(log.createdAt).toLocaleString()} {log.changedBy ? `· ${log.changedBy}` : ""}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

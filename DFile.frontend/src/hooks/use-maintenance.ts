@@ -15,6 +15,9 @@ interface CreateMaintenancePayload {
     endDate?: string;
     cost?: number;
     attachments?: string;
+    diagnosisOutcome?: string;
+    inspectionNotes?: string;
+    quotationNotes?: string;
 }
 
 interface UpdateMaintenancePayload extends CreateMaintenancePayload {
@@ -139,7 +142,12 @@ export function useUpdateMaintenanceStatus() {
 
     return useMutation({
         mutationFn: async ({ id, status }: { id: string; status: string }) => {
-            const { data: record } = await api.get<MaintenanceRecord>(`/api/maintenance/${id}`);
+            // Get record from React Query cache — try both active and archived keys
+            const active = queryClient.getQueryData<MaintenanceRecord[]>(['maintenance', false]);
+            const archived = queryClient.getQueryData<MaintenanceRecord[]>(['maintenance', true]);
+            const record = active?.find(r => r.id === id) || archived?.find(r => r.id === id);
+            if (!record) throw new Error('Record not found in cache. Please refresh the page.');
+
             const payload: UpdateMaintenancePayload = {
                 assetId: record.assetId,
                 description: record.description,
@@ -151,6 +159,9 @@ export function useUpdateMaintenanceStatus() {
                 endDate: record.endDate,
                 cost: record.cost,
                 attachments: record.attachments,
+                diagnosisOutcome: record.diagnosisOutcome || undefined,
+                inspectionNotes: record.inspectionNotes || undefined,
+                quotationNotes: record.quotationNotes || undefined,
                 dateReported: record.dateReported,
             };
             await api.put(`/api/maintenance/${id}`, payload);
@@ -197,5 +208,62 @@ export function useRestoreMaintenanceRecord() {
         onError: () => {
             toast.error('Failed to restore record');
         },
+    });
+}
+
+export function useUploadAttachment() {
+    return useMutation({
+        mutationFn: async (file: File) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            const { data } = await api.post<{ url: string; fileName: string; size: number }>(
+                '/api/maintenance/upload',
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
+            return data;
+        },
+        onError: () => {
+            toast.error('Failed to upload file');
+        },
+    });
+}
+
+export function useMarkBeyondRepair() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (maintenanceId: string) => {
+            const { data } = await api.put<{ message: string }>(`/api/maintenance/mark-beyond-repair/${maintenanceId}`);
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            toast.success(data.message);
+        },
+        onError: () => {
+            toast.error('Failed to mark asset as beyond repair');
+        },
+    });
+}
+
+export interface ConditionLogEntry {
+    id: number;
+    previousCondition: string;
+    newCondition: string;
+    notes?: string;
+    changedBy?: string;
+    createdAt: string;
+}
+
+export function useAssetConditionHistory(assetId: string | undefined) {
+    return useQuery({
+        queryKey: ['condition-history', assetId],
+        queryFn: async () => {
+            const { data } = await api.get<ConditionLogEntry[]>(`/api/maintenance/condition-history/${assetId}`);
+            return data;
+        },
+        enabled: !!assetId,
     });
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,13 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useAddMaintenanceRecord } from "@/hooks/use-maintenance";
+import { useMaintenanceRecords, useArchiveMaintenanceRecord } from "@/hooks/use-maintenance";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/stat-card";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
+import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 
 interface MaintenanceViewProps {
-    // No longer needs data props
     onScheduleMaintenance?: (assetId: string) => void;
     onRequestReplacement?: (assetId: string) => void;
 }
@@ -24,22 +24,17 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     const [showArchived, setShowArchived] = useState(false);
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
-    // Mutations
-    const updateStatusMutation = useUpdateMaintenanceStatus();
     const archiveRecordMutation = useArchiveMaintenanceRecord();
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
     // Request Filters
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
     const [priorityFilter, setPriorityFilter] = useState("All");
     const [dateFilter, setDateFilter] = useState("All Time");
-
-    // Asset Schedule Filter
-    const [assetSearchQuery, setAssetSearchQuery] = useState("");
-
-
 
     // Loading State
     if (isLoadingRecords) {
@@ -72,6 +67,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
             record.description.toLowerCase().includes(query) ||
             record.assetId.toLowerCase().includes(query) ||
             assetName.includes(query) ||
+            (record.assetCode || "").toLowerCase().includes(query) ||
             roomDisplay.toLowerCase().includes(query);
 
         if (!matchesSearch) return false;
@@ -92,10 +88,10 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
             }
         }
         return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt || b.dateReported).getTime() - new Date(a.createdAt || a.dateReported).getTime());
 
     // KPI Calculations
-    const openRequests = records.filter(r => !r.isArchived && (r.status === "Pending" || r.status === "In Progress")).length;
+    const openRequests = records.filter(r => !r.isArchived && (r.status === "Open" || r.status === "Inspection" || r.status === "Quoted" || r.status === "Pending" || r.status === "In Progress")).length;
     
     const overdueRequests = records.filter(r => {
         if (r.isArchived || r.status === "Completed") return false;
@@ -110,14 +106,14 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     const scheduledThisWeek = records.filter(r => {
         if (r.isArchived || r.status !== "Scheduled" || !r.startDate) return false;
         const start = new Date(r.startDate);
-        const curr = new Date(); 
-        const first = curr.getDate() - curr.getDay(); 
-        const last = first + 6; 
-
-        // Create new date objects to avoid mutation side effects
-        const firstday = new Date(curr.setDate(first));
-        const lastday = new Date(new Date().setDate(last));
-        
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const firstday = new Date(now);
+        firstday.setDate(now.getDate() - dayOfWeek);
+        firstday.setHours(0, 0, 0, 0);
+        const lastday = new Date(firstday);
+        lastday.setDate(firstday.getDate() + 6);
+        lastday.setHours(23, 59, 59, 999);
         return start >= firstday && start <= lastday;
     }).length;
 
@@ -132,14 +128,21 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         ? Math.round((totalRepairTime / completedRepairs.length) / (1000 * 60 * 60 * 24))
         : 0;
 
-    const activeRecords = records.filter(r => !r.isArchived);
-
-    const statusVariant: Record<string, "warning" | "info" | "success" | "muted"> = {
+    const statusVariant: Record<string, "warning" | "info" | "success" | "muted" | "danger"> = {
+        Open: "info",
+        Inspection: "warning",
+        Quoted: "muted",
         Pending: "warning",
         "In Progress": "info",
         Completed: "success",
+        Scheduled: "info",
     };
 
+    const priorityVariant: Record<string, "danger" | "warning" | "success" | "muted"> = {
+        High: "danger",
+        Medium: "warning",
+        Low: "success",
+    };
 
     return (
         <div className="space-y-8">
@@ -240,14 +243,16 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="All">All Status</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Open">Open</SelectItem>
+                            <SelectItem value="Inspection">Inspection</SelectItem>
+                            <SelectItem value="Quoted">Quoted</SelectItem>
                             <SelectItem value="In Progress">In Progress</SelectItem>
                             <SelectItem value="Scheduled">Scheduled</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
                         </SelectContent>
                     </Select>
 
-                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                         <SelectTrigger className="w-[160px] h-10">
                             <div className="flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 text-muted-foreground" />
@@ -262,7 +267,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </SelectContent>
                     </Select>
 
-                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
                         <SelectTrigger className="w-[160px] h-10">
                             <div className="flex items-center gap-2">
                                 <CalendarIcon className="w-4 h-4 text-muted-foreground" />
@@ -301,9 +306,9 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[100px]">ID</TableHead>
-                            <TableHead>Asset / Description</TableHead>
-                            <TableHead className="w-[150px]">Room</TableHead>
+                            <TableHead>Asset</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Room</TableHead>
                             <TableHead className="text-center w-[100px]">Status</TableHead>
                             <TableHead className="text-center w-[100px]">Priority</TableHead>
                             <TableHead className="text-center w-[120px]">Date</TableHead>
@@ -321,15 +326,21 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                             </TableRow>
                         ) : (
                             filteredRecords.map((record) => (
-                                <TableRow key={record.id}>
-                                    <TableCell className="font-mono text-xs text-muted-foreground">
-                                        {record.id}
-                                    </TableCell>
+                                <TableRow
+                                    key={record.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => { setSelectedRecord(record); setIsDetailsModalOpen(true); }}
+                                >
                                     <TableCell>
                                         <div className="space-y-0.5">
                                             <span className="text-sm font-medium block line-clamp-1">{record.assetName || record.assetId}</span>
-                                            <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
+                                            {record.assetCode && (
+                                                <span className="text-xs text-muted-foreground font-mono block">{record.assetCode}</span>
+                                            )}
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="text-sm text-muted-foreground line-clamp-2">{record.description}</span>
                                     </TableCell>
                                     <TableCell>
                                         {record.roomName ? (
@@ -338,20 +349,14 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                                 <span className="text-xs text-muted-foreground block line-clamp-1">{record.roomName}</span>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground">Unassigned</span>
+                                            <span className="text-xs text-muted-foreground">—</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-semibold ${
-                                            record.priority === 'High' ? 'bg-red-500/10 text-red-700' :
-                                            record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700' :
-                                            'bg-emerald-500/10 text-emerald-700'
-                                        }`}>
-                                           {(record.priority || "N/A").charAt(0)}
-                                        </div>
+                                        <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority}</StatusText>
                                     </TableCell>
                                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                                         {new Date(record.dateReported).toLocaleDateString()}
@@ -362,7 +367,22 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Create Maintenance Modal */}
+            <CreateMaintenanceModal
+                open={isCreateModalOpen}
+                onOpenChange={setIsCreateModalOpen}
+            />
+
+            {/* Maintenance Details Modal */}
+            <MaintenanceDetailsModal
+                open={isDetailsModalOpen}
+                onOpenChange={setIsDetailsModalOpen}
+                record={selectedRecord}
+                onEdit={() => {
+                    setIsDetailsModalOpen(false);
+                }}
+            />
         </div>
     );
 }
-// End of MaintenanceView component

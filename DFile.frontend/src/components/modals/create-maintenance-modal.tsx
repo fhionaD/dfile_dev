@@ -31,7 +31,7 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
         priority: "Medium",
         type: "Corrective",
         frequency: "One-time",
-        status: "Pending",
+        status: "Open",
         startDate: "",
         endDate: "",
         cost: 0
@@ -58,7 +58,7 @@ export function CreateMaintenanceModal({ open, onOpenChange, initialData, defaul
                     priority: "Medium",
                     type: "Corrective",
                     frequency: "One-time",
-                    status: "Pending",
+                    status: "Open",
                     startDate: "",
                     endDate: "",
                     cost: 0
