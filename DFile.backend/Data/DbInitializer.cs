@@ -706,9 +706,6 @@ namespace DFile.backend.Data
             {
                 // DB constraint now enforces ASTC- prefix (not ACAT-), so keep seeding compliant.
                 var existingCodes = context.AssetCategories.Select(c => c.AssetCategoryCode).ToList();
-<<<<<<< HEAD
-                int seq = context.AssetCategories.Count() + 1;
-=======
                 var trackedCodes = context.ChangeTracker.Entries<AssetCategory>()
                     .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
                     .Select(e => e.Entity.AssetCategoryCode)
@@ -716,7 +713,6 @@ namespace DFile.backend.Data
                 existingCodes.AddRange(trackedCodes);
 
                 int seq = existingCodes.Count + 1;
->>>>>>> 31309d0425d1dcd614c934fd318f61bab0f05c15
                 while (existingCodes.Contains($"ASTC-{seq:D4}")) { seq++; }
                 
                 context.AssetCategories.Add(new AssetCategory
