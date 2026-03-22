@@ -3,6 +3,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Asset, CreateAssetPayload, UpdateAssetPayload, UpdateAssetFinancialPayload } from '@/types/asset';
 import { toast } from 'sonner';
+import { AxiosError } from 'axios';
+
+const resolveApiErrorMessage = (error: Error, fallback: string) => {
+    const axiosErr = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+    const msg = axiosErr.response?.data?.message;
+    if (msg) return msg;
+
+    const validation = axiosErr.response?.data?.errors;
+    if (validation) {
+        const firstField = Object.keys(validation)[0];
+        const firstIssue = firstField ? validation[firstField]?.[0] : undefined;
+        if (firstIssue) return firstIssue;
+    }
+    return fallback;
+};
 
 export function useAssets(showArchived: boolean = false) {
     return useQuery({
@@ -49,8 +64,8 @@ export function useAddAsset() {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             toast.success('Asset added successfully');
         },
-        onError: () => {
-            toast.error('Failed to add asset');
+        onError: (error: Error) => {
+            toast.error(resolveApiErrorMessage(error, 'Failed to add asset'));
         },
     });
 }
@@ -68,8 +83,8 @@ export function useUpdateAsset() {
             queryClient.invalidateQueries({ queryKey: ['assets', variables.id] });
             toast.success('Asset updated successfully');
         },
-        onError: () => {
-            toast.error('Failed to update asset');
+        onError: (error: Error) => {
+            toast.error(resolveApiErrorMessage(error, 'Failed to update asset'));
         },
     });
 }

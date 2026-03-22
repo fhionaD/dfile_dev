@@ -11,7 +11,6 @@ import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useRestoreMaintenanceRecord } from "@/hooks/use-maintenance";
-import { useAssets } from "@/hooks/use-assets";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface MaintenanceOperationsProps {
@@ -22,7 +21,6 @@ interface MaintenanceOperationsProps {
 export function MaintenanceOperations({ onCreateRequest, onRecordClick }: MaintenanceOperationsProps) {
     const [showArchived, setShowArchived] = useState(false);
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
-    const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
 
     // Mutations
     const updateStatusMutation = useUpdateMaintenanceStatus();
@@ -35,12 +33,6 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     const [statusFilter, setStatusFilter] = useState("All");
     const [priorityFilter, setPriorityFilter] = useState("All");
     const [dateFilter, setDateFilter] = useState("All Time");
-
-    // Helper functions
-    const getAssetName = (id: string) => {
-        const asset = assets.find(a => a.id === id);
-        return asset ? asset.desc : id;
-    };
 
     const statusVariant: Record<string, "warning" | "info" | "success" | "muted"> = {
         Pending: "warning",
@@ -55,14 +47,16 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
     };
 
     const filteredRecords = records.filter(record => {
-        // if (showArchived !== !!record.archived) return false; // Handled by API
+        // if (showArchived !== !!record.isArchived) return false; // Handled by API
         const query = searchQuery.toLowerCase();
-        const assetName = getAssetName(record.assetId).toLowerCase();
+        const assetName = (record.assetName || record.assetId).toLowerCase();
+        const roomDisplay = record.roomName ? `${record.roomCode} (${record.roomName})` : "";
         const matchesSearch =
             record.id.toLowerCase().includes(query) ||
             record.description.toLowerCase().includes(query) ||
             record.assetId.toLowerCase().includes(query) ||
-            assetName.includes(query);
+            assetName.includes(query) ||
+            roomDisplay.toLowerCase().includes(query);
 
         if (!matchesSearch) return false;
         if (statusFilter !== "All" && record.status !== statusFilter) return false;
@@ -85,8 +79,8 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
         return true;
     });
 
-    const activeRecordsCount = records.filter(r => !r.archived).length;
-    const archivedRecordsCount = records.filter(r => r.archived).length;
+    const activeRecordsCount = records.filter(r => !r.isArchived).length;
+    const archivedRecordsCount = records.filter(r => r.isArchived).length;
 
     return (
         <div className="space-y-6">
@@ -187,8 +181,8 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                                     <TableCell className="px-6 py-4 align-middle font-mono text-sm font-medium text-foreground text-left">{record.id}</TableCell>
                                     <TableCell className="px-6 py-4 align-middle text-sm text-foreground font-medium text-left">
                                         <div className="flex flex-col items-start">
-                                            <span>{getAssetName(record.assetId)}</span>
-                                            <span className="text-[10px] text-muted-foreground font-mono">{record.assetId}</span>
+                                            <span>{record.assetName || record.assetId}</span>
+                                            <span className="text-[10px] text-muted-foreground font-mono">{record.assetCode || record.assetId}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell className="px-6 py-4 align-middle text-sm text-muted-foreground truncate text-left" title={record.description}>{record.description}</TableCell>
@@ -210,7 +204,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                                                 <DropdownMenuItem onClick={() => onRecordClick(record)} className="gap-2 cursor-pointer">
                                                     <Eye className="h-4 w-4" /> View
                                                 </DropdownMenuItem>
-                                                {record.archived ? (
+                                                {record.isArchived ? (
                                                     <DropdownMenuItem onClick={() => restoreRecordMutation.mutateAsync(record.id)} className="gap-2 cursor-pointer">
                                                         <RotateCcw className="h-4 w-4" /> Restore
                                                     </DropdownMenuItem>

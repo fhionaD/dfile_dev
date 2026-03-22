@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PurchaseOrder } from '@/types/asset';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { AxiosError } from 'axios';
 
 interface CreatePurchaseOrderPayload {
     assetName: string;
@@ -46,8 +47,10 @@ export function useCreateOrder() {
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
             toast.success('Procurement order initiated');
         },
-        onError: () => {
-            toast.error('Failed to create procurement order');
+        onError: (error: Error) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Failed to create procurement order';
+            toast.error(msg);
         },
     });
 }
@@ -64,8 +67,10 @@ export function useUpdateOrder() {
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
             toast.success('Order updated');
         },
-        onError: () => {
-            toast.error('Failed to update order');
+        onError: (error: Error) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Failed to update order';
+            toast.error(msg);
         },
     });
 }

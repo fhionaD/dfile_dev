@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,14 +9,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TablePagination, paginateData } from "@/components/ui/table-pagination";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tag, Plus, Search, Archive, RotateCcw, Pencil, Filter } from "lucide-react";
+import { Tag, Plus, Search, Archive, RotateCcw, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { useCategories, useAddCategory, useArchiveCategory, useRestoreCategory } from "@/hooks/use-categories";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EditCategoryModal } from "@/components/modals/edit-category-modal";
+import { CategoryDetailsModal } from "@/components/modals/category-details-modal";
 import { Category } from "@/types/asset";
 
 const handlingLabels: Record<number, string> = { 0: "Fixed", 1: "Consumable", 2: "Movable" };
+const handlingTextColors: Record<number, string> = {
+    0: "text-blue-700 dark:text-blue-400",
+    1: "text-amber-700 dark:text-amber-400",
+    2: "text-emerald-700 dark:text-emerald-400",
+};
 
 export default function AssetCategoriesPage() {
     const [showArchived, setShowArchived] = useState(false);
@@ -37,8 +42,9 @@ export default function AssetCategoriesPage() {
     const [pageIndex, setPageIndex] = useState(0);
     const [pageSize, setPageSize] = useState(10);
 
-    // Edit modal state
+    // Detail + Edit modal state
     const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     const filtered = useMemo(() => {
@@ -69,7 +75,13 @@ export default function AssetCategoriesPage() {
         }
     };
 
+    const openDetailModal = (category: Category) => {
+        setSelectedCategory(category);
+        setIsDetailModalOpen(true);
+    };
+
     const openEditModal = (category: Category) => {
+        setIsDetailModalOpen(false);
         setSelectedCategory(category);
         setIsEditModalOpen(true);
     };
@@ -143,31 +155,24 @@ export default function AssetCategoriesPage() {
                         </TableHeader>
                         <TableBody>
                             {paginateData(filtered, pageIndex, pageSize).map(c => (
-                                <TableRow key={c.id}>
+                                <TableRow key={c.id} className="cursor-pointer" onClick={() => openDetailModal(c)}>
                                     <TableCell className="font-medium">{c.categoryName}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{c.description}</TableCell>
-                                    <TableCell><Badge variant="muted">{handlingLabels[c.handlingType] ?? "Unknown"}</Badge></TableCell>
+                                    <TableCell>
+                                        <span className={`text-xs font-semibold ${handlingTextColors[c.handlingType] ?? "text-foreground"}`}>
+                                            {handlingLabels[c.handlingType] ?? "Unknown"}
+                                        </span>
+                                    </TableCell>
                                     <TableCell>{c.assetCount}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : "—"}</TableCell>
                                     <TableCell className="text-center">
                                         <div className="flex items-center justify-center gap-1">
-                                            {!c.isArchived && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    title="Edit"
-                                                    onClick={() => openEditModal(c)}
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                            )}
                                             {!c.isArchived ? (
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Archive" onClick={() => setArchiveTarget(c.id)}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Archive" onClick={(e) => { e.stopPropagation(); setArchiveTarget(c.id); }}>
                                                     <Archive className="h-4 w-4" />
                                                 </Button>
                                             ) : (
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreMutation.mutateAsync(c.id)}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={(e) => { e.stopPropagation(); restoreMutation.mutateAsync(c.id); }}>
                                                     <RotateCcw className="h-4 w-4" />
                                                 </Button>
                                             )}
@@ -237,6 +242,13 @@ export default function AssetCategoriesPage() {
                     }
                 }}
                 isLoading={archiveMutation.isPending}
+            />
+
+            <CategoryDetailsModal
+                open={isDetailModalOpen}
+                onOpenChange={setIsDetailModalOpen}
+                category={selectedCategory}
+                onEdit={openEditModal}
             />
 
             <EditCategoryModal

@@ -7,6 +7,13 @@ export interface Asset {
     handlingType?: number;
     status: string;
     room?: string;
+    roomId?: string;
+    roomCode?: string;
+    roomName?: string;
+    allocationState?: string;
+    lifecycleStatus?: number;
+    currentCondition?: number;
+    conditionLabel?: string;
     image?: string;
     manufacturer?: string;
     model?: string;
@@ -28,6 +35,7 @@ export interface Asset {
     assetStatus?: number;
     assetCode?: string;
     isArchived?: boolean;
+    rowVersion?: string;
 }
 
 export interface CreateAssetPayload {
@@ -106,6 +114,7 @@ export interface Room {
     name: string;
     categoryId: string;
     categoryName?: string;
+    subCategoryId?: string;
     subCategoryName?: string;
     floor: string;
     maxOccupancy: number;
@@ -117,6 +126,13 @@ export interface Room {
 export interface MaintenanceRecord {
     id: string;
     assetId: string;
+    assetName?: string;
+    assetCode?: string;
+    tagNumber?: string;
+    categoryName?: string;
+    roomId?: string;
+    roomCode?: string;
+    roomName?: string;
     description: string;
     status: "Pending" | "In Progress" | "Completed" | "Scheduled";
     priority: "Low" | "Medium" | "High";
@@ -128,6 +144,9 @@ export interface MaintenanceRecord {
     attachments?: string;
     dateReported: string;
     archived?: boolean;
+    isArchived?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface PurchaseOrder {
@@ -163,19 +182,36 @@ export interface Employee {
 
 export interface RoomCategory {
     id: string;
+    roomCategoryCode: string;
     name: string;
-    subCategory: string;
     description: string;
-    baseRate: number;
-    maxOccupancy: number;
-    status: "Active" | "Archived";
-    archived?: boolean;
+    isArchived?: boolean;
+    archivedAt?: string;
+    archivedBy?: string;
+    tenantId?: number;
+    roomCount: number;
+    subCategoryCount: number;
     rowVersion?: string;
     createdAt?: string;
     updatedAt?: string;
     createdByName?: string;
     updatedByName?: string;
+}
+
+export interface RoomSubCategory {
+    id: string;
+    subCategoryCode: string;
+    name: string;
+    description: string;
+    roomCategoryId: string;
+    categoryName?: string;
     isArchived?: boolean;
+    tenantId?: number;
+    rowVersion?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    createdByName?: string;
+    updatedByName?: string;
 }
 
 export interface Role {
@@ -258,6 +294,7 @@ export interface RiskIndicators {
 }
 export type NotificationType = "Info" | "Warning" | "Success" | "Error"; export interface Notification { id: number; type: NotificationType; message: string; isRead: boolean; createdAt: string; link?: string; module?: string; }
 export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }
+export interface AllocatedAssetForMaintenance { assetId: string; assetCode?: string; assetName?: string; tagNumber?: string; categoryName?: string; roomId: string; roomCode?: string; roomName?: string; allocatedAt: string; tenantId?: number; }
 
 export interface ModulePermission { moduleId?: string; moduleName: string; accessLevel?: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canApprove?: boolean; canArchive?: boolean; canRestore?: boolean; }
 

@@ -15,13 +15,7 @@ import { Asset, Room } from "@/types/asset";
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function statusLabel(asset: Asset) {
-    if (asset.status) return asset.status;
-    switch (asset.assetStatus) {
-        case 1: return "Available";
-        case 2: return "In Use";
-        case 3: return "Under Maintenance";
-        default: return "Disposed";
-    }
+    return asset.status || "Unknown";
 }
 
 function statusBadgeVariant(label: string): "default" | "secondary" | "outline" | "destructive" {
@@ -110,14 +104,16 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
     const [roomFloorFilter, setRoomFloorFilter] = useState("all");
     const [remarks, setRemarks] = useState("");
 
-    const availableAssets = useMemo(() => assets.filter(a => !a.isArchived && a.assetStatus === 1), [assets]);
-    const allocatedAssets = useMemo(() => assets.filter(a => !a.isArchived && a.assetStatus === 2), [assets]);
+    const availableAssets = useMemo(() => assets.filter(a => !a.isArchived && a.allocationState === 'Unallocated' && a.status !== 'Disposed' && a.status !== 'Archived'), [assets]);
+    const allocatedAssets = useMemo(() => assets.filter(a => !a.isArchived && a.allocationState === 'Allocated'), [assets]);
     const activeRooms = useMemo(() => rooms.filter(r => !r.isArchived), [rooms]);
 
-    // Asset count per room unit (by unitId)
-    const assetCountByUnitId = useMemo(() => {
+    const assetCountByRoom = useMemo(() => {
         const map: Record<string, number> = {};
-        allocatedAssets.forEach(a => { if (a.room) map[a.room] = (map[a.room] ?? 0) + 1; });
+        allocatedAssets.forEach(a => {
+            const rc = a.roomCode;
+            if (rc) map[rc] = (map[rc] ?? 0) + 1;
+        });
         return map;
     }, [allocatedAssets]);
 
@@ -304,7 +300,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                         <p className="text-xs">No room units found</p>
                                     </div>
                                 ) : filteredRooms.map(r => (
-                                    <RoomRow key={r.id} room={r} selected={selectedRoom?.id === r.id} assetCount={assetCountByUnitId[r.unitId] ?? 0} onClick={() => setSelectedRoom(prev => prev?.id === r.id ? null : r)} />
+                                    <RoomRow key={r.id} room={r} selected={selectedRoom?.id === r.id} assetCount={assetCountByRoom[r.unitId] ?? 0} onClick={() => setSelectedRoom(prev => prev?.id === r.id ? null : r)} />
                                 ))}
                             </div>
                         </div>
@@ -337,17 +333,16 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                     </thead>
                                     <tbody>
                                         {allocatedAssets.map(asset => {
-                                            const matchedRoom = rooms.find(r => r.unitId === asset.room);
                                             return (
                                                 <tr key={asset.id} className="border-b last:border-0 hover:bg-muted/20">
                                                     <td className="p-3 font-medium max-w-[200px]"><p className="truncate">{asset.desc}</p></td>
                                                     <td className="p-3 text-xs font-mono text-muted-foreground">{asset.tagNumber || asset.assetCode || "—"}</td>
                                                     <td className="p-3 text-xs text-muted-foreground max-w-[150px]"><span className="truncate block">{asset.categoryName || "—"}</span></td>
                                                     <td className="p-3">
-                                                        {asset.room ? (
+                                                        {asset.roomCode ? (
                                                             <div>
-                                                                <span className="font-mono text-xs text-foreground">{asset.room}</span>
-                                                                {matchedRoom && <span className="text-xs text-muted-foreground ml-1">({matchedRoom.name})</span>}
+                                                                <span className="font-mono text-xs text-foreground">{asset.roomCode}</span>
+                                                                {asset.roomName && <span className="text-xs text-muted-foreground ml-1">({asset.roomName})</span>}
                                                             </div>
                                                         ) : "—"}
                                                     </td>

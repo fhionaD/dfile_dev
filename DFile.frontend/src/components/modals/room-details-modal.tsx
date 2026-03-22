@@ -61,14 +61,17 @@ export function RoomDetailsModal({ open, onOpenChange, room, roomCategories, onE
                      <div className="space-y-1">
                         <div className="flex items-center gap-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                             <Layers size={12} />
-                            Category / Classification
+                            Classification
                         </div>
-                        <div className="p-4 bg-muted/20  border border-border/40">
-                             <span className="text-sm font-medium text-foreground">
-                                {category?.name || "Uncategorized"} 
-                                {category?.subCategory && <span className="mx-2 text-muted-foreground">—</span>}
-                                {category?.subCategory}
-                             </span>
+                        <div className="p-4 bg-muted/20  border border-border/40 space-y-3">
+                             <div>
+                                <span className="text-xs text-muted-foreground block mb-1">Category</span>
+                                <span className="text-sm font-medium text-foreground">{category?.name || "Uncategorized"}</span>
+                             </div>
+                             <div>
+                                <span className="text-xs text-muted-foreground block mb-1">Sub-category</span>
+                                <span className="text-sm font-medium text-foreground">{room.subCategoryName || "—"}</span>
+                             </div>
                         </div>
                     </div>
 

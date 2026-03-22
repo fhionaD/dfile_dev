@@ -9,17 +9,80 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TablePagination, paginateData } from "@/components/ui/table-pagination";
 import { RoomListView } from "@/components/room-list-view";
 import { RoomModal } from "@/components/modals/create-room-modal";
+import { toast } from "sonner";
 import {
-    useRooms, useRoomCategories,
+    useRooms, useRoomCategories, useRoomSubCategories,
     useAddRoom, useUpdateRoom, useArchiveRoom, useRestoreRoom,
     useAddRoomCategory, useUpdateRoomCategory, useArchiveRoomCategory, useRestoreRoomCategory,
+    useAddRoomSubCategory, useUpdateRoomSubCategory,
 } from "@/hooks/use-rooms";
-import { Room, RoomCategory } from "@/types/asset";
+import { Room, RoomCategory, RoomSubCategory } from "@/types/asset";
+
+type CategorySubCategoryRow = {
+    key: string;
+    category: RoomCategory;
+    subCategory: RoomSubCategory | null;
+};
+
+// ─── Category Details Dialog ─────────────────────────────────────
+function CategoryDetailsDialog({ detailRow, detailOpen, setDetailOpen, handleEditFromDetails }: {
+    detailRow: CategorySubCategoryRow | null;
+    detailOpen: boolean;
+    setDetailOpen: (v: boolean) => void;
+    handleEditFromDetails: () => void;
+}) {
+    if (!detailRow) return null;
+
+    return (
+        <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+            <DialogContent className="max-w-md rounded-2xl border-border p-0 overflow-hidden flex flex-col gap-0 shadow-lg">
+                <DialogHeader className="p-6 bg-muted/30 border-b border-border shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-background border border-border/50 text-primary shadow-sm">
+                            <Layers size={24} strokeWidth={1.5} />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-lg font-semibold text-foreground">Room Category Details</DialogTitle>
+                            <DialogDescription className="text-muted-foreground text-xs mt-1">
+                                {detailRow.category.name} {detailRow.subCategory ? `- ${detailRow.subCategory.name}` : ""}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                </DialogHeader>
+                <div className="p-6 space-y-3 flex-1 overflow-y-auto bg-background">
+                    {[
+                        { label: "Category Name", value: detailRow.category.name },
+                        { label: "Sub-Category", value: detailRow.subCategory?.name || "—" },
+                        { label: "Description", value: detailRow.category.description || "—" },
+                        { label: "Created By", value: detailRow.subCategory?.createdByName || detailRow.category.createdByName || "—" },
+                        { label: "Created At", value: detailRow.subCategory?.createdAt ? new Date(detailRow.subCategory.createdAt).toLocaleDateString() : detailRow.category.createdAt ? new Date(detailRow.category.createdAt).toLocaleDateString() : "—" },
+                        { label: "Updated By", value: detailRow.subCategory?.updatedByName || detailRow.category.updatedByName || detailRow.category.createdByName || "—" },
+                        { label: "Updated At", value: new Date(detailRow.subCategory?.updatedAt || detailRow.category.updatedAt || detailRow.category.createdAt || "").toLocaleDateString() },
+                    ].map((f) => (
+                        <div key={f.label} className="flex justify-between items-baseline py-2 border-b border-border/30 last:border-0">
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{f.label}</span>
+                            <span className="text-sm font-medium text-foreground text-right max-w-[60%]">
+                                {f.value}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                <DialogFooter className="p-6 bg-muted/30 border-t border-border shrink-0 flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+                    {!detailRow.category.isArchived && (
+                        <Button onClick={handleEditFromDetails}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 // ─── Character Counter Input ─────────────────────────────────────
 function CountedInput({ value, onChange, maxLength = 50, ...props }: { value: string; onChange: (v: string) => void; maxLength?: number } & Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange'>) {
@@ -41,10 +104,13 @@ export default function LocationsPage() {
     const catArchivedCount = catShowArchived ? categories.length : catCountOpposite.length;
     const catActiveCount = catShowArchived ? catCountOpposite.length : categories.length;
     const { data: allCategories = [] } = useRoomCategories(false);
+    const { data: allSubCategories = [] } = useRoomSubCategories(undefined, false);
     const addCategory = useAddRoomCategory();
     const updateCategory = useUpdateRoomCategory();
     const archiveCategory = useArchiveRoomCategory();
     const restoreCategory = useRestoreRoomCategory();
+    const addSubCategory = useAddRoomSubCategory();
+    const updateSubCategory = useUpdateRoomSubCategory();
     const [catSearch, setCatSearch] = useState("");
     const [archiveCatTarget, setArchiveCatTarget] = useState<string | null>(null);
     const [catPageIndex, setCatPageIndex] = useState(0);
@@ -52,23 +118,16 @@ export default function LocationsPage() {
 
     // ── "Define Category" create modal state ──
     const [isCatCreateOpen, setIsCatCreateOpen] = useState(false);
-    const [catCreateForm, setCatCreateForm] = useState({ name: "", subCategory: "", description: "", baseRate: 0, maxOccupancy: 0 });
-    const [isCreatingNewCatName, setIsCreatingNewCatName] = useState(false);
-
-    // ── Unique category names for reuse ──
-    const uniqueCategoryNames = useMemo(
-        () => Array.from(new Set(allCategories.map(c => c.name))).sort(),
-        [allCategories],
-    );
+    const [catCreateForm, setCatCreateForm] = useState({ name: "", subCategoryName: "", description: "" });
 
     // ── Category edit modal state ──
     const [isCatEditOpen, setIsCatEditOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<RoomCategory | null>(null);
-    const [catEditForm, setCatEditForm] = useState({ name: "", subCategory: "", description: "", baseRate: 0, maxOccupancy: 0 });
-    const [isEditCreatingNewCatName, setIsEditCreatingNewCatName] = useState(false);
+    const [editingSubCategory, setEditingSubCategory] = useState<RoomSubCategory | null>(null);
+    const [catEditForm, setCatEditForm] = useState({ name: "", subCategoryName: "", description: "" });
 
     // ── Category details modal state ──
-    const [detailCategory, setDetailCategory] = useState<RoomCategory | null>(null);
+    const [detailRow, setDetailRow] = useState<CategorySubCategoryRow | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
 
     // ── Room Units state ──
@@ -85,50 +144,155 @@ export default function LocationsPage() {
     const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
     // ── Filtered categories ──
-    const filteredCategories = useMemo(() => {
-        if (!catSearch) return categories;
-        const q = catSearch.toLowerCase();
-        return categories.filter(c =>
-            c.name.toLowerCase().includes(q) || c.subCategory.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
+    const filteredCategories = useMemo(() => categories, [categories]);
+
+    const categorySubCategoryRows = useMemo(() => {
+        const q = catSearch.trim().toLowerCase();
+        const rows = filteredCategories.flatMap((cat): CategorySubCategoryRow[] => {
+            const subs = allSubCategories.filter(sc => sc.roomCategoryId === cat.id);
+            if (subs.length === 0) {
+                return [{
+                    key: `${cat.id}__none__`,
+                    category: cat,
+                    subCategory: null,
+                }];
+            }
+
+            return subs.map(sc => ({
+                key: `${cat.id}_${sc.id}`,
+                category: cat,
+                subCategory: sc,
+            }));
+        });
+
+        if (!q) return rows;
+
+        return rows.filter(r =>
+            r.category.name.toLowerCase().includes(q) ||
+            (r.category.description || "").toLowerCase().includes(q) ||
+            (r.subCategory?.name || "").toLowerCase().includes(q)
         );
-    }, [categories, catSearch]);
+    }, [filteredCategories, allSubCategories, catSearch]);
 
     // ── Category create handlers ──
     const openCatCreate = () => {
-        setCatCreateForm({ name: "", subCategory: "", description: "", baseRate: 0, maxOccupancy: 0 });
-        setIsCreatingNewCatName(uniqueCategoryNames.length === 0);
+        setCatCreateForm({ name: "", subCategoryName: "", description: "" });
         setIsCatCreateOpen(true);
     };
     const handleCatCreate = () => {
-        if (!catCreateForm.name.trim() || !catCreateForm.subCategory.trim()) return;
-        addCategory.mutate(catCreateForm, {
-            onSuccess: () => setIsCatCreateOpen(false),
-        });
+        const categoryName = catCreateForm.name.trim();
+        const subCatName = catCreateForm.subCategoryName.trim();
+        if (!categoryName || !subCatName) return;
+
+        const existingCategory = allCategories.find(c => c.name.trim().toLowerCase() === categoryName.toLowerCase());
+
+        if (existingCategory) {
+            const duplicateSub = allSubCategories.some(sc =>
+                sc.roomCategoryId === existingCategory.id &&
+                (sc.name || "").trim().toLowerCase() === subCatName.toLowerCase()
+            );
+            if (duplicateSub) {
+                toast.error("This category and sub-category pair already exists.");
+                return;
+            }
+
+            addSubCategory.mutate(
+                { name: subCatName, description: "", roomCategoryId: existingCategory.id },
+                { onSuccess: () => setIsCatCreateOpen(false) }
+            );
+            return;
+        }
+
+        addCategory.mutate(
+            { name: categoryName, description: catCreateForm.description.trim() },
+            {
+                onSuccess: (newCategory) => {
+                    addSubCategory.mutate(
+                        { name: subCatName, description: "", roomCategoryId: newCategory.id },
+                        { onSuccess: () => setIsCatCreateOpen(false) }
+                    );
+                },
+            }
+        );
     };
 
     // ── Category edit handlers ──
-    const openCatEdit = (cat: RoomCategory) => {
-        setEditingCategory(cat);
-        setCatEditForm({ name: cat.name, subCategory: cat.subCategory, description: cat.description, baseRate: cat.baseRate || 0, maxOccupancy: cat.maxOccupancy || 0 });
-        setIsEditCreatingNewCatName(!uniqueCategoryNames.includes(cat.name));
+    const openCatEdit = (row: CategorySubCategoryRow) => {
+        setEditingCategory(row.category);
+        setEditingSubCategory(row.subCategory);
+        setCatEditForm({
+            name: row.category.name,
+            subCategoryName: row.subCategory?.name || "",
+            description: row.category.description,
+        });
         setIsCatEditOpen(true);
     };
     const handleCatUpdate = () => {
-        if (!editingCategory || !catEditForm.name.trim() || !catEditForm.subCategory.trim()) return;
-        updateCategory.mutate({ id: editingCategory.id, payload: { ...catEditForm, rowVersion: editingCategory.rowVersion } }, {
-            onSuccess: () => setIsCatEditOpen(false),
-        });
+        if (!editingCategory || !catEditForm.name.trim()) return;
+        if (editingSubCategory && !catEditForm.subCategoryName.trim()) return;
+
+        const nextCategoryName = catEditForm.name.trim();
+        const nextDescription = catEditForm.description.trim();
+        const nextSubCategoryName = catEditForm.subCategoryName.trim();
+
+        const hasCategoryChanges =
+            editingCategory.name !== nextCategoryName ||
+            (editingCategory.description || "") !== nextDescription;
+        const hasSubCategoryChanges = !!editingSubCategory &&
+            editingSubCategory.name !== nextSubCategoryName;
+
+        const finish = () => {
+            setIsCatEditOpen(false);
+            setEditingCategory(null);
+            setEditingSubCategory(null);
+        };
+
+        const updateSubCategoryStep = () => {
+            if (!editingSubCategory || !hasSubCategoryChanges) {
+                finish();
+                return;
+            }
+
+            updateSubCategory.mutate(
+                {
+                    id: editingSubCategory.id,
+                    payload: {
+                        name: nextSubCategoryName,
+                        description: editingSubCategory.description || "",
+                        rowVersion: editingSubCategory.rowVersion,
+                    },
+                },
+                { onSuccess: finish }
+            );
+        };
+
+        if (hasCategoryChanges) {
+            updateCategory.mutate(
+                {
+                    id: editingCategory.id,
+                    payload: {
+                        name: nextCategoryName,
+                        description: nextDescription,
+                        rowVersion: editingCategory.rowVersion,
+                    },
+                },
+                { onSuccess: updateSubCategoryStep }
+            );
+            return;
+        }
+
+        updateSubCategoryStep();
     };
 
     // ── Category detail handlers ──
-    const handleCatRowClick = (cat: RoomCategory) => {
-        setDetailCategory(cat);
+    const handleCatRowClick = (row: CategorySubCategoryRow) => {
+        setDetailRow(row);
         setDetailOpen(true);
     };
     const handleEditFromDetails = () => {
-        if (detailCategory) {
+        if (detailRow) {
             setDetailOpen(false);
-            openCatEdit(detailCategory);
+            openCatEdit(detailRow);
         }
     };
 
@@ -166,7 +330,7 @@ export default function LocationsPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                             <h2 className="text-lg font-semibold">{catShowArchived ? "Archived Room Categories" : "Room Categories"}</h2>
-                            <span className="text-sm text-muted-foreground">({filteredCategories.length})</span>
+                            <span className="text-sm text-muted-foreground">({categorySubCategoryRows.length})</span>
                         </div>
                         <div className="flex gap-2">
                             <div className="relative flex-1 sm:w-64">
@@ -188,7 +352,7 @@ export default function LocationsPage() {
 
                     {catsLoading ? (
                         <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filteredCategories.length === 0 ? (
+                    ) : categorySubCategoryRows.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground rounded-md border min-h-[520px] flex flex-col items-center justify-center">
                             <Layers className="h-12 w-12 mx-auto mb-4 opacity-20" />
                             <p>{catShowArchived ? "No archived room categories" : "No room categories found"}</p>
@@ -200,28 +364,28 @@ export default function LocationsPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Category</TableHead>
-                                        <TableHead>Sub Category</TableHead>
+                                        <TableHead>Sub-categories</TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead>Updated</TableHead>
                                         <TableHead className="w-[80px] text-center">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {paginateData(filteredCategories, catPageIndex, catPageSize).map(cat => (
-                                        <TableRow key={cat.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleCatRowClick(cat)}>
+                                    {paginateData(categorySubCategoryRows, catPageIndex, catPageSize).map((row) => (
+                                        <TableRow key={row.key} className="cursor-pointer hover:bg-muted/50" onClick={() => handleCatRowClick(row)}>
                                             <TableCell className="font-medium">
-                                                <button type="button" className="text-primary hover:underline text-left" onClick={(e) => { e.stopPropagation(); handleCatRowClick(cat); }}>{cat.name}</button>
+                                                <button type="button" className="text-primary hover:underline text-left" onClick={(e) => { e.stopPropagation(); handleCatRowClick(row); }}>{row.category.name}</button>
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground">{cat.subCategory}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{cat.description || "—"}</TableCell>
-                                            <TableCell className="text-muted-foreground text-xs">{new Date(cat.updatedAt || cat.createdAt || "").toLocaleDateString()}</TableCell>
+                                            <TableCell className="text-muted-foreground">{row.subCategory?.name || "—"}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.category.description || "—"}</TableCell>
+                                            <TableCell className="text-muted-foreground text-xs">{new Date(row.category.updatedAt || row.category.createdAt || "").toLocaleDateString()}</TableCell>
                                             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                                 {catShowArchived ? (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreCategory.mutate(cat.id)}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreCategory.mutate(row.category.id)}>
                                                         <RotateCcw className="h-4 w-4" />
                                                     </Button>
                                                 ) : (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Archive" onClick={() => setArchiveCatTarget(cat.id)}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Archive" onClick={() => setArchiveCatTarget(row.category.id)}>
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
                                                 )}
@@ -231,7 +395,7 @@ export default function LocationsPage() {
                                 </TableBody>
                             </Table>
                             <TablePagination
-                                totalItems={filteredCategories.length}
+                                totalItems={categorySubCategoryRows.length}
                                 pageSize={catPageSize}
                                 pageIndex={catPageIndex}
                                 onPageChange={setCatPageIndex}
@@ -245,7 +409,7 @@ export default function LocationsPage() {
                 <TabsContent value="units" className="space-y-4 mt-4">
                     <RoomListView
                         rooms={rooms}
-                        roomCategories={allCategories.map(c => ({ id: c.id, name: c.subCategory ? `${c.name} — ${c.subCategory}` : c.name }))}
+                        roomCategories={allCategories.map(c => ({ id: c.id, name: c.name }))}
                         showArchived={showArchived}
                         archivedCount={archivedCount}
                         activeCount={activeCount}
@@ -278,41 +442,13 @@ export default function LocationsPage() {
                                 <Label className="flex items-center gap-1.5">
                                     <Layers className="h-3.5 w-3.5" /> Category Name <span className="text-destructive">*</span>
                                 </Label>
-                                {isCreatingNewCatName ? (
-                                    <div className="space-y-1.5">
-                                        <CountedInput value={catCreateForm.name} onChange={(v) => setCatCreateForm(f => ({ ...f, name: v }))} placeholder="e.g. Standard Room" />
-                                        {uniqueCategoryNames.length > 0 && (
-                                            <button type="button" className="text-xs text-primary hover:underline" onClick={() => setIsCreatingNewCatName(false)}>
-                                                Select existing category
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <Select value={catCreateForm.name} onValueChange={(val) => {
-                                        if (val === "__new__") {
-                                            setIsCreatingNewCatName(true);
-                                            setCatCreateForm(f => ({ ...f, name: "" }));
-                                        } else {
-                                            setCatCreateForm(f => ({ ...f, name: val }));
-                                        }
-                                    }}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select category name" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {uniqueCategoryNames.map(n => (
-                                                <SelectItem key={n} value={n}>{n}</SelectItem>
-                                            ))}
-                                            <SelectItem value="__new__">+ Create New Category Name</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
+                                <CountedInput value={catCreateForm.name} onChange={(v) => setCatCreateForm(f => ({ ...f, name: v }))} placeholder="e.g. Deluxe Room" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-1.5">
-                                    <Layers className="h-3.5 w-3.5" /> Sub Category <span className="text-destructive">*</span>
+                                    <Layers className="h-3.5 w-3.5" /> Sub-Category <span className="text-destructive">*</span>
                                 </Label>
-                                <CountedInput value={catCreateForm.subCategory} onChange={(v) => setCatCreateForm(f => ({ ...f, subCategory: v }))} placeholder="e.g. Single Room" />
+                                <CountedInput value={catCreateForm.subCategoryName} onChange={(v) => setCatCreateForm(f => ({ ...f, subCategoryName: v }))} placeholder="e.g. Deluxe King" maxLength={100} />
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -322,7 +458,7 @@ export default function LocationsPage() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsCatCreateOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCatCreate} disabled={!catCreateForm.name.trim() || !catCreateForm.subCategory.trim() || addCategory.isPending}>
+                        <Button onClick={handleCatCreate} disabled={!catCreateForm.name.trim() || !catCreateForm.subCategoryName.trim() || addCategory.isPending || addSubCategory.isPending}>
                             Define Category
                         </Button>
                     </DialogFooter>
@@ -340,39 +476,19 @@ export default function LocationsPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Category Name <span className="text-destructive">*</span></Label>
-                                {isEditCreatingNewCatName ? (
-                                    <div className="space-y-1.5">
-                                        <CountedInput value={catEditForm.name} onChange={(v) => setCatEditForm(f => ({ ...f, name: v }))} placeholder="e.g. Standard Room" />
-                                        {uniqueCategoryNames.length > 0 && (
-                                            <button type="button" className="text-xs text-primary hover:underline" onClick={() => setIsEditCreatingNewCatName(false)}>
-                                                Select existing category
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <Select value={catEditForm.name} onValueChange={(val) => {
-                                        if (val === "__new__") {
-                                            setIsEditCreatingNewCatName(true);
-                                            setCatEditForm(f => ({ ...f, name: "" }));
-                                        } else {
-                                            setCatEditForm(f => ({ ...f, name: val }));
-                                        }
-                                    }}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select category name" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {uniqueCategoryNames.map(n => (
-                                                <SelectItem key={n} value={n}>{n}</SelectItem>
-                                            ))}
-                                            <SelectItem value="__new__">+ Create New Category Name</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
+                                <CountedInput value={catEditForm.name} onChange={(v) => setCatEditForm(f => ({ ...f, name: v }))} placeholder="e.g. Deluxe Room" />
                             </div>
                             <div className="space-y-2">
-                                <Label>Sub Category <span className="text-destructive">*</span></Label>
-                                <CountedInput value={catEditForm.subCategory} onChange={(v) => setCatEditForm(f => ({ ...f, subCategory: v }))} placeholder="e.g. Single Room" />
+                                <Label className="flex items-center gap-1.5">
+                                    <Layers className="h-3.5 w-3.5" /> Sub-Category {editingSubCategory && <span className="text-destructive">*</span>}
+                                </Label>
+                                <CountedInput value={catEditForm.subCategoryName} onChange={(v) => setCatEditForm(f => ({ ...f, subCategoryName: v }))} placeholder="e.g. Double Bed / Ocean View" maxLength={100} />
+                                {editingCategory && (() => {
+                                    const existingSubs = allSubCategories.filter(sc => sc.roomCategoryId === editingCategory.id);
+                                    return existingSubs.length > 0 ? (
+                                        <p className="text-xs text-muted-foreground">Existing: {existingSubs.map(sc => sc.name).join(", ")}</p>
+                                    ) : null;
+                                })()}
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -381,8 +497,8 @@ export default function LocationsPage() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCatEditOpen(false)}>Cancel</Button>
-                        <Button onClick={handleCatUpdate} disabled={!catEditForm.name.trim() || !catEditForm.subCategory.trim() || updateCategory.isPending}>
+                        <Button variant="outline" onClick={() => { setIsCatEditOpen(false); setEditingSubCategory(null); setEditingCategory(null); }}>Cancel</Button>
+                        <Button onClick={handleCatUpdate} disabled={!catEditForm.name.trim() || (editingSubCategory && !catEditForm.subCategoryName.trim()) || updateCategory.isPending || updateSubCategory.isPending}>
                             Update
                         </Button>
                     </DialogFooter>
@@ -390,66 +506,26 @@ export default function LocationsPage() {
             </Dialog>
 
             {/* ════════════  CATEGORY DETAILS DIALOG  ════════════ */}
-            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                <DialogContent className="max-w-md rounded-2xl border-border p-0 overflow-hidden flex flex-col gap-0 shadow-lg">
-                    {detailCategory && (
-                        <>
-                            <DialogHeader className="p-6 bg-muted/30 border-b border-border shrink-0">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-background border border-border/50 text-primary shadow-sm">
-                                        <Layers size={24} strokeWidth={1.5} />
-                                    </div>
-                                    <div>
-                                        <DialogTitle className="text-lg font-semibold text-foreground">Room Category Details</DialogTitle>
-                                        <DialogDescription className="text-muted-foreground text-xs mt-1">
-                                            {detailCategory.name}{detailCategory.subCategory ? ` — ${detailCategory.subCategory}` : ""}
-                                        </DialogDescription>
-                                    </div>
-                                </div>
-                            </DialogHeader>
-                            <div className="p-6 space-y-3 flex-1 overflow-y-auto bg-background">
-                                {[
-                                    { label: "Category Name", value: detailCategory.name },
-                                    { label: "Sub Category", value: detailCategory.subCategory },
-                                    { label: "Description", value: detailCategory.description || "—" },
-                                    { label: "Created By", value: detailCategory.createdByName || "—" },
-                                    { label: "Created At", value: detailCategory.createdAt ? new Date(detailCategory.createdAt).toLocaleDateString() : "—" },
-                                    { label: "Updated By", value: detailCategory.updatedByName || detailCategory.createdByName || "—" },
-                                    { label: "Updated At", value: new Date(detailCategory.updatedAt || detailCategory.createdAt || "").toLocaleDateString() },
-                                ].map((f) => (
-                                    <div key={f.label} className="flex justify-between items-baseline py-2 border-b border-border/30 last:border-0">
-                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{f.label}</span>
-                                        <span className="text-sm font-medium text-foreground text-right max-w-[60%]">
-                                            {f.value}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            <DialogFooter className="p-6 bg-muted/30 border-t border-border shrink-0 flex justify-end gap-3">
-                                <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
-                                {!detailCategory.archived && (
-                                    <Button onClick={handleEditFromDetails}>
-                                        <Edit className="mr-2 h-4 w-4" /> Edit
-                                    </Button>
-                                )}
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <CategoryDetailsDialog
+                detailRow={detailRow}
+                detailOpen={detailOpen}
+                setDetailOpen={setDetailOpen}
+                handleEditFromDetails={handleEditFromDetails}
+            />
 
             {/* ════════════  ROOM UNIT CREATE/EDIT MODAL  ════════════ */}
             <RoomModal
                 open={createRoomOpen}
                 onOpenChange={(open) => { setCreateRoomOpen(open); if (!open) setEditingRoom(null); }}
                 roomCategories={allCategories}
+                subCategories={allSubCategories}
                 initialData={editingRoom}
                 defaultEditing={!!editingRoom}
                 onSave={(room) => {
                     if (editingRoom) {
-                        updateRoom.mutate({ id: editingRoom.id, payload: { unitId: room.unitId, name: room.name, floor: room.floor ?? "", categoryId: room.categoryId, status: room.status, maxOccupancy: room.maxOccupancy } });
+                        updateRoom.mutate({ id: editingRoom.id, payload: { unitId: room.unitId, name: room.name, floor: room.floor ?? "", categoryId: room.categoryId, subCategoryId: room.subCategoryId, status: room.status, maxOccupancy: room.maxOccupancy } });
                     } else {
-                        addRoom.mutate({ unitId: room.unitId, name: room.name, floor: room.floor ?? "", categoryId: room.categoryId, status: room.status, maxOccupancy: room.maxOccupancy });
+                        addRoom.mutate({ unitId: room.unitId, name: room.name, floor: room.floor ?? "", categoryId: room.categoryId, subCategoryId: room.subCategoryId, status: room.status, maxOccupancy: room.maxOccupancy });
                     }
                 }}
             />

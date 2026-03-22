@@ -37,6 +37,7 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
             var query = _context.Rooms
                 .Include(r => r.RoomCategory)
+                .Include(r => r.RoomSubCategory)
                 .Include(r => r.CreatedByUser)
                 .Include(r => r.UpdatedByUser)
                 .Where(r => r.IsArchived == showArchived);
@@ -70,7 +71,8 @@ namespace DFile.backend.Controllers
                 Floor = r.Floor,
                 CategoryId = r.CategoryId,
                 CategoryName = r.RoomCategory?.Name,
-                SubCategoryName = r.RoomCategory?.SubCategory,
+                SubCategoryId = r.SubCategoryId,
+                SubCategoryName = r.RoomSubCategory?.Name,
                 IsArchived = r.IsArchived,
                 TenantId = r.TenantId,
                 CreatedByName = r.CreatedByUser != null ? r.CreatedByUser.FirstName + " " + r.CreatedByUser.LastName : null,
@@ -90,6 +92,7 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
             var room = await _context.Rooms
                 .Include(r => r.RoomCategory)
+                .Include(r => r.RoomSubCategory)
                 .Include(r => r.CreatedByUser)
                 .Include(r => r.UpdatedByUser)
                 .FirstOrDefaultAsync(r => r.Id == id);
@@ -105,7 +108,8 @@ namespace DFile.backend.Controllers
                 Floor = room.Floor,
                 CategoryId = room.CategoryId,
                 CategoryName = room.RoomCategory?.Name,
-                SubCategoryName = room.RoomCategory?.SubCategory,
+                SubCategoryId = room.SubCategoryId,
+                SubCategoryName = room.RoomSubCategory?.Name,
                 IsArchived = room.IsArchived,
                 TenantId = room.TenantId,
                 CreatedByName = room.CreatedByUser != null ? room.CreatedByUser.FirstName + " " + room.CreatedByUser.LastName : null,
@@ -154,6 +158,7 @@ namespace DFile.backend.Controllers
                 Name = trimmedName,
                 Floor = trimmedFloor,
                 CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId,
+                SubCategoryId = string.IsNullOrEmpty(dto.SubCategoryId) ? null : dto.SubCategoryId,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
                 CreatedAt = DateTime.UtcNow,
@@ -194,7 +199,8 @@ namespace DFile.backend.Controllers
                 Floor = room.Floor,
                 CategoryId = room.CategoryId,
                 CategoryName = category?.Name,
-                SubCategoryName = category?.SubCategory,
+                SubCategoryId = room.SubCategoryId,
+                SubCategoryName = null,
                 IsArchived = room.IsArchived,
                 TenantId = room.TenantId,
                 CreatedAt = room.CreatedAt,
@@ -231,6 +237,7 @@ namespace DFile.backend.Controllers
             existing.Name = dto.Name;
             existing.Floor = dto.Floor;
             existing.CategoryId = string.IsNullOrEmpty(dto.CategoryId) ? null : dto.CategoryId;
+            existing.SubCategoryId = string.IsNullOrEmpty(dto.SubCategoryId) ? null : dto.SubCategoryId;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
 

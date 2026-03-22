@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Room, RoomCategory } from '@/types/asset';
+import { Room, RoomCategory, RoomSubCategory } from '@/types/asset';
 import { toast } from 'sonner';
+import axios from 'axios';
+
+// ── Room hooks ───────────────────────────────────────────────
 
 export function useRooms(showArchived: boolean = false) {
     return useQuery({
@@ -15,24 +18,11 @@ export function useRooms(showArchived: boolean = false) {
     });
 }
 
-export function useRoomCategories(archivedOnly?: boolean) {
-    return useQuery({
-        queryKey: ['room-categories', archivedOnly],
-        queryFn: async () => {
-            const endpoint = archivedOnly !== undefined 
-                ? `/api/roomcategories?archivedOnly=${archivedOnly}` 
-                : '/api/roomcategories?includeArchived=true';
-            const { data } = await api.get<RoomCategory[]>(endpoint);
-            return data;
-        },
-    });
-}
-
 export function useAddRoom() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (room: { unitId: string; name: string; floor: string; categoryId?: string; status?: string; maxOccupancy?: number }) => {
+        mutationFn: async (room: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number }) => {
             const { data } = await api.post<Room>('/api/rooms', room);
             return data;
         },
@@ -40,8 +30,12 @@ export function useAddRoom() {
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Room added successfully');
         },
-        onError: () => {
-            toast.error('Failed to add room');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'This room already exists.');
+            } else {
+                toast.error('Failed to add room');
+            }
         },
     });
 }
@@ -50,7 +44,7 @@ export function useUpdateRoom() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: { unitId: string; name: string; floor: string; categoryId?: string; status?: string; maxOccupancy?: number; archived?: boolean } }) => {
+        mutationFn: async ({ id, payload }: { id: string; payload: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number; archived?: boolean } }) => {
             const { data } = await api.put<Room>(`/api/rooms/${id}`, payload);
             return data;
         },
@@ -69,14 +63,18 @@ export function useArchiveRoom() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/rooms/archive/${id}`);
+            await api.patch(`/api/rooms/${id}/archive`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Room archived');
         },
-        onError: () => {
-            toast.error('Failed to archive room');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to archive room.');
+            } else {
+                toast.error('Failed to archive room');
+            }
         },
     });
 }
@@ -86,14 +84,32 @@ export function useRestoreRoom() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/rooms/restore/${id}`);
+            await api.patch(`/api/rooms/${id}/restore`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Room restored');
         },
-        onError: () => {
-            toast.error('Failed to restore room');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to restore room.');
+            } else {
+                toast.error('Failed to restore room');
+            }
+        },
+    });
+}
+
+// ── Room Category hooks ──────────────────────────────────────
+
+export function useRoomCategories(showArchived: boolean = false) {
+    return useQuery({
+        queryKey: ['room-categories', showArchived],
+        queryFn: async () => {
+            const { data } = await api.get<RoomCategory[]>('/api/roomcategories', {
+                params: { showArchived }
+            });
+            return data;
         },
     });
 }
@@ -102,7 +118,7 @@ export function useAddRoomCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (payload: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy: number }) => {
+        mutationFn: async (payload: { name: string; description: string }) => {
             const { data } = await api.post<RoomCategory>('/api/roomcategories', payload);
             return data;
         },
@@ -110,8 +126,12 @@ export function useAddRoomCategory() {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
             toast.success('Room category added');
         },
-        onError: () => {
-            toast.error('Failed to add room category');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'This category already exists.');
+            } else {
+                toast.error('Failed to add room category');
+            }
         },
     });
 }
@@ -120,7 +140,7 @@ export function useUpdateRoomCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy: number; archived?: boolean; status?: string; rowVersion?: string } }) => {
+        mutationFn: async ({ id, payload }: { id: string; payload: { name: string; description: string; rowVersion?: string } }) => {
             const { data } = await api.put<RoomCategory>(`/api/roomcategories/${id}`, payload);
             return data;
         },
@@ -128,8 +148,12 @@ export function useUpdateRoomCategory() {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
             toast.success('Room category updated');
         },
-        onError: () => {
-            toast.error('Failed to update room category');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'This category already exists.');
+            } else {
+                toast.error('Failed to update room category');
+            }
         },
     });
 }
@@ -139,14 +163,18 @@ export function useArchiveRoomCategory() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/roomcategories/archive/${id}`);
+            await api.patch(`/api/roomcategories/${id}/archive`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
             toast.success('Room category archived');
         },
-        onError: () => {
-            toast.error('Failed to archive room category');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to archive room category.');
+            } else {
+                toast.error('Failed to archive room category');
+            }
         },
     });
 }
@@ -156,14 +184,121 @@ export function useRestoreRoomCategory() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/roomcategories/restore/${id}`);
+            await api.patch(`/api/roomcategories/${id}/restore`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
             toast.success('Room category restored');
         },
-        onError: () => {
-            toast.error('Failed to restore room category');
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to restore room category.');
+            } else {
+                toast.error('Failed to restore room category');
+            }
+        },
+    });
+}
+
+// ── Room SubCategory hooks ───────────────────────────────────
+
+export function useRoomSubCategories(roomCategoryId?: string, showArchived: boolean = false) {
+    return useQuery({
+        queryKey: ['room-subcategories', roomCategoryId, showArchived],
+        queryFn: async () => {
+            const params: Record<string, string | boolean> = { showArchived };
+            if (roomCategoryId) params.roomCategoryId = roomCategoryId;
+            const { data } = await api.get<RoomSubCategory[]>('/api/roomsubcategories', { params });
+            return data;
+        },
+    });
+}
+
+export function useAddRoomSubCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: { name: string; description: string; roomCategoryId: string }) => {
+            const { data } = await api.post<RoomSubCategory>('/api/roomsubcategories', payload);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            toast.success('Sub-category added');
+        },
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'This sub-category already exists.');
+            } else {
+                toast.error('Failed to add sub-category');
+            }
+        },
+    });
+}
+
+export function useUpdateRoomSubCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, payload }: { id: string; payload: { name: string; description: string; rowVersion?: string } }) => {
+            const { data } = await api.put<RoomSubCategory>(`/api/roomsubcategories/${id}`, payload);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            toast.success('Sub-category updated');
+        },
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'This sub-category already exists.');
+            } else {
+                toast.error('Failed to update sub-category');
+            }
+        },
+    });
+}
+
+export function useArchiveRoomSubCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.patch(`/api/roomsubcategories/${id}/archive`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            toast.success('Sub-category archived');
+        },
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to archive sub-category.');
+            } else {
+                toast.error('Failed to archive sub-category');
+            }
+        },
+    });
+}
+
+export function useRestoreRoomSubCategory() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.patch(`/api/roomsubcategories/${id}/restore`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            toast.success('Sub-category restored');
+        },
+        onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 409) {
+                toast.error(error.response.data?.message || 'Failed to restore sub-category.');
+            } else {
+                toast.error('Failed to restore sub-category');
+            }
         },
     });
 }

@@ -5,6 +5,7 @@ using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.Text.Json;
 
 namespace DFile.backend.Controllers
@@ -46,6 +47,12 @@ namespace DFile.backend.Controllers
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private static string? NormalizeSerial(string? value)
+        {
+            var normalized = value?.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         [HttpGet]
@@ -194,6 +201,19 @@ namespace DFile.backend.Controllers
             if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
                 return BadRequest(new { message = "Purchase date cannot be in the future." });
 
+            var normalizedSerial = NormalizeSerial(dto.SerialNumber);
+            if (!string.IsNullOrEmpty(normalizedSerial))
+            {
+                var serialExists = await _context.Assets.AnyAsync(a =>
+                    a.SerialNumber != null &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
+                if (serialExists)
+                {
+                    return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
+                }
+            }
+
             var generatedTag = await RecordCodeGenerator.GenerateTagNumberAsync(_context);
 
             var asset = new Asset
@@ -210,6 +230,7 @@ namespace DFile.backend.Controllers
                 Image = dto.Image,
                 Manufacturer = dto.Manufacturer,
                 Model = dto.Model,
+                SerialNumber = normalizedSerial,
                 PurchaseDate = dto.PurchaseDate,
                 Vendor = dto.Vendor,
                 AcquisitionCost = dto.AcquisitionCost,
@@ -246,7 +267,14 @@ namespace DFile.backend.Controllers
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
+            }
 
             return CreatedAtAction("GetAsset", new { id = asset.Id }, MapToDto(asset, category, new Dictionary<int, string>(), null));
         }
@@ -268,6 +296,20 @@ namespace DFile.backend.Controllers
 
             if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
                 return BadRequest(new { message = "Purchase date cannot be in the future." });
+
+            var normalizedSerial = NormalizeSerial(dto.SerialNumber);
+            if (!string.IsNullOrEmpty(normalizedSerial))
+            {
+                var serialExists = await _context.Assets.AnyAsync(a =>
+                    a.Id != id &&
+                    a.SerialNumber != null &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    ((existing.TenantId == null && a.TenantId == null) || a.TenantId == existing.TenantId));
+                if (serialExists)
+                {
+                    return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
+                }
+            }
 
             // Lifecycle transition validation
             if (existing.LifecycleStatus == LifecycleStatus.Disposed && dto.LifecycleStatus != LifecycleStatus.Disposed)
@@ -291,6 +333,7 @@ namespace DFile.backend.Controllers
             existing.Image = dto.Image;
             existing.Manufacturer = dto.Manufacturer;
             existing.Model = dto.Model;
+            existing.SerialNumber = normalizedSerial;
             existing.PurchaseDate = dto.PurchaseDate;
             existing.Vendor = dto.Vendor;
             existing.WarrantyExpiry = dto.WarrantyExpiry;
@@ -334,6 +377,10 @@ namespace DFile.backend.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
             }
 
             return NoContent();
@@ -488,6 +535,7 @@ namespace DFile.backend.Controllers
             Image = a.Image,
             Manufacturer = a.Manufacturer,
             Model = a.Model,
+            SerialNumber = a.SerialNumber,
 
             PurchaseDate = a.PurchaseDate,
             Vendor = a.Vendor,

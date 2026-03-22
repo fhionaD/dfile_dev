@@ -39,8 +39,11 @@ export function useAddCategory() {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
             toast.success('Category added');
         },
-        onError: () => {
-            toast.error('Failed to add category');
+        onError: (error: any) => {
+            const status = error?.response?.status;
+            const backendMessage = String(error?.response?.data?.message ?? "").toLowerCase();
+            const isDuplicate = status === 409 || backendMessage.includes("exist") || backendMessage.includes("duplicate");
+            toast.error(isDuplicate ? 'Category Name already existed. Check again' : 'Failed to add category');
         }
     });
 }

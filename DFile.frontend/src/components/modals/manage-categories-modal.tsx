@@ -34,7 +34,11 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
     const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
         if (editingId) {
-            onUpdateCategory(editingId, { ...newCat, handlingType: newCat.handlingType === "Fixed" ? 0 : newCat.handlingType === "Consumable" ? 1 : 2 });
+            onUpdateCategory(editingId, {
+                categoryName: newCat.name,
+                description: newCat.description,
+                handlingType: newCat.handlingType === "Fixed" ? 0 : newCat.handlingType === "Consumable" ? 1 : 2
+            });
             setEditingId(null);
         } else {
             onAddCategory({ ...newCat, id: `cat_${Date.now()}` });
@@ -44,7 +48,11 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
     };
 
     const handleEdit = (cat: Category) => {
-        setNewCat({ name: cat.name, description: cat.description, handlingType: cat.handlingType || "Fixed" });
+        setNewCat({
+            name: cat.categoryName,
+            description: cat.description,
+            handlingType: cat.handlingType === 0 ? "Fixed" : cat.handlingType === 1 ? "Consumable" : "Moveable"
+        });
         setEditingId(cat.id);
         setIsAdding(true);
         setView('active');
@@ -80,7 +88,7 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                 <DialogDescription className="text-muted-foreground text-xs mt-1">
                                     {view === 'active' ? "Tenant-Level Classification Schema" : 
                                      view === 'archived' ? "Restore or permanently delete archived items" :
-                                     `Detailed view of ${selectedCategory?.name}`}
+                                     `Detailed view of ${selectedCategory?.categoryName}`}
                                 </DialogDescription>
                             </div>
                         </div>
@@ -99,17 +107,17 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                 <div className="space-y-4">
                                     <div>
                                         <Label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Category Name</Label>
-                                        <p className="text-lg font-semibold">{selectedCategory.name}</p>
+                                        <p className="text-lg font-semibold">{selectedCategory.categoryName}</p>
                                     </div>
                                     <div>
                                         <Label className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Handling Type</Label>
                                         <div>
                                             <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${
-                                                selectedCategory.handlingType === "Fixed" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-                                                selectedCategory.handlingType === "Moveable" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
+                                                selectedCategory.handlingType === 0 ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                                                selectedCategory.handlingType === 2 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
                                                 "bg-amber-500/10 text-amber-500 border-amber-500/20"
                                             }`}>
-                                                {selectedCategory.handlingType}
+                                                {selectedCategory.handlingType === 0 ? "Fixed" : selectedCategory.handlingType === 1 ? "Consumable" : "Movable"}
                                             </span>
                                         </div>
                                     </div>
@@ -133,12 +141,12 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                     <div className="flex items-center gap-2 text-xs">
                                         <Clock size={14} className="text-muted-foreground" />
                                         <span className="text-muted-foreground">Created:</span>
-                                        <span className="font-medium">{selectedCategory.createdAt ? new Date(selectedCategory.createdAt).toLocaleString() : 'N/A'}</span>
+                                        <span className="font-medium">N/A</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-xs">
                                         <User size={14} className="text-muted-foreground" />
                                         <span className="text-muted-foreground">Created By:</span>
-                                        <span className="font-medium">{selectedCategory.createdBy || 'System'}</span>
+                                        <span className="font-medium">{selectedCategory.createdByName || 'System'}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-3">
@@ -150,7 +158,7 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                     <div className="flex items-center gap-2 text-xs">
                                         <User size={14} className="text-muted-foreground" />
                                         <span className="text-muted-foreground">Updated By:</span>
-                                        <span className="font-medium">{selectedCategory.updatedBy || 'System'}</span>
+                                        <span className="font-medium">{selectedCategory.updatedByName || 'System'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -165,12 +173,12 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                         <div className="flex items-center gap-2 text-xs">
                                             <Clock size={14} className="text-destructive/70" />
                                             <span className="text-muted-foreground">Archived At:</span>
-                                            <span className="font-medium">{selectedCategory.archivedAt ? new Date(selectedCategory.archivedAt).toLocaleString() : 'N/A'}</span>
+                                            <span className="font-medium">N/A</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs">
                                             <User size={14} className="text-destructive/70" />
                                             <span className="text-muted-foreground">Archived By:</span>
-                                            <span className="font-medium">{selectedCategory.archivedBy || 'N/A'}</span>
+                                            <span className="font-medium">N/A</span>
                                         </div>
                                     </div>
                                 </div>
@@ -266,16 +274,16 @@ export function ManageCategoriesModal({ open, onOpenChange, categories, onAddCat
                                         <div className="flex items-center gap-5 flex-1 cursor-pointer" onClick={() => handleViewDetail(cat)}>
                                             <div className="p-3 bg-primary/10  text-primary"><LayoutGrid size={18} /></div>
                                             <div className="flex-1 min-w-0 grid gap-0.5">
-                                                <h4 className="text-sm font-bold text-foreground truncate">{cat.name}</h4>
+                                                <h4 className="text-sm font-bold text-foreground truncate">{cat.categoryName}</h4>
                                                 <p className="text-xs font-medium text-muted-foreground truncate">{cat.description}</p>
                                             </div>
                                             <div className="px-4 shrink-0">
                                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
-                                                    cat.handlingType === "Fixed" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-                                                    cat.handlingType === "Moveable" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
+                                                    cat.handlingType === 0 ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                                                    cat.handlingType === 2 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
                                                     "bg-amber-500/10 text-amber-500 border-amber-500/20"
                                                 }`}>
-                                                    {cat.handlingType}
+                                                    {cat.handlingType === 0 ? "Fixed" : cat.handlingType === 1 ? "Consumable" : "Movable"}
                                                 </span>
                                             </div>
                                         </div>

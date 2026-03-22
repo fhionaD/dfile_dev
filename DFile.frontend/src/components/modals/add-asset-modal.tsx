@@ -10,12 +10,13 @@ interface AddAssetModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     categories: Category[];
+    existingSerialNumbers?: string[];
     onAddAsset?: (asset: Asset) => void;
     initialData?: Asset;
     mode?: "create" | "edit";
 }
 
-export function AddAssetModal({ open, onOpenChange, categories, onAddAsset, initialData, mode = "create" }: AddAssetModalProps) {
+export function AddAssetModal({ open, onOpenChange, categories, existingSerialNumbers = [], onAddAsset, initialData, mode = "create" }: AddAssetModalProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[72rem] w-[95vw] rounded-2xl border-border p-0 overflow-hidden h-[90vh] flex flex-col">
@@ -31,6 +32,7 @@ export function AddAssetModal({ open, onOpenChange, categories, onAddAsset, init
 
                 <AddAssetForm
                     categories={categories}
+                    existingSerialNumbers={existingSerialNumbers}
                     onCancel={() => onOpenChange(false)}
                     onSuccess={() => onOpenChange(false)}
                     onAddAsset={onAddAsset}

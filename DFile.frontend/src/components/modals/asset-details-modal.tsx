@@ -31,7 +31,7 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                             <div>
                                 <DialogTitle className="text-lg font-semibold text-foreground tracking-tight">{asset.desc}</DialogTitle>
                                 <div className="flex items-center gap-2 mt-1.5">
-                                    <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">{asset.id}</Badge>
+                                    <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">{asset.assetCode || asset.id}</Badge>
                                     <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{asset.categoryName}</Badge>
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wider ${asset.status === "Available" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30" :
                                         asset.status === "In Use" ? "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400 dark:border-blue-500/30" :
@@ -43,11 +43,6 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                                 </div>
                             </div>
                         </div>
-                        {onEdit && (
-                            <Button variant="outline" size="sm" onClick={() => onEdit(asset)}>
-                                <Wrench size={14} className="mr-2" /> Edit
-                            </Button>
-                        )}
                     </div>
                     <DialogDescription className="sr-only">Detailed information about the selected asset.</DialogDescription>
                 </DialogHeader>
@@ -132,9 +127,17 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                 </div>
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
-                    <Button onClick={() => onOpenChange(false)} className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Close
                     </Button>
+                    {onEdit && (
+                        <Button
+                            onClick={() => onEdit(asset)}
+                            className="bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
+                        >
+                            <Wrench size={14} className="mr-2" /> Edit Detail
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

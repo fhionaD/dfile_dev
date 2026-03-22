@@ -2,9 +2,8 @@ import { Wrench, AlertTriangle, Clock, Calendar as CalendarIcon, TrendingDown } 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
-import { MaintenanceRecord, Asset } from "@/types/asset";
+import { MaintenanceRecord } from "@/types/asset";
 import { useMaintenanceRecords } from "@/hooks/use-maintenance";
-import { useAssets } from "@/hooks/use-assets";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface MaintenanceDashboardProps {
@@ -13,9 +12,8 @@ interface MaintenanceDashboardProps {
 
 export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashboardProps) {
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
-    const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
 
-    if (isLoadingRecords || isLoadingAssets) {
+    if (isLoadingRecords) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[...Array(4)].map((_, i) => (
@@ -26,7 +24,7 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
     }
 
     // KPI Calculations
-    const activeRecords = records.filter(r => !r.archived);
+    const activeRecords = records.filter(r => !r.isArchived);
     const openRequests = activeRecords.filter(r => r.status === "Pending" || r.status === "In Progress").length;
     
     const overdueRequests = activeRecords.filter(r => {
@@ -69,8 +67,8 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
         .slice(0, 5);
 
     const getAssetName = (id: string) => {
-        const asset = assets.find(a => a.id === id);
-        return asset ? asset.desc : id;
+        const record = records.find(r => r.assetId === id);
+        return record?.assetName || id;
     };
 
     return (

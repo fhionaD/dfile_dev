@@ -57,7 +57,9 @@ namespace DFile.backend.Services
         /// </summary>
         public async Task<bool> HasPermission(int userId, int tenantId, string moduleName, string action)
         {
-            var permission = await _context.UserRoleAssignments
+            // Merge permissions across all role templates (OR), same as GetUserPermissions.
+            // FirstOrDefault on joined RolePermissions could pick the wrong row when a user has multiple roles.
+            var permissions = await _context.UserRoleAssignments
                 .Where(ura => ura.UserId == userId)
                 .Join(
                     _context.TenantRoles.Where(tr => tr.TenantId == tenantId),
@@ -73,17 +75,17 @@ namespace DFile.backend.Services
                 )
                 .SelectMany(rtId => _context.RolePermissions
                     .Where(rp => rp.RoleTemplateId == rtId && rp.ModuleName == moduleName))
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            if (permission == null) return false;
+            if (permissions.Count == 0) return false;
 
             return action switch
             {
-                "CanView" => permission.CanView,
-                "CanCreate" => permission.CanCreate,
-                "CanEdit" => permission.CanEdit,
-                "CanApprove" => permission.CanApprove,
-                "CanArchive" => permission.CanArchive,
+                "CanView" => permissions.Any(p => p.CanView),
+                "CanCreate" => permissions.Any(p => p.CanCreate),
+                "CanEdit" => permissions.Any(p => p.CanEdit),
+                "CanApprove" => permissions.Any(p => p.CanApprove),
+                "CanArchive" => permissions.Any(p => p.CanArchive),
                 _ => false
             };
         }

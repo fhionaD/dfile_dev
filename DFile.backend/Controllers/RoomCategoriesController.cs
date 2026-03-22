@@ -5,6 +5,7 @@ using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.Text.Json;
 
 namespace DFile.backend.Controllers
@@ -25,6 +26,16 @@ namespace DFile.backend.Controllers
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            if (ex.InnerException is SqlException sqlEx)
+            {
+                return sqlEx.Number == 2601 || sqlEx.Number == 2627;
+            }
+
+            return false;
         }
 
         [HttpGet]
@@ -50,7 +61,6 @@ namespace DFile.backend.Controllers
                 search = search.ToLower();
                 query = query.Where(c =>
                     c.Name.ToLower().Contains(search) ||
-                    c.SubCategory.ToLower().Contains(search) ||
                     (c.Description != null && c.Description.ToLower().Contains(search)));
             }
 
@@ -69,16 +79,28 @@ namespace DFile.backend.Controllers
                 .Select(g => new { CategoryId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
 
+            // Get subcategory counts per category
+            var subCatCountsQuery = _context.RoomSubCategories.Where(s => !s.IsArchived).AsQueryable();
+            if (!IsSuperAdmin() && tenantId.HasValue)
+            {
+                subCatCountsQuery = subCatCountsQuery.Where(s => s.TenantId == tenantId);
+            }
+
+            var subCatCounts = await subCatCountsQuery
+                .GroupBy(s => s.RoomCategoryId)
+                .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
+
             var result = categories.Select(c => new RoomCategoryResponseDto
             {
                 Id = c.Id,
                 RoomCategoryCode = c.RoomCategoryCode,
                 Name = c.Name,
-                SubCategory = c.SubCategory,
                 Description = c.Description,
                 IsArchived = c.IsArchived,
                 TenantId = c.TenantId,
                 RoomCount = roomCounts.TryGetValue(c.Id, out var count) ? count : 0,
+                SubCategoryCount = subCatCounts.TryGetValue(c.Id, out var subCount) ? subCount : 0,
                 CreatedByName = c.CreatedByUser != null ? c.CreatedByUser.FirstName + " " + c.CreatedByUser.LastName : null,
                 UpdatedByName = c.UpdatedByUser != null ? c.UpdatedByUser.FirstName + " " + c.UpdatedByUser.LastName : null,
                 CreatedAt = c.CreatedAt,
@@ -107,16 +129,20 @@ namespace DFile.backend.Controllers
                 .Where(r => IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId)
                 .CountAsync();
 
+            var subCategoryCount = await _context.RoomSubCategories
+                .Where(s => s.RoomCategoryId == id && !s.IsArchived)
+                .CountAsync();
+
             return Ok(new RoomCategoryResponseDto
             {
                 Id = category.Id,
                 RoomCategoryCode = category.RoomCategoryCode,
                 Name = category.Name,
-                SubCategory = category.SubCategory,
                 Description = category.Description,
                 IsArchived = category.IsArchived,
                 TenantId = category.TenantId,
                 RoomCount = roomCount,
+                SubCategoryCount = subCategoryCount,
                 CreatedByName = category.CreatedByUser != null ? category.CreatedByUser.FirstName + " " + category.CreatedByUser.LastName : null,
                 UpdatedByName = category.UpdatedByUser != null ? category.UpdatedByUser.FirstName + " " + category.UpdatedByUser.LastName : null,
                 CreatedAt = category.CreatedAt,
@@ -133,28 +159,25 @@ namespace DFile.backend.Controllers
             var userId = GetCurrentUserId();
 
             var trimmedName = dto.Name?.Trim() ?? string.Empty;
-            var trimmedSub = dto.SubCategory?.Trim() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(trimmedName) || string.IsNullOrWhiteSpace(trimmedSub))
-                return BadRequest(new { message = "Category name and sub-category are required." });
+            if (string.IsNullOrWhiteSpace(trimmedName))
+                return BadRequest(new { message = "Category name is required." });
 
             var nameLower = trimmedName.ToLower();
-            var subLower = trimmedSub.ToLower();
 
             var nameExists = await _context.RoomCategories.AnyAsync(c =>
                 c.Name.ToLower() == nameLower &&
-                c.SubCategory.ToLower() == subLower &&
                 !c.IsArchived &&
                 (IsSuperAdmin() ? c.TenantId == null : c.TenantId == tenantId));
             if (nameExists)
-                return Conflict(new { message = "This category name and sub-category combination already exists." });
+                return Conflict(new { message = "This category name already exists." });
 
             var category = new RoomCategory
             {
                 Id = await RecordCodeGenerator.GenerateRoomCategoryIdAsync(_context),
                 RoomCategoryCode = await RecordCodeGenerator.GenerateRoomCategoryCodeAsync(_context),
                 Name = trimmedName,
-                SubCategory = trimmedSub,
+                SubCategory = string.Empty,
                 Description = dto.Description?.Trim() ?? string.Empty,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
@@ -174,7 +197,7 @@ namespace DFile.backend.Controllers
                 Module = "Configuration",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { category.Name, category.SubCategory, category.Description }),
+                NewValues = JsonSerializer.Serialize(new { category.Name, category.Description }),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
@@ -183,9 +206,9 @@ namespace DFile.backend.Controllers
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
-                return Conflict(new { message = "This category name and sub-category combination already exists." });
+                return Conflict(new { message = "This category name already exists." });
             }
 
             return CreatedAtAction("GetRoomCategory", new { id = category.Id }, new RoomCategoryResponseDto
@@ -193,11 +216,11 @@ namespace DFile.backend.Controllers
                 Id = category.Id,
                 RoomCategoryCode = category.RoomCategoryCode,
                 Name = category.Name,
-                SubCategory = category.SubCategory,
                 Description = category.Description,
                 IsArchived = category.IsArchived,
                 TenantId = category.TenantId,
                 RoomCount = 0,
+                SubCategoryCount = 0,
                 CreatedAt = category.CreatedAt,
                 UpdatedAt = category.UpdatedAt,
                 RowVersion = category.RowVersion
@@ -216,24 +239,21 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
 
             var trimmedName = dto.Name?.Trim() ?? string.Empty;
-            var trimmedSub = dto.SubCategory?.Trim() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(trimmedName) || string.IsNullOrWhiteSpace(trimmedSub))
-                return BadRequest(new { message = "Category name and sub-category are required." });
+            if (string.IsNullOrWhiteSpace(trimmedName))
+                return BadRequest(new { message = "Category name is required." });
 
-            if (existing.Name.ToLower() != trimmedName.ToLower() || existing.SubCategory.ToLower() != trimmedSub.ToLower())
+            if (existing.Name.ToLower() != trimmedName.ToLower())
             {
                 var nameLower = trimmedName.ToLower();
-                var subLower = trimmedSub.ToLower();
 
                 var nameExists = await _context.RoomCategories.AnyAsync(c =>
                     c.Id != id &&
                     c.Name.ToLower() == nameLower &&
-                    c.SubCategory.ToLower() == subLower &&
                     !c.IsArchived &&
                     (IsSuperAdmin() ? c.TenantId == null : c.TenantId == tenantId));
                 if (nameExists)
-                    return Conflict(new { message = "This category name and sub-category combination already exists." });
+                    return Conflict(new { message = "This category name already exists." });
             }
 
             if (dto.RowVersion != null)
@@ -241,10 +261,10 @@ namespace DFile.backend.Controllers
                 _context.Entry(existing).Property(p => p.RowVersion).OriginalValue = dto.RowVersion;
             }
 
-            var oldValues = JsonSerializer.Serialize(new { existing.Name, existing.SubCategory, existing.Description });
+            var oldValues = JsonSerializer.Serialize(new { existing.Name, existing.Description });
 
             existing.Name = trimmedName;
-            existing.SubCategory = trimmedSub;
+            existing.SubCategory = existing.SubCategory ?? string.Empty;
             existing.Description = dto.Description?.Trim() ?? string.Empty;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
@@ -258,7 +278,7 @@ namespace DFile.backend.Controllers
                 UserId = userId,
                 TenantId = tenantId,
                 OldValues = oldValues,
-                NewValues = JsonSerializer.Serialize(new { Name = trimmedName, SubCategory = trimmedSub, Description = existing.Description }),
+                NewValues = JsonSerializer.Serialize(new { Name = trimmedName, Description = existing.Description }),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
@@ -271,9 +291,9 @@ namespace DFile.backend.Controllers
             {
                 return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
-                return Conflict(new { message = "This category name and sub-category combination already exists." });
+                return Conflict(new { message = "This category name already exists." });
             }
 
             return NoContent();
@@ -313,7 +333,7 @@ namespace DFile.backend.Controllers
                 Module = "Configuration",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { category.Name, category.SubCategory, IsArchived = true }),
+                NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = true }),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
@@ -336,11 +356,10 @@ namespace DFile.backend.Controllers
             var nameExists = await _context.RoomCategories.AnyAsync(c =>
                 c.Id != id &&
                 c.Name.ToLower() == category.Name.ToLower() &&
-                c.SubCategory.ToLower() == category.SubCategory.ToLower() &&
                 !c.IsArchived &&
                 (IsSuperAdmin() ? c.TenantId == null : c.TenantId == tenantId));
             if (nameExists)
-                return Conflict(new { message = "Cannot restore: this category name and sub-category combination already exists as an active record." });
+                return Conflict(new { message = "Cannot restore: this category name already exists as an active record." });
 
             category.IsArchived = false;
             category.ArchivedAt = null;
@@ -356,7 +375,7 @@ namespace DFile.backend.Controllers
                 Module = "Configuration",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { category.Name, category.SubCategory, IsArchived = false }),
+                NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = false }),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString()
             });
@@ -367,7 +386,7 @@ namespace DFile.backend.Controllers
             }
             catch (DbUpdateException)
             {
-                return Conflict(new { message = "Cannot restore: this category name and sub-category combination already exists as an active record." });
+                return Conflict(new { message = "Cannot restore: this category name already exists as an active record." });
             }
 
             return NoContent();

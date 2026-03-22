@@ -1,7 +1,7 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { LayoutDashboard, Building2, QrCode, ArrowLeftRight, MapPin, Tag, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, Building2, QrCode, ArrowLeftRight, MapPin, Tag, ShoppingCart, Wrench, PieChart } from "lucide-react";
 import { UserRole } from "@/types/asset";
 
 const REQUIRED_ROLES: UserRole[] = ["Admin"];
@@ -33,7 +33,14 @@ const navSections: NavSection[] = [
         items: [
             { href: "/tenant/procurement",        label: "Purchase Orders",        icon: ShoppingCart },
         ],
-    }
+    },
+    {
+        label: "Cross-Module",
+        items: [
+            { href: "/tenant/maintenance",        label: "Maintenance",            icon: Wrench },
+            { href: "/tenant/finance",            label: "Finance Overview",       icon: PieChart },
+        ],
+    },
 ];
 
 export default function TenantLayout({ children }: { children: React.ReactNode }) {

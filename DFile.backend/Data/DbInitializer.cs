@@ -75,6 +75,12 @@ namespace DFile.backend.Data
             context.SaveChanges();
 
             // ------------------------------------------------------------------
+            // EMPLOYEES: mirror tenant login users (Users) so Personnel / Users UI lists them
+            // ------------------------------------------------------------------
+            SeedEmployeesFromLoginUsers(context);
+            context.SaveChanges();
+
+            // ------------------------------------------------------------------
             // ASSET CATEGORIES (15 â€” global, TenantId = null)
             // ------------------------------------------------------------------
             var catDefs = new[]
@@ -650,14 +656,67 @@ namespace DFile.backend.Data
             }
         }
 
+        /// <summary>
+        /// The tenant "Users" screen lists <see cref="Employee"/> rows from /api/Employees.
+        /// Seeded and manually created login accounts live in <see cref="User"/>; without a matching
+        /// Employee they never appear. Idempotent: one Employee per User email per tenant.
+        /// </summary>
+        private static void SeedEmployeesFromLoginUsers(AppDbContext context)
+        {
+            var tenantUsers = context.Users.Where(u => u.TenantId != null).ToList();
+            foreach (var u in tenantUsers)
+            {
+                if (context.Employees.Any(e => e.Email == u.Email))
+                    continue;
+
+                var id = $"EMP-USER-{u.Id}";
+                if (context.Employees.Any(e => e.Id == id))
+                    continue;
+
+                var code = $"USR-{u.Id:D4}";
+                if (context.Employees.Any(e => e.EmployeeCode == code))
+                    code = $"USR-{u.Id:D6}";
+
+                var status = u.Status == "Archived" ? "Archived" : "Active";
+                if (status != "Archived" && u.Status != "Active")
+                    status = u.Status;
+
+                context.Employees.Add(new Employee
+                {
+                    Id = id,
+                    EmployeeCode = code,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Email = u.Email,
+                    ContactNumber = "—",
+                    Department = "Organization",
+                    Role = string.IsNullOrWhiteSpace(u.RoleLabel) ? u.Role : u.RoleLabel,
+                    HireDate = u.CreatedAt,
+                    Status = status,
+                    TenantId = u.TenantId
+                });
+            }
+        }
+
         private static void UpsertAssetCategory(AppDbContext context, string id, string name,
             HandlingType ht, string desc)
         {
             var existing = context.AssetCategories.Find(id);
             if (existing == null)
             {
+                // DB constraint now enforces ASTC- prefix (not ACAT-), so keep seeding compliant.
                 var existingCodes = context.AssetCategories.Select(c => c.AssetCategoryCode).ToList();
+<<<<<<< HEAD
                 int seq = context.AssetCategories.Count() + 1;
+=======
+                var trackedCodes = context.ChangeTracker.Entries<AssetCategory>()
+                    .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
+                    .Select(e => e.Entity.AssetCategoryCode)
+                    .ToList();
+                existingCodes.AddRange(trackedCodes);
+
+                int seq = existingCodes.Count + 1;
+>>>>>>> 31309d0425d1dcd614c934fd318f61bab0f05c15
                 while (existingCodes.Contains($"ASTC-{seq:D4}")) { seq++; }
                 
                 context.AssetCategories.Add(new AssetCategory

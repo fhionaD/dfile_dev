@@ -4,6 +4,7 @@ using DFile.backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace dfile.backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321141808_AddUniqueAssetSerialPerTenant")]
+    partial class AddUniqueAssetSerialPerTenant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -103,8 +106,7 @@ namespace dfile.backend.Migrations
                         .HasColumnType("rowversion");
 
                     b.Property<string>("SerialNumber")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TagNumber")
                         .HasColumnType("nvarchar(450)");
@@ -147,11 +149,6 @@ namespace dfile.backend.Migrations
                         .HasDatabaseName("IX_Assets_LifecycleStatus");
 
                     b.HasIndex("UpdatedBy");
-
-                    b.HasIndex("TenantId", "SerialNumber")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Assets_TenantId_SerialNumber")
-                        .HasFilter("[SerialNumber] IS NOT NULL");
 
                     b.HasIndex("TenantId", "TagNumber")
                         .IsUnique()
@@ -927,10 +924,6 @@ namespace dfile.backend.Migrations
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
-
-                    b.Property<string>("SubCategory")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("TenantId")
                         .HasColumnType("int");

@@ -4,13 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusText } from "@/components/ui/status-text";
 import { Card } from "@/components/ui/card";
-import { MaintenanceRecord, Asset } from "@/types/asset";
+import { MaintenanceRecord } from "@/types/asset";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useAddMaintenanceRecord } from "@/hooks/use-maintenance";
-import { useAssets } from "@/hooks/use-assets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/stat-card";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
@@ -22,14 +21,13 @@ interface MaintenanceViewProps {
 }
 
 export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }: MaintenanceViewProps) {
-    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
-    const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
+    const [showArchived, setShowArchived] = useState(false);
+    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
     // Mutations
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const archiveRecordMutation = useArchiveMaintenanceRecord();
 
-    const [showArchived, setShowArchived] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     // Request Filters
@@ -41,16 +39,10 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     // Asset Schedule Filter
     const [assetSearchQuery, setAssetSearchQuery] = useState("");
 
-    // Helper functions
-    const getAssetName = (id: string) => {
-        const asset = assets.find(a => a.id === id);
-        return asset ? asset.desc : id;
-    };
-
 
 
     // Loading State
-    if (isLoadingRecords || isLoadingAssets) {
+    if (isLoadingRecords) {
         return (
             <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -72,14 +64,15 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     }
 
     const filteredRecords = records.filter(record => {
-        if (showArchived !== !!record.archived) return false;
         const query = searchQuery.toLowerCase();
-        const assetName = getAssetName(record.assetId).toLowerCase();
+        const assetName = (record.assetName || record.assetId).toLowerCase();
+        const roomDisplay = record.roomName ? `${record.roomCode} (${record.roomName})` : "";
         const matchesSearch =
             record.id.toLowerCase().includes(query) ||
             record.description.toLowerCase().includes(query) ||
             record.assetId.toLowerCase().includes(query) ||
-            assetName.includes(query);
+            assetName.includes(query) ||
+            roomDisplay.toLowerCase().includes(query);
 
         if (!matchesSearch) return false;
         if (statusFilter !== "All" && record.status !== statusFilter) return false;
@@ -102,20 +95,20 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     });
 
     // KPI Calculations
-    const openRequests = records.filter(r => !r.archived && (r.status === "Pending" || r.status === "In Progress")).length;
+    const openRequests = records.filter(r => !r.isArchived && (r.status === "Pending" || r.status === "In Progress")).length;
     
     const overdueRequests = records.filter(r => {
-        if (r.archived || r.status === "Completed") return false;
+        if (r.isArchived || r.status === "Completed") return false;
         const targetDate = r.startDate ? new Date(r.startDate) : new Date(r.dateReported);
         return targetDate < new Date();
     }).length;
 
-    const inRepair = records.filter(r => !r.archived && r.status === "In Progress").length;
+    const inRepair = records.filter(r => !r.isArchived && r.status === "In Progress").length;
     
-    const immediateAttention = records.filter(r => !r.archived && r.status !== "Completed" && r.priority === "High").length;
+    const immediateAttention = records.filter(r => !r.isArchived && r.status !== "Completed" && r.priority === "High").length;
 
     const scheduledThisWeek = records.filter(r => {
-        if (r.archived || r.status !== "Scheduled" || !r.startDate) return false;
+        if (r.isArchived || r.status !== "Scheduled" || !r.startDate) return false;
         const start = new Date(r.startDate);
         const curr = new Date(); 
         const first = curr.getDate() - curr.getDay(); 
@@ -139,7 +132,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         ? Math.round((totalRepairTime / completedRepairs.length) / (1000 * 60 * 60 * 24))
         : 0;
 
-    const activeRecords = records.filter(r => !r.archived);
+    const activeRecords = records.filter(r => !r.isArchived);
 
     const statusVariant: Record<string, "warning" | "info" | "success" | "muted"> = {
         Pending: "warning",
@@ -310,6 +303,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         <TableRow>
                             <TableHead className="w-[100px]">ID</TableHead>
                             <TableHead>Asset / Description</TableHead>
+                            <TableHead className="w-[150px]">Room</TableHead>
                             <TableHead className="text-center w-[100px]">Status</TableHead>
                             <TableHead className="text-center w-[100px]">Priority</TableHead>
                             <TableHead className="text-center w-[120px]">Date</TableHead>
@@ -318,7 +312,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     <TableBody>
                         {filteredRecords.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
+                                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
                                     <div className="flex flex-col items-center justify-center h-full gap-3">
                                         <Wrench className="h-8 w-8 opacity-20" />
                                         <p className="text-sm">No maintenance requests found</p>
@@ -333,9 +327,19 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                     </TableCell>
                                     <TableCell>
                                         <div className="space-y-0.5">
-                                            <span className="text-sm font-medium block line-clamp-1">{getAssetName(record.assetId)}</span>
+                                            <span className="text-sm font-medium block line-clamp-1">{record.assetName || record.assetId}</span>
                                             <span className="text-xs text-muted-foreground block line-clamp-1">{record.description}</span>
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {record.roomName ? (
+                                            <div className="space-y-0.5">
+                                                <span className="text-sm font-medium block line-clamp-1">{record.roomCode}</span>
+                                                <span className="text-xs text-muted-foreground block line-clamp-1">{record.roomName}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">Unassigned</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
@@ -346,7 +350,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                             record.priority === 'Medium' ? 'bg-orange-500/10 text-orange-700' :
                                             'bg-emerald-500/10 text-emerald-700'
                                         }`}>
-                                           {record.priority!.charAt(0)}
+                                           {(record.priority || "N/A").charAt(0)}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
