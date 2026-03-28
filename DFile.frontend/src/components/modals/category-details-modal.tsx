@@ -92,6 +92,10 @@ export function CategoryDetailsModal({ open, onOpenChange, category, onEdit }: C
                                 <p className="font-medium">{category.status}</p>
                             </div>
                             <div>
+                                <p className="text-xs text-muted-foreground">Default Salvage Value</p>
+                                <p className="font-medium">{category.salvagePercentage ?? 10}%</p>
+                            </div>
+                            <div>
                                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Package size={12} /> Total Assets
                                 </p>

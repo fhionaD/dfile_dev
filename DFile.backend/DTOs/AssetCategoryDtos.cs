@@ -12,6 +12,9 @@ namespace DFile.backend.DTOs
         public HandlingType HandlingType { get; set; } = HandlingType.Fixed;
 
         public string Description { get; set; } = string.Empty;
+
+        [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
+        public decimal SalvagePercentage { get; set; } = 10m;
     }
 
     public class UpdateAssetCategoryDto
@@ -24,6 +27,9 @@ namespace DFile.backend.DTOs
 
         public string Description { get; set; } = string.Empty;
 
+        [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
+        public decimal SalvagePercentage { get; set; } = 10m;
+
         public byte[]? RowVersion { get; set; }
     }
 
@@ -34,6 +40,7 @@ namespace DFile.backend.DTOs
         public string CategoryName { get; set; } = string.Empty;
         public HandlingType HandlingType { get; set; }
         public string Description { get; set; } = string.Empty;
+        public decimal SalvagePercentage { get; set; }
         public bool IsArchived { get; set; }
         public int? TenantId { get; set; }
         public int AssetCount { get; set; }

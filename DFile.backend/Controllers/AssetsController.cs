@@ -275,6 +275,11 @@ namespace DFile.backend.Controllers
 
             var generatedTag = await RecordCodeGenerator.GenerateTagNumberAsync(_context);
 
+            var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
+                ? dto.SalvagePercentage.Value
+                : category.SalvagePercentage;
+            var computedSalvageValue = Math.Round(dto.AcquisitionCost * effectiveSalvagePct / 100m, 2);
+
             var asset = new Asset
             {
                 Id = Guid.NewGuid().ToString(),
@@ -285,7 +290,7 @@ namespace DFile.backend.Controllers
                 LifecycleStatus = LifecycleStatus.Registered,
                 CurrentCondition = dto.CurrentCondition,
                 HandlingTypeSnapshot = category.HandlingType.ToString(),
-                Room = null, // Legacy field, ignored during updates/writes
+                Room = null,
                 Image = dto.Image,
                 Manufacturer = dto.Manufacturer,
                 Model = dto.Model,
@@ -296,6 +301,9 @@ namespace DFile.backend.Controllers
                 UsefulLifeYears = dto.UsefulLifeYears,
                 PurchasePrice = dto.PurchasePrice,
                 ResidualValue = dto.ResidualValue,
+                SalvagePercentage = effectiveSalvagePct,
+                SalvageValue = computedSalvageValue,
+                IsSalvageOverride = dto.IsSalvageOverride,
                 CurrentBookValue = dto.PurchasePrice,
                 MonthlyDepreciation = dto.UsefulLifeYears > 0
                     ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
@@ -411,6 +419,13 @@ namespace DFile.backend.Controllers
                 existing.MonthlyDepreciation = dto.UsefulLifeYears > 0
                     ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
                     : 0;
+
+                var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
+                    ? dto.SalvagePercentage.Value
+                    : category.SalvagePercentage;
+                existing.SalvagePercentage = effectiveSalvagePct;
+                existing.SalvageValue = Math.Round(dto.AcquisitionCost * effectiveSalvagePct / 100m, 2);
+                existing.IsSalvageOverride = dto.IsSalvageOverride;
             }
 
             _auditService.Add(HttpContext, new AuditLog
@@ -592,6 +607,9 @@ namespace DFile.backend.Controllers
             UsefulLifeYears = a.UsefulLifeYears,
             PurchasePrice = a.PurchasePrice,
             ResidualValue = a.ResidualValue,
+            SalvagePercentage = a.SalvagePercentage,
+            SalvageValue = a.SalvageValue,
+            IsSalvageOverride = a.IsSalvageOverride,
             CurrentBookValue = a.CurrentBookValue,
             MonthlyDepreciation = a.MonthlyDepreciation,
             TenantId = a.TenantId,

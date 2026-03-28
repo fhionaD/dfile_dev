@@ -30,6 +30,11 @@ namespace DFile.backend.DTOs
         public decimal PurchasePrice { get; set; }
 
         public decimal? ResidualValue { get; set; }
+
+        [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
+        public decimal? SalvagePercentage { get; set; }
+        public bool IsSalvageOverride { get; set; } = false;
+
         public DateTime? WarrantyExpiry { get; set; }
         public string? Notes { get; set; }
         public string? Documents { get; set; }
@@ -62,6 +67,11 @@ namespace DFile.backend.DTOs
         public decimal PurchasePrice { get; set; }
 
         public decimal? ResidualValue { get; set; }
+
+        [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
+        public decimal? SalvagePercentage { get; set; }
+        public bool IsSalvageOverride { get; set; } = false;
+
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
         public DateTime? WarrantyExpiry { get; set; }
@@ -150,6 +160,9 @@ namespace DFile.backend.DTOs
         public int UsefulLifeYears { get; set; }
         public decimal PurchasePrice { get; set; }
         public decimal? ResidualValue { get; set; }
+        public decimal? SalvagePercentage { get; set; }
+        public decimal? SalvageValue { get; set; }
+        public bool IsSalvageOverride { get; set; }
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
         public int? TenantId { get; set; }

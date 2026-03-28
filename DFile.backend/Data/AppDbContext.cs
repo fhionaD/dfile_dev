@@ -53,6 +53,8 @@ namespace DFile.backend.Data
                 e.Property(a => a.CurrentBookValue).HasColumnType("decimal(18,2)");
                 e.Property(a => a.MonthlyDepreciation).HasColumnType("decimal(18,2)");
                 e.Property(a => a.ResidualValue).HasColumnType("decimal(18,2)");
+                e.Property(a => a.SalvagePercentage).HasColumnType("decimal(5,2)");
+                e.Property(a => a.SalvageValue).HasColumnType("decimal(18,2)");
                 e.Property(a => a.SerialNumber).HasMaxLength(450);
 
                 e.Property(a => a.LifecycleStatus)
@@ -110,6 +112,8 @@ namespace DFile.backend.Data
             // ── AssetCategory ──────────────────────────────────────
             modelBuilder.Entity<AssetCategory>(e =>
             {
+                e.Property(c => c.SalvagePercentage).HasColumnType("decimal(5,2)");
+
                 e.Property(c => c.HandlingType)
                     .HasConversion<int>()
                     .HasDefaultValue(HandlingType.Fixed);

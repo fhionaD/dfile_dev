@@ -39,6 +39,9 @@ namespace DFile.backend.Models
         public int UsefulLifeYears { get; set; }
         public decimal PurchasePrice { get; set; }
         public decimal? ResidualValue { get; set; }
+        public decimal? SalvagePercentage { get; set; }
+        public decimal? SalvageValue { get; set; }
+        public bool IsSalvageOverride { get; set; } = false;
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
         public int? TenantId { get; set; }

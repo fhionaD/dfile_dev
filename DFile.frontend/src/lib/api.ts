@@ -1,8 +1,29 @@
 
 import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 import { getApiBaseUrl } from '@/lib/api-base-url';
+
+declare module 'axios' {
+    export interface AxiosRequestConfig {
+        skipAuthHeader?: boolean;
+        /** When true the global response-error interceptor will not emit toasts / banners. */
+        suppressGlobalError?: boolean;
+    }
+}
 import { toast } from 'sonner';
 import { emitGlobalError } from '@/lib/global-error-bus';
+
+function clearAuthorizationHeader(config: InternalAxiosRequestConfig) {
+    const h = config.headers;
+    if (!h) return;
+    if (typeof (h as { delete?: (name: string) => void }).delete === 'function') {
+        (h as { delete: (name: string) => void }).delete('Authorization');
+        (h as { delete: (name: string) => void }).delete('authorization');
+    } else {
+        delete (h as Record<string, unknown>).Authorization;
+        delete (h as Record<string, unknown>).authorization;
+    }
+}
 
 // baseURL is resolved per request so dev fallback (localhost:3000 → API :5090) runs after window exists.
 const api = axios.create({
@@ -15,9 +36,13 @@ const api = axios.create({
 api.interceptors.request.use(
     (config) => {
         config.baseURL = getApiBaseUrl();
+        const path = (config.url ?? '').toLowerCase();
+        const isLogin = config.skipAuthHeader === true || path.includes('auth/login');
         const token = typeof window !== 'undefined' ? localStorage.getItem('dfile_token') : null;
-        if (token) {
+        if (token !== null && token !== '' && !isLogin) {
             config.headers.Authorization = `Bearer ${token}`;
+        } else {
+            clearAuthorizationHeader(config);
         }
         return config;
     },
@@ -47,6 +72,12 @@ function isAxiosNetworkError(error: unknown): boolean {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Callers that handle their own errors (e.g. the login form) set this flag
+        // so the global interceptor stays silent and doesn't show duplicate banners.
+        if (error?.config?.suppressGlobalError) {
+            return Promise.reject(error);
+        }
+
         const status = error?.response?.status;
         const message = error?.response?.data?.message;
         if (status === 409 && typeof message === 'string' && message.includes('Duplicate request detected')) {

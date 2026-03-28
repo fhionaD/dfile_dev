@@ -23,6 +23,7 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
         categoryName: "",
         description: "",
         handlingType: 0,
+        salvagePercentage: "10",
     });
     const [hasLinkedAssets, setHasLinkedAssets] = useState(false);
 
@@ -32,6 +33,7 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
                 categoryName: category.categoryName,
                 description: category.description || "",
                 handlingType: category.handlingType,
+                salvagePercentage: String(category.salvagePercentage ?? 10),
             });
             setHasLinkedAssets((category.items ?? 0) > 0);
         }
@@ -41,10 +43,14 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
         if (!category) return;
         if (!form.categoryName.trim()) return;
 
+        const pct = Number(form.salvagePercentage);
+        if (isNaN(pct) || pct < 0 || pct > 100) return;
+
         const payload: any = {
             categoryName: form.categoryName.trim(),
             description: form.description.trim(),
             handlingType: form.handlingType,
+            salvagePercentage: pct,
             rowVersion: (category as any).rowVersion,
         };
 
@@ -118,6 +124,28 @@ export function EditCategoryModal({ open, onOpenChange, category, onSuccess }: E
                                 Cannot change handling type while assets are linked to this category.
                             </p>
                         )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="salvagePercentage">Default Salvage Value (%)</Label>
+                        <Input
+                            id="salvagePercentage"
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            value={form.salvagePercentage}
+                            onChange={(e) => setForm(f => ({ ...f, salvagePercentage: e.target.value }))}
+                            onBlur={() => {
+                                const n = Number(form.salvagePercentage);
+                                if (form.salvagePercentage === "" || isNaN(n)) return;
+                                setForm(f => ({ ...f, salvagePercentage: String(Math.min(100, Math.max(0, n))) }));
+                            }}
+                            placeholder="e.g. 10"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Applied as default salvage percentage when registering assets in this category
+                        </p>
                     </div>
                 </div>
 

@@ -28,9 +28,16 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        [AllowAnonymous]
+        public async Task<IActionResult> Login([FromBody] LoginDto? dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
+            {
+                return BadRequest(new { message = "Email and password are required." });
+            }
+
+            var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
 
             if (user == null)
             {
@@ -46,7 +53,17 @@ namespace DFile.backend.Controllers
                 }
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            bool passwordMatches;
+            try
+            {
+                passwordMatches = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+            }
+            catch
+            {
+                passwordMatches = false;
+            }
+
+            if (!passwordMatches)
             {
                 return Unauthorized(new { message = "Invalid credentials" });
             }

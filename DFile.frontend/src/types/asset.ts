@@ -29,6 +29,9 @@ export interface Asset {
     purchasePrice?: number;
     currentBookValue?: number;
     monthlyDepreciation?: number;
+    salvagePercentage?: number;
+    salvageValue?: number;
+    isSalvageOverride?: boolean;
     tenantId?: number;
     permissions?: ModulePermission[];
     archived?: boolean;
@@ -53,6 +56,8 @@ export interface CreateAssetPayload {
     value?: number;
     usefulLifeYears?: number;
     purchasePrice?: number;
+    salvagePercentage?: number;
+    isSalvageOverride?: boolean;
     warrantyExpiry?: string;
     notes?: string;
     documents?: string;
@@ -92,6 +97,7 @@ export interface Category {
     categoryName: string;
     description: string;
     handlingType: number;
+    salvagePercentage?: number;
     items: number;
     status: "Active" | "Archived";
     tenantId?: number;
@@ -106,6 +112,7 @@ export interface CreateCategoryPayload {
     categoryName: string;
     handlingType: number;
     description: string;
+    salvagePercentage: number;
 }
 
 export interface Room {

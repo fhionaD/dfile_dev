@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { RegistrationView } from "@/components/registration-view";
 import { AddAssetModal } from "@/components/modals/add-asset-modal";
 import { AssetDetailsModal } from "@/components/modals/asset-details-modal";
@@ -10,7 +9,6 @@ import { useCategories } from "@/hooks/use-categories";
 import { Asset } from "@/types/asset";
 
 export default function InventoryPage() {
-    const router = useRouter();
     const { data: assetCategories = [] } = useCategories(false);
     const { data: assets = [] } = useAssets(false);
 
@@ -35,7 +33,6 @@ export default function InventoryPage() {
                     setSelectedAsset(null);
                     setIsAddModalOpen(true);
                 }}
-                onManageCategories={() => router.push("/tenant/asset-categories")}
                 onAssetClick={(asset) => {
                     setSelectedAsset(asset);
                     setIsDetailsOpen(true);
@@ -72,6 +69,8 @@ export default function InventoryPage() {
                         usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
                         purchasePrice: Number(asset.purchasePrice ?? 0),
                         residualValue: null,
+                        salvagePercentage: asset.salvagePercentage ?? null,
+                        isSalvageOverride: asset.isSalvageOverride ?? false,
                         currentBookValue: Number(asset.currentBookValue ?? asset.purchasePrice ?? 0),
                         monthlyDepreciation: Number(asset.monthlyDepreciation ?? 0),
                         warrantyExpiry: asNullableDate(asset.warrantyExpiry),

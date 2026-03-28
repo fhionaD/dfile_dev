@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Package, Calendar, Upload, Layers, FileText, ChevronDown, ChevronRight, Camera, Trash2, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,21 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
 
     const initialCategoryId = initialData ? categories.find(c => c.id === initialData.categoryId)?.id : undefined;
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialCategoryId ?? "");
+    const [isSalvageOverride, setIsSalvageOverride] = useState(initialData?.isSalvageOverride ?? false);
+    const [manualSalvagePctStr, setManualSalvagePctStr] = useState<string>(String(initialData?.salvagePercentage ?? ""));
+    const [costInput, setCostInput] = useState<number>(initialData?.purchasePrice ?? 0);
+
+    const selectedCategory = useMemo(() => categories.find(c => c.id === selectedCategoryId), [categories, selectedCategoryId]);
+    const categorySalvagePct = selectedCategory?.salvagePercentage ?? 10;
+    const manualSalvagePct = Number(manualSalvagePctStr) || 0;
+    const effectiveSalvagePct = isSalvageOverride ? manualSalvagePct : categorySalvagePct;
+    const computedSalvageValue = costInput > 0 ? Math.round(costInput * effectiveSalvagePct / 100 * 100) / 100 : 0;
+
+    useEffect(() => {
+        if (!isSalvageOverride) {
+            setManualSalvagePctStr(String(categorySalvagePct));
+        }
+    }, [selectedCategoryId, categorySalvagePct, isSalvageOverride]);
 
     useEffect(() => {
         if (!initialData) return;
@@ -84,13 +100,14 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
         if (onAddAsset) {
             const purchasePrice = Number(formData.get("purchasePrice")) || 0;
             const usefulLifeYears = Number(formData.get("usefulLifeYears")) || 0;
+            const currentEffectivePct = isSalvageOverride ? manualSalvagePct : (category?.salvagePercentage ?? 10);
             const newAsset: Asset = {
                 id: initialData?.id || (formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`),
                 desc: formData.get("name") as string,
                 rowVersion: initialData?.rowVersion,
                 categoryId: catId,
                 categoryName: category?.categoryName || "Unknown",
-                status: initialData ? initialData.status : "Available", // Default to Available if new
+                status: initialData ? initialData.status : "Available",
                 room: "—",
                 image: previewUrl || undefined,
                 manufacturer: formData.get("manufacturer") as string,
@@ -104,6 +121,8 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                 value: purchasePrice,
                 purchasePrice: purchasePrice,
                 usefulLifeYears: usefulLifeYears > 0 ? usefulLifeYears : undefined,
+                salvagePercentage: currentEffectivePct,
+                isSalvageOverride: isSalvageOverride,
             };
             try {
                 setIsSubmitting(true);
@@ -184,13 +203,76 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</Label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₱</span>
-                                    <Input name="purchasePrice" defaultValue={initialData?.purchasePrice} type="number" placeholder="0.00" className="pl-7 h-10 w-full font-mono" />
+                                    <Input
+                                        name="purchasePrice"
+                                        defaultValue={initialData?.purchasePrice}
+                                        type="number"
+                                        placeholder="0.00"
+                                        className="pl-7 h-10 w-full font-mono"
+                                        onChange={(e) => setCostInput(Number(e.target.value) || 0)}
+                                    />
                                 </div>
                             </div>
 
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years)</Label>
                                 <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10 w-full" />
+                            </div>
+
+                            {/* Salvage Value Configuration */}
+                            <div className="md:col-span-2 space-y-3 p-4 rounded-lg border border-border/60 bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salvage Value</Label>
+                                    {selectedCategory && (
+                                        <span className="text-xs text-muted-foreground">
+                                            Category default: <strong>{categorySalvagePct}%</strong>
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="salvageOverride"
+                                        checked={isSalvageOverride}
+                                        onCheckedChange={(checked) => {
+                                            setIsSalvageOverride(checked === true);
+                                            if (checked !== true) setManualSalvagePctStr(String(categorySalvagePct));
+                                        }}
+                                    />
+                                    <Label htmlFor="salvageOverride" className="text-sm font-medium cursor-pointer">
+                                        Enable Manual Salvage Value
+                                    </Label>
+                                </div>
+
+                                {isSalvageOverride && (
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-muted-foreground">Custom Salvage Percentage (%)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step={0.01}
+                                            value={manualSalvagePctStr}
+                                            onChange={(e) => setManualSalvagePctStr(e.target.value)}
+                                            onBlur={() => {
+                                                const n = Number(manualSalvagePctStr);
+                                                if (manualSalvagePctStr === "" || isNaN(n)) return;
+                                                setManualSalvagePctStr(String(Math.min(100, Math.max(0, n))));
+                                            }}
+                                            className="h-10 w-full max-w-[200px]"
+                                        />
+                                    </div>
+                                )}
+
+                                {costInput > 0 && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-muted-foreground">Estimated Salvage Value:</span>
+                                        <span className="font-semibold font-mono text-primary">
+                                            ₱{computedSalvageValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">({effectiveSalvagePct}% of ₱{costInput.toLocaleString()})</span>
+                                    </div>
+                                )}
                             </div>
                                 </div>
                             </CollapsibleContent>

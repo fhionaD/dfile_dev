@@ -38,7 +38,7 @@ export default function AssetCategoriesPage() {
     const [handlingTypeFilter, setHandlingTypeFilter] = useState("All");
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [form, setForm] = useState({ categoryName: "", description: "", handlingType: 0 });
+    const [form, setForm] = useState({ categoryName: "", description: "", handlingType: 0, salvagePercentage: "10" });
     const [pageIndex, setPageIndex] = useState(0);
     const [pageSize, setPageSize] = useState(10);
 
@@ -59,14 +59,16 @@ export default function AssetCategoriesPage() {
     }, [categories, searchQuery, handlingTypeFilter]);
 
     const openCreate = () => {
-        setForm({ categoryName: "", description: "", handlingType: 0 });
+        setForm({ categoryName: "", description: "", handlingType: 0, salvagePercentage: "10" });
         setIsFormOpen(true);
     };
 
     const handleSave = async () => {
         if (!form.categoryName.trim()) { toast.error("Category name is required"); return; }
+        const pct = Number(form.salvagePercentage);
+        if (isNaN(pct) || pct < 0 || pct > 100) { toast.error("Salvage percentage must be between 0 and 100"); return; }
         try {
-            await addMutation.mutateAsync(form);
+            await addMutation.mutateAsync({ ...form, salvagePercentage: pct });
             toast.success("Category created");
             setIsFormOpen(false);
         } catch {
@@ -217,6 +219,24 @@ export default function AssetCategoriesPage() {
                                     <SelectItem value="2">Movable</SelectItem>
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Default Salvage Value (%)</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.01}
+                                value={form.salvagePercentage}
+                                onChange={(e) => setForm(f => ({ ...f, salvagePercentage: e.target.value }))}
+                                onBlur={() => {
+                                    const n = Number(form.salvagePercentage);
+                                    if (form.salvagePercentage === "" || isNaN(n)) return;
+                                    setForm(f => ({ ...f, salvagePercentage: String(Math.min(100, Math.max(0, n))) }));
+                                }}
+                                placeholder="e.g. 10"
+                            />
+                            <p className="text-xs text-muted-foreground">Applied as default salvage percentage when registering assets in this category</p>
                         </div>
                     </div>
                     <DialogFooter>
