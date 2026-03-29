@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-table";
 import {
     QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
-    Archive, RotateCcw, Search, Filter, Package,
+    Archive, RotateCcw, Search, Filter, Package, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,10 +57,12 @@ function SortableHeader({ column, children }: { column: { toggleSorting: (asc: b
 
 interface AssetTableProps {
     onAssetClick?: (asset: Asset) => void;
+    /** Opens the register-new-asset flow (inventory only). */
+    onRegisterAsset?: () => void;
     readOnly?: boolean;
 }
 
-export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) {
+export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: AssetTableProps) {
     const [showArchived, setShowArchived] = useState(false);
     const [pageIndex, setPageIndex] = useState(0);
     const [pageSize, setPageSize] = useState(10);
@@ -300,6 +302,18 @@ export function AssetTable({ onAssetClick, readOnly = false }: AssetTableProps) 
                         </Select>
                     </div>
                     <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
+                        {!readOnly && onRegisterAsset && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="h-10"
+                                onClick={onRegisterAsset}
+                                aria-label="Register new asset"
+                            >
+                                <Plus size={16} className="mr-2" />
+                                Register Asset
+                            </Button>
+                        )}
                         <Button variant="outline" size="sm" className="h-10" onClick={handleExportCSV}>
                             <FileBarChart size={16} className="mr-2" />
                             Export

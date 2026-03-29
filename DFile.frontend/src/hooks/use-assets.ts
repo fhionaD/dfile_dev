@@ -10,9 +10,7 @@ function mapAssetFromApi(a: Record<string, unknown>): Asset {
         ...(a as unknown as Asset),
         desc: (a.assetName as string) || (a.desc as string) || "—",
         value: typeof a.purchasePrice === "number" ? a.purchasePrice : ((a.value as number) || 0),
-        room: a.roomName
-            ? `${a.roomCode} (${a.roomName})`
-            : ((a.room as string) || "—"),
+        room: (a.roomName as string) || (a.room as string) || "—",
     };
 }
 
@@ -82,9 +80,7 @@ export function useAsset(id: string) {
                 ...data,
                 desc: (data.assetName as string) || (data.desc as string) || "—",
                 value: typeof data.purchasePrice === "number" ? data.purchasePrice : ((data.value as number) || 0),
-                room: data.roomName
-                    ? `${data.roomCode} (${data.roomName})`
-                    : ((data.room as string) || "—"),
+                room: (data.roomName as string) || (data.room as string) || "—",
             } as Asset;
         },
         enabled: !!id,

@@ -20,7 +20,16 @@ interface AssetDetailsModalProps {
 
 export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDetailsModalProps) {
     const { data: conditionHistory = [], isLoading: historyLoading } = useAssetConditionHistory(asset?.id);
-    const formatCurrency = (val: number | undefined) => val != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val) : "-";
+    const formatCurrency = (val: number | undefined) =>
+        val != null ? new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(val) : "—";
+
+    const formatDate = (dateStr: string | undefined | null) => {
+        if (!dateStr) return "—";
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return "—";
+        return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
+    };
+
     if (!asset) return null;
 
     return (
@@ -62,15 +71,19 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                             )}
                         </div>
 
-                        <div className="bg-muted/30  p-4 space-y-3 border border-border/50">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground flex items-center gap-2"><PhilippinePeso size={14} /> Value</span>
-                                <span className="font-semibold">{formatCurrency(asset.value)}</span>
+                        <div className="bg-muted/30 p-4 space-y-3 border border-border/50">
+                            <div className="space-y-0.5">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                    <PhilippinePeso size={12} /> Value
+                                </p>
+                                <p className="font-semibold text-sm break-all">{formatCurrency(asset.value)}</p>
                             </div>
                             <Separator />
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground flex items-center gap-2"><MapPin size={14} /> Room</span>
-                                <span className="font-medium">{asset.room}</span>
+                            <div className="space-y-0.5">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                    <MapPin size={12} /> Room
+                                </p>
+                                <p className="font-medium text-sm break-words">{asset.room || "—"}</p>
                             </div>
                         </div>
                     </div>
@@ -108,11 +121,11 @@ export function AssetDetailsModal({ open, onOpenChange, asset, onEdit }: AssetDe
                             <div className="grid grid-cols-2 gap-4 text-sm bg-muted/10 p-4  border border-border/50">
                                 <div>
                                     <p className="text-xs text-muted-foreground">Purchased</p>
-                                    <p className="font-medium">{asset.purchaseDate || "—"}</p>
+                                    <p className="font-medium">{formatDate(asset.purchaseDate)}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">Warranty Expiry</p>
-                                    <p className="font-medium">{asset.warrantyExpiry || "—"}</p>
+                                    <p className="font-medium">{formatDate(asset.warrantyExpiry)}</p>
                                 </div>
                             </div>
                         </div>

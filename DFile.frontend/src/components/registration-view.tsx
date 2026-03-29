@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+"use client";
+
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tag, Search, Archive, RotateCcw, Filter, Plus } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePagination, paginateData } from "@/components/ui/table-pagination";
@@ -12,17 +14,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 
 import { Asset, Category } from "@/types/asset";
-import { useAssets } from "@/hooks/use-assets";
+import { useAssets, useAddAsset, useUpdateAsset } from "@/hooks/use-assets";
 import { useCategories, useAddCategory, useArchiveCategory, useRestoreCategory } from "@/hooks/use-categories";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EditCategoryModal } from "@/components/modals/edit-category-modal";
 import { CategoryDetailsModal } from "@/components/modals/category-details-modal";
+import { AddAssetModal } from "@/components/modals/add-asset-modal";
+import { AssetDetailsModal } from "@/components/modals/asset-details-modal";
 
 import { AssetStats } from "@/components/asset-stats";
 import { AssetTable } from "@/components/asset-table";
 
 interface RegistrationViewProps {
+    /** @deprecated Registration is handled inside this component; kept for compatibility if passed. */
     onRegister?: () => void;
+    /** @deprecated Use internal asset details; kept for compatibility if passed. */
     onAssetClick?: (asset: Asset) => void;
 }
 
@@ -35,6 +41,44 @@ const handlingTextColors: Record<number, string> = {
 
 export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewProps) {
     const [activeTab, setActiveTab] = useState<string>("inventory");
+
+    const { data: assetsForSerial = [] } = useAssets(false);
+    const { data: activeCategoriesRaw = [] } = useCategories(false);
+    const addAssetMutation = useAddAsset();
+    const updateAssetMutation = useUpdateAsset();
+
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+
+    const activeCategories = useMemo(
+        () => activeCategoriesRaw.filter((c) => c.status !== "Archived"),
+        [activeCategoriesRaw],
+    );
+    const existingSerialNumbers = useMemo(
+        () =>
+            assetsForSerial
+                .map((a) => (a.serialNumber ?? "").trim())
+                .filter((s): s is string => s.length > 0),
+        [assetsForSerial],
+    );
+
+    const openRegisterAsset = useCallback(() => {
+        setIsEditMode(false);
+        setSelectedAsset(null);
+        setIsAddModalOpen(true);
+        onRegister?.();
+    }, [onRegister]);
+
+    const handleInventoryAssetClick = useCallback(
+        (asset: Asset) => {
+            setSelectedAsset(asset);
+            setIsDetailsOpen(true);
+            onAssetClick?.(asset);
+        },
+        [onAssetClick],
+    );
 
     // ── Category state ──
     const [showArchived, setShowArchived] = useState(false);
@@ -101,38 +145,30 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
     return (
         <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
+                <div className="mb-8 space-y-4">
                     <TabsList className="grid w-full max-w-[400px] grid-cols-2 h-11">
-                        <TabsTrigger value="inventory" className="text-sm">Inventory List</TabsTrigger>
-                        <TabsTrigger value="categories" className="text-sm">Asset Categories</TabsTrigger>
+                        <TabsTrigger value="inventory" className="text-sm">
+                            Inventory List
+                        </TabsTrigger>
+                        <TabsTrigger value="categories" className="text-sm">
+                            Asset Categories
+                        </TabsTrigger>
                     </TabsList>
-
-                    {activeTab === "inventory" && (
-                        <div className="flex gap-3 w-full lg:w-auto">
-                            <Button onClick={onRegister} className="h-10 flex-1 lg:flex-none">
-                                <Plus size={16} className="mr-2" />
-                                Register Asset
-                            </Button>
-                        </div>
-                    )}
-
                     {activeTab === "categories" && (
-                        <div className="flex gap-3 w-full lg:w-auto">
-                            <Button onClick={openCreate} className="gap-2 h-10">
+                        <div className="flex justify-end">
+                            <Button type="button" onClick={openCreate} className="gap-2 h-10">
                                 <Plus className="h-4 w-4" /> Add Category
                             </Button>
                         </div>
                     )}
                 </div>
 
-                {/* ── Inventory List Tab ── */}
-                <TabsContent value="inventory" className="space-y-8 mt-0">
-                    <AssetStats />
-                    <AssetTable onAssetClick={onAssetClick} />
-                </TabsContent>
-
-                {/* ── Asset Categories Tab ── */}
-                <TabsContent value="categories" className="mt-0">
+                {activeTab === "inventory" ? (
+                    <div className="space-y-8">
+                        <AssetStats />
+                        <AssetTable onAssetClick={handleInventoryAssetClick} onRegisterAsset={openRegisterAsset} />
+                    </div>
+                ) : (
                     <div className="space-y-6">
                         <div className="flex items-center gap-3">
                             <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -235,7 +271,7 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                             </div>
                         )}
                     </div>
-                </TabsContent>
+                )}
             </Tabs>
 
             {/* ── Category Create Dialog ── */}
@@ -318,6 +354,69 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                 open={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
                 category={selectedCategory}
+            />
+
+            <AddAssetModal
+                open={isAddModalOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setIsEditMode(false);
+                        setSelectedAsset(null);
+                    }
+                    setIsAddModalOpen(open);
+                }}
+                categories={activeCategories}
+                existingSerialNumbers={existingSerialNumbers}
+                mode={isEditMode ? "edit" : "create"}
+                initialData={isEditMode && selectedAsset ? selectedAsset : undefined}
+                onAddAsset={async (asset) => {
+                    const asNullableDate = (v?: string) => (v && v.trim() ? v : null);
+                    const payload: Record<string, unknown> = {
+                        assetName: asset.desc?.trim() || "",
+                        categoryId: asset.categoryId,
+                        lifecycleStatus: asset.lifecycleStatus ?? 0,
+                        currentCondition: asset.currentCondition ?? 0,
+                        image: asset.image || null,
+                        manufacturer: asset.manufacturer || null,
+                        model: asset.model || null,
+                        serialNumber: asset.serialNumber || null,
+                        purchaseDate: asNullableDate(asset.purchaseDate),
+                        vendor: asset.vendor || null,
+                        acquisitionCost: Number(asset.purchasePrice ?? 0),
+                        usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
+                        purchasePrice: Number(asset.purchasePrice ?? 0),
+                        residualValue: null,
+                        salvagePercentage: asset.salvagePercentage ?? null,
+                        isSalvageOverride: asset.isSalvageOverride ?? false,
+                        currentBookValue: Number(asset.currentBookValue ?? asset.purchasePrice ?? 0),
+                        monthlyDepreciation: Number(asset.monthlyDepreciation ?? 0),
+                        warrantyExpiry: asNullableDate(asset.warrantyExpiry),
+                        notes: asset.notes || null,
+                        documents: asset.documents || null,
+                        rowVersion: asset.rowVersion || null,
+                        tagNumber: asset.tagNumber || asset.assetCode || asset.id || `AST-${Date.now()}`,
+                    };
+                    if (isEditMode && selectedAsset) {
+                        await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as never });
+                    } else {
+                        await addAssetMutation.mutateAsync(payload as never);
+                    }
+                    setIsAddModalOpen(false);
+                    setIsEditMode(false);
+                    setSelectedAsset(null);
+                }}
+            />
+
+            <AssetDetailsModal
+                open={isDetailsOpen}
+                onOpenChange={setIsDetailsOpen}
+                asset={selectedAsset}
+                onEdit={(asset) => {
+                    setIsDetailsOpen(false);
+                    setSelectedAsset(asset);
+                    setIsEditMode(true);
+                    setIsAddModalOpen(true);
+                }}
             />
         </div>
     );

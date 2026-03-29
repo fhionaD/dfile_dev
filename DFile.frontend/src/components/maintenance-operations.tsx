@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Wrench, Plus, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, CheckCircle2, Eye, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";

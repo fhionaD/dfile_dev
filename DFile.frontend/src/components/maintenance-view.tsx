@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useMemo } from "react";
 import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
