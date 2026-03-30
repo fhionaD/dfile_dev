@@ -14,7 +14,6 @@ import { toast } from "sonner";
 
 import { Asset, Category } from "@/types/asset";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/auth-context";
 
 interface AddAssetFormProps {
     categories: Category[];
@@ -27,8 +26,6 @@ interface AddAssetFormProps {
 }
 
 export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
-    const { user } = useAuth();
-    const isAdmin = user?.role === "Admin";
     const isCreating = !initialData;
 
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
@@ -63,11 +60,10 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
     const isFormValid = useMemo(() => (
         assetName.trim().length > 0 &&
         selectedCategoryId.length > 0 &&
-        !!previewUrl &&
         warrantyExpiryValue.length > 0
-    ), [assetName, selectedCategoryId, previewUrl, warrantyExpiryValue]);
+    ), [assetName, selectedCategoryId, warrantyExpiryValue]);
 
-    const canSubmit = !isSubmitting && isFormValid && !(isAdmin && isCreating);
+    const canSubmit = !isSubmitting && isFormValid;
 
     useEffect(() => {
         if (!isSalvageOverride) {
@@ -87,14 +83,6 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
         e.preventDefault();
         if (isSubmitting) {
             toast.error("Request already in progress. Please wait.");
-            return;
-        }
-        if (isAdmin && isCreating) {
-            toast.error("Admin users are not permitted to register new assets.");
-            return;
-        }
-        if (!previewUrl) {
-            toast.error("Asset image is required.");
             return;
         }
         if (!warrantyExpiryValue) {
@@ -366,7 +354,7 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                                     {/* Asset Image – required */}
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                            Asset Image <span className="text-destructive">*</span>
+                                            Asset Image
                                         </Label>
                                         <div
                                             className="group relative border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 aspect-square w-full max-w-[360px] flex flex-col items-center justify-center p-4 transition-all duration-200 cursor-pointer overflow-hidden bg-background"
@@ -477,7 +465,7 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
             {/* Footer */}
             <div className="p-4 px-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between mt-auto z-10">
                 <div className="text-xs text-muted-foreground">
-                    {!isAdmin && !isFormValid && isCreating && (
+                    {!isFormValid && isCreating && (
                         <span>Fill in all required fields <span className="text-destructive font-bold">*</span> to enable registration.</span>
                     )}
                 </div>

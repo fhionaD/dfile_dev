@@ -19,6 +19,80 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getErrorMessage } from "@/lib/api";
 import { MaintenanceRecord } from "@/types/asset";
 
+// ── Occurrence expansion ──────────────────────────────────────────────────────
+
+type ScheduleOccurrence = MaintenanceRecord & {
+    /** Original record ID — used for all mutations and modal state. */
+    parentId: string;
+    /** The specific date this occurrence falls on. */
+    occurrenceDate: string;
+    /** 0-based index within the expanded series. */
+    occurrenceIndex: number;
+    /** Total occurrences generated from this parent record. */
+    totalOccurrences: number;
+};
+
+const ADVANCE_PER_FREQUENCY: Record<string, (d: Date) => Date> = {
+    Daily:     d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; },
+    Weekly:    d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; },
+    Monthly:   d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n; },
+    Quarterly: d => { const n = new Date(d); n.setMonth(n.getMonth() + 3); return n; },
+    Yearly:    d => { const n = new Date(d); n.setFullYear(n.getFullYear() + 1); return n; },
+};
+
+const MAX_OCCURRENCES: Record<string, number> = {
+    Daily: 366, Weekly: 104, Monthly: 60, Quarterly: 20, Yearly: 10,
+};
+
+function generateOccurrences(record: MaintenanceRecord): ScheduleOccurrence[] {
+    const advance = record.frequency ? ADVANCE_PER_FREQUENCY[record.frequency] : undefined;
+    const hasRange = !!record.startDate && !!record.endDate;
+
+    if (!advance || !hasRange) {
+        return [{
+            ...record,
+            parentId: record.id,
+            occurrenceDate: record.startDate ?? "",
+            occurrenceIndex: 0,
+            totalOccurrences: 1,
+        }];
+    }
+
+    const end = new Date(record.endDate!);
+    end.setHours(23, 59, 59, 999);
+
+    const list: ScheduleOccurrence[] = [];
+    let current = new Date(record.startDate!);
+    const max = MAX_OCCURRENCES[record.frequency!] ?? 100;
+
+    while (current <= end && list.length < max) {
+        const dateStr = current.toISOString().split("T")[0];
+        list.push({
+            ...record,
+            id: `${record.id}_occ_${list.length}`,
+            parentId: record.id,
+            startDate: dateStr,
+            occurrenceDate: dateStr,
+            occurrenceIndex: list.length,
+            totalOccurrences: 0, // back-filled below
+        });
+        current = advance(current);
+    }
+
+    const total = list.length;
+    list.forEach(o => { o.totalOccurrences = total; });
+
+    return list.length > 0 ? list : [{
+        ...record,
+        parentId: record.id,
+        occurrenceDate: record.startDate ?? "",
+        occurrenceIndex: 0,
+        totalOccurrences: 1,
+    }];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function SchedulesPage() {
     const { data: records = [], isLoading } = useMaintenanceRecords();
     const { data: assets = [] } = useAssets();
@@ -49,42 +123,50 @@ export default function SchedulesPage() {
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const updateRecordMutation = useUpdateMaintenanceRecord();
 
-    // Helper: get asset display name
     const getAssetDisplay = (assetId: string) => {
         const asset = assets.find(a => a.id === assetId);
         if (asset) return { name: asset.desc || assetId, code: asset.assetCode || asset.tagNumber || "" };
-        // Also try allocatedAssets
         const alloc = allocatedAssets.find(a => a.assetId === assetId);
         if (alloc) return { name: alloc.assetName || assetId, code: alloc.assetCode || alloc.tagNumber || "" };
         return { name: assetId, code: "" };
     };
 
-    const scheduledRecords = useMemo(() => {
-        return records.filter(r => !r.isArchived && ((r.frequency && r.frequency !== "One-time") || r.status === "Scheduled"));
-    }, [records]);
+    /** Original parent records — used for summary counts and modal lookups. */
+    const parentScheduledRecords = useMemo(() =>
+        records.filter(r => !r.isArchived && ((r.frequency && r.frequency !== "One-time") || r.status === "Scheduled")),
+        [records],
+    );
+
+    /** All occurrences expanded from parent records — drives the table. */
+    const scheduledOccurrences = useMemo(() =>
+        parentScheduledRecords.flatMap(r => generateOccurrences(r)),
+        [parentScheduledRecords],
+    );
 
     const filtered = useMemo(() => {
-        return scheduledRecords.filter(r => {
-            if (frequencyFilter !== "all" && r.frequency !== frequencyFilter) return false;
-            if (statusFilter !== "all" && r.status !== statusFilter) return false;
+        return scheduledOccurrences.filter(occ => {
+            if (frequencyFilter !== "all" && occ.frequency !== frequencyFilter) return false;
+            if (statusFilter !== "all" && occ.status !== statusFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const assetInfo = getAssetDisplay(r.assetId);
-                return r.description.toLowerCase().includes(q) ||
-                    r.assetId.toLowerCase().includes(q) ||
+                const assetInfo = getAssetDisplay(occ.assetId);
+                return (
+                    occ.description.toLowerCase().includes(q) ||
+                    occ.assetId.toLowerCase().includes(q) ||
                     assetInfo.name.toLowerCase().includes(q) ||
                     assetInfo.code.toLowerCase().includes(q) ||
-                    (r.assetName || "").toLowerCase().includes(q) ||
-                    (r.assetCode || "").toLowerCase().includes(q);
+                    (occ.assetName || "").toLowerCase().includes(q) ||
+                    (occ.assetCode || "").toLowerCase().includes(q) ||
+                    occ.occurrenceDate.includes(q)
+                );
             }
             return true;
         });
-    }, [scheduledRecords, searchQuery, frequencyFilter, statusFilter, assets, allocatedAssets]);
+    }, [scheduledOccurrences, searchQuery, frequencyFilter, statusFilter, assets, allocatedAssets]);
 
     const filteredAllocatedAssets = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         if (!q) return allocatedAssets;
-
         return allocatedAssets.filter(a =>
             (a.assetCode || "").toLowerCase().includes(q) ||
             (a.tagNumber || "").toLowerCase().includes(q) ||
@@ -95,25 +177,22 @@ export default function SchedulesPage() {
         );
     }, [allocatedAssets, searchQuery]);
 
-    const scheduledCount = scheduledRecords.filter(r => r.status === "Scheduled" || r.status === "Pending" || r.status === "Open").length;
-    const inProgressCount = scheduledRecords.filter(r => r.status === "In Progress" || r.status === "Inspection" || r.status === "Quoted").length;
-    const completedCount = scheduledRecords.filter(r => r.status === "Completed").length;
+    // Counts are based on unique parent records (not inflated by occurrences)
+    const scheduledCount  = parentScheduledRecords.filter(r => ["Scheduled", "Pending", "Open"].includes(r.status)).length;
+    const inProgressCount = parentScheduledRecords.filter(r => ["In Progress", "Inspection", "Quoted"].includes(r.status)).length;
+    const completedCount  = parentScheduledRecords.filter(r => r.status === "Completed").length;
 
     const priorityVariant: Record<string, "danger" | "warning" | "info" | "muted"> = {
-        High: "danger",
-        Medium: "warning",
-        Low: "info",
+        High: "danger", Medium: "warning", Low: "info",
+    };
+    const statusVariant: Record<string, "info" | "success" | "warning" | "muted"> = {
+        Open: "info", Inspection: "warning", Quoted: "muted",
+        Scheduled: "info", Pending: "warning", "In Progress": "warning", Completed: "success",
     };
 
-    const statusVariant: Record<string, "info" | "success" | "warning" | "muted"> = {
-        Open: "info",
-        Inspection: "warning",
-        Quoted: "muted",
-        Scheduled: "info",
-        Pending: "warning",
-        "In Progress": "warning",
-        Completed: "success",
-    };
+    /** Retrieve the original MaintenanceRecord for modal state (never pass a virtual occurrence). */
+    const getParentRecord = (occ: ScheduleOccurrence): MaintenanceRecord =>
+        records.find(r => r.id === occ.parentId) ?? (occ as unknown as MaintenanceRecord);
 
     return (
         <div className="space-y-6">
@@ -160,19 +239,19 @@ export default function SchedulesPage() {
                 </Card>
             </section>
 
-            {/* Upcoming Schedule – Next 30 Days */}
+            {/* Upcoming in 30 Days — uses expanded occurrences */}
             {(() => {
                 const now = new Date();
                 const thirtyDaysLater = new Date(now);
                 thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
 
-                const upcoming = scheduledRecords
-                    .filter(r => r.status !== "Completed" && r.startDate)
-                    .filter(r => {
-                        const d = new Date(r.startDate!);
+                const upcoming = scheduledOccurrences
+                    .filter(occ => occ.status !== "Completed" && occ.occurrenceDate)
+                    .filter(occ => {
+                        const d = new Date(occ.occurrenceDate);
                         return d >= now && d <= thirtyDaysLater;
                     })
-                    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
+                    .sort((a, b) => new Date(a.occurrenceDate).getTime() - new Date(b.occurrenceDate).getTime())
                     .slice(0, 5);
 
                 if (upcoming.length === 0 && !isLoading) return null;
@@ -190,15 +269,15 @@ export default function SchedulesPage() {
                                 <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
                             ) : (
                                 <div className="space-y-2">
-                                    {upcoming.map(r => {
-                                        const startDate = new Date(r.startDate!);
-                                        const daysUntil = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                                        const assetInfo = getAssetDisplay(r.assetId);
+                                    {upcoming.map(occ => {
+                                        const occDate = new Date(occ.occurrenceDate);
+                                        const daysUntil = Math.ceil((occDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                        const assetInfo = getAssetDisplay(occ.assetId);
                                         return (
                                             <div
-                                                key={r.id}
+                                                key={occ.id}
                                                 className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/60 transition-colors"
-                                                onClick={() => { setSelectedRecord(r); setIsDetailsModalOpen(true); }}
+                                                onClick={() => { setSelectedRecord(getParentRecord(occ)); setIsDetailsModalOpen(true); }}
                                             >
                                                 <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
                                                     daysUntil <= 3 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
@@ -208,13 +287,19 @@ export default function SchedulesPage() {
                                                     {daysUntil === 0 ? "!" : `${daysUntil}d`}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium truncate">{r.description}</p>
+                                                    <p className="text-sm font-medium truncate">{occ.description}</p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {assetInfo.code && <span className="font-mono">{assetInfo.code} · </span>}
-                                                        {startDate.toLocaleDateString()} · {r.frequency} · {r.priority}
+                                                        {occDate.toLocaleDateString()} · {occ.frequency}
+                                                        {occ.totalOccurrences > 1 && (
+                                                            <span className="ml-1 text-primary/70 font-medium">
+                                                                #{occ.occurrenceIndex + 1}/{occ.totalOccurrences}
+                                                            </span>
+                                                        )}
+                                                        {" · "}{occ.priority}
                                                     </p>
                                                 </div>
-                                                <StatusText variant={statusVariant[r.status] ?? "muted"}>{r.status}</StatusText>
+                                                <StatusText variant={statusVariant[occ.status] ?? "muted"}>{occ.status}</StatusText>
                                             </div>
                                         );
                                     })}
@@ -229,7 +314,7 @@ export default function SchedulesPage() {
             <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search by asset, description..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                    <Input placeholder="Search by asset, description, date..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
                 </div>
                 <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
                     <SelectTrigger className="w-[160px]"><SelectValue placeholder="Frequency" /></SelectTrigger>
@@ -260,6 +345,11 @@ export default function SchedulesPage() {
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-semibold">Maintenance Schedules</h2>
                         <Badge variant="secondary" className="font-mono text-xs">{filtered.length}</Badge>
+                        {filtered.length !== parentScheduledRecords.length && (
+                            <span className="text-xs text-muted-foreground">
+                                ({parentScheduledRecords.length} schedule{parentScheduledRecords.length !== 1 ? "s" : ""})
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -281,71 +371,97 @@ export default function SchedulesPage() {
                                     <TableHead>Frequency</TableHead>
                                     <TableHead>Priority</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Start Date</TableHead>
+                                    <TableHead>Date</TableHead>
                                     <TableHead>End Date</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filtered.map(r => {
-                                    const assetInfo = getAssetDisplay(r.assetId);
+                                {filtered.map(occ => {
+                                    const assetInfo = getAssetDisplay(occ.assetId);
+                                    const isRecurring = occ.totalOccurrences > 1;
                                     return (
                                         <TableRow
-                                            key={r.id}
+                                            key={occ.id}
                                             className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => { setSelectedRecord(r); setIsDetailsModalOpen(true); }}
+                                            onClick={() => { setSelectedRecord(getParentRecord(occ)); setIsDetailsModalOpen(true); }}
                                         >
+                                            {/* Asset */}
                                             <TableCell>
                                                 <div className="space-y-0.5">
                                                     <span className="text-sm font-medium block truncate max-w-[180px]">
-                                                        {r.assetName || assetInfo.name}
+                                                        {occ.assetName || assetInfo.name}
                                                     </span>
-                                                    {(r.assetCode || assetInfo.code) && (
+                                                    {(occ.assetCode || assetInfo.code) && (
                                                         <span className="text-xs text-muted-foreground font-mono block">
-                                                            {r.assetCode || assetInfo.code}
+                                                            {occ.assetCode || assetInfo.code}
                                                         </span>
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-medium max-w-[200px] truncate">{r.description}</TableCell>
+
+                                            {/* Description */}
+                                            <TableCell className="font-medium max-w-[200px] truncate">{occ.description}</TableCell>
+
+                                            {/* Frequency + occurrence badge */}
                                             <TableCell>
-                                                <div className="flex items-center gap-1.5">
-                                                    <RefreshCw className="h-3 w-3 text-muted-foreground" />
-                                                    <span className="text-sm">{r.frequency ?? "One-time"}</span>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                                                        <span className="text-sm">{occ.frequency ?? "One-time"}</span>
+                                                    </div>
+                                                    {isRecurring && (
+                                                        <span className="text-xs font-mono text-primary/80 font-semibold">
+                                                            #{occ.occurrenceIndex + 1} of {occ.totalOccurrences}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
+
+                                            {/* Priority */}
                                             <TableCell>
-                                                <StatusText variant={priorityVariant[r.priority] ?? "muted"}>{r.priority}</StatusText>
+                                                <StatusText variant={priorityVariant[occ.priority] ?? "muted"}>{occ.priority}</StatusText>
                                             </TableCell>
+
+                                            {/* Status */}
                                             <TableCell>
-                                                <StatusText variant={statusVariant[r.status] ?? "muted"}>{r.status}</StatusText>
+                                                <StatusText variant={statusVariant[occ.status] ?? "muted"}>{occ.status}</StatusText>
                                             </TableCell>
+
+                                            {/* Occurrence date */}
+                                            <TableCell className="text-sm tabular-nums">
+                                                {occ.occurrenceDate
+                                                    ? new Date(occ.occurrenceDate).toLocaleDateString()
+                                                    : "—"}
+                                            </TableCell>
+
+                                            {/* End date (from parent record) */}
                                             <TableCell className="text-sm text-muted-foreground tabular-nums">
-                                                {r.startDate ? new Date(r.startDate).toLocaleDateString() : "—"}
+                                                {occ.endDate ? new Date(occ.endDate).toLocaleDateString() : "—"}
                                             </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground tabular-nums">
-                                                {r.endDate ? new Date(r.endDate).toLocaleDateString() : "—"}
-                                            </TableCell>
+
+                                            {/* Action */}
                                             <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                                                 {(() => {
-                                                    const nextStatus = NEXT_STATUS[r.status];
+                                                    const nextStatus = NEXT_STATUS[occ.status];
                                                     if (!nextStatus) return <StatusText variant="success">Done</StatusText>;
 
                                                     const needsInspection = nextStatus === "Inspection";
-                                                    const needsQuotation = nextStatus === "Quoted";
+                                                    const needsQuotation  = nextStatus === "Quoted";
 
                                                     return (
                                                         <Button
                                                             size="sm"
                                                             variant={nextStatus === "Completed" ? "default" : "outline"}
                                                             onClick={() => {
+                                                                const orig = getParentRecord(occ);
                                                                 if (needsInspection) {
-                                                                    setInspectionTarget(r);
+                                                                    setInspectionTarget(orig);
                                                                 } else if (needsQuotation) {
-                                                                    setSelectedRecord(r);
+                                                                    setSelectedRecord(orig);
                                                                     setIsDetailsModalOpen(true);
                                                                 } else {
-                                                                    setAdvanceTarget({ id: r.id, nextStatus });
+                                                                    setAdvanceTarget({ id: occ.parentId, nextStatus });
                                                                 }
                                                             }}
                                                             className={nextStatus === "Completed" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}

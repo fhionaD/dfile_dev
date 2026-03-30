@@ -17,11 +17,13 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly PermissionService _permissionService;
 
-        public AssetCategoriesController(AppDbContext context, IAuditService auditService)
+        public AssetCategoriesController(AppDbContext context, IAuditService auditService, PermissionService permissionService)
         {
             _context = context;
             _auditService = auditService;
+            _permissionService = permissionService;
         }
 
         private int? GetCurrentUserId()
@@ -33,10 +35,20 @@ namespace DFile.backend.Controllers
         private static readonly string[] StatusLabels = { "", "Available", "In Use", "Maintenance", "Disposed" };
 
         [HttpGet]
-        [RequirePermission("AssetCategories", "CanView")]
         public async Task<ActionResult<IEnumerable<AssetCategoryResponseDto>>> GetAssetCategories([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue) return Forbid();
+                var canAssetCategories = await _permissionService.HasPermission(userId.Value, tenantId.Value, "AssetCategories", "CanView");
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var isMaintenanceRole = User.IsInRole("Maintenance");
+                if (!canAssetCategories && !canAssets && !isMaintenanceRole)
+                    return StatusCode(403, new { message = "You do not have permission to view asset categories." });
+            }
 
             var categoriesQuery = _context.AssetCategories
                 .Include(c => c.CreatedByUser)

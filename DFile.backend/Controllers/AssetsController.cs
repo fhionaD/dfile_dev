@@ -18,6 +18,7 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly PermissionService _permissionService;
 
         private static readonly Dictionary<LifecycleStatus, string> StatusLabels = new()
         {
@@ -40,10 +41,11 @@ namespace DFile.backend.Controllers
             { AssetCondition.Unknown, "Unknown" }
         };
 
-        public AssetsController(AppDbContext context, IAuditService auditService)
+        public AssetsController(AppDbContext context, IAuditService auditService, PermissionService permissionService)
         {
             _context = context;
             _auditService = auditService;
+            _permissionService = permissionService;
         }
 
         private int? GetCurrentUserId()
@@ -59,7 +61,6 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet]
-        [RequirePermission("Assets", "CanView")]
         public async Task<ActionResult> GetAssets(
             [FromQuery] bool showArchived = false,
             [FromQuery] int? page = null,
@@ -69,6 +70,16 @@ namespace DFile.backend.Controllers
             [FromQuery] string? category = null)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue) return Forbid();
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var isMaintenanceRole = User.IsInRole("Maintenance");
+                if (!canAssets && !isMaintenanceRole)
+                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+            }
             var query = _context.Assets.AsQueryable();
 
             if (!IsSuperAdmin() && tenantId.HasValue)
@@ -161,11 +172,20 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("summary")]
-        [RequirePermission("Assets", "CanView")]
         public async Task<ActionResult<object>> GetAssetSummary()
         {
             var tenantId = GetCurrentTenantId();
-            
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue) return Forbid();
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var isMaintenanceRole = User.IsInRole("Maintenance");
+                if (!canAssets && !isMaintenanceRole)
+                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+            }
+
             var query = _context.Assets.Where(a => !a.IsArchived && a.LifecycleStatus != LifecycleStatus.Disposed);
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
@@ -191,10 +211,19 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("available-for-allocation")]
-        [RequirePermission("Assets", "CanView")]
         public async Task<ActionResult<IEnumerable<AssetResponseDto>>> GetAvailableForAllocation()
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue) return Forbid();
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var isMaintenanceRole = User.IsInRole("Maintenance");
+                if (!canAssets && !isMaintenanceRole)
+                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+            }
             var query = _context.Assets.Where(a => !a.IsArchived && 
                 (a.LifecycleStatus == LifecycleStatus.Registered || a.LifecycleStatus == LifecycleStatus.InUse));
 
@@ -224,10 +253,20 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("{id}")]
-        [RequirePermission("Assets", "CanView")]
         public async Task<ActionResult<AssetResponseDto>> GetAsset(string id)
         {
             var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin())
+            {
+                if (!tenantId.HasValue || !userId.HasValue) return Forbid();
+                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                var isMaintenanceRole = User.IsInRole("Maintenance");
+                if (!canAssets && !isMaintenanceRole)
+                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+            }
+
             var asset = await _context.Assets.FindAsync(id);
 
             if (asset == null) return NotFound();
