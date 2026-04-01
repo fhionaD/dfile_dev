@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,15 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
               "Login"
             )}
           </Button>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/register" className="font-semibold text-primary hover:underline">
+                Create organization
+              </Link>
+            </p>
+          </div>
 
           <p className="mt-6 text-center text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
             Protected by DFile Security
