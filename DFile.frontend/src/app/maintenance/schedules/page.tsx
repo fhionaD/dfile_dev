@@ -162,7 +162,7 @@ export default function SchedulesPage() {
             }
             return true;
         });
-    }, [scheduledOccurrences, searchQuery, frequencyFilter, statusFilter, assets, allocatedAssets]);
+    }, [scheduledOccurrences, searchQuery, frequencyFilter, statusFilter, getAssetDisplay]);
 
     const filteredAllocatedAssets = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();

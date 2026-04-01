@@ -27,8 +27,9 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
     if (onLogin) {
       try {
         await onLogin(email, password);
-      } catch (err: any) {
-        setError(err?.message ?? "An unexpected error occurred. Please try again.");
+      } catch (err: unknown) {
+        const error = err as { message?: string } | undefined;
+        setError(error?.message ?? "An unexpected error occurred. Please try again.");
         setIsLoading(false);
       }
     } else {
@@ -134,7 +135,7 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/register" className="font-semibold text-primary hover:underline">
                 Create organization
               </Link>

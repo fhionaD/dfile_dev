@@ -40,19 +40,19 @@ export default function RegisterOrganizationPage() {
                 <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center py-8">
                     <img
                         src="/bg_login.svg"
-                        alt=""
-                        aria-hidden="true"
+                        alt="Background illustration"
+                        aria-hidden="false"
                         className="w-full max-w-xs xl:max-w-sm object-contain select-none opacity-90"
                     />
                 </div>
                 <div className="relative z-10 shrink-0">
                     <blockquote className="space-y-3">
                         <p className="text-lg font-medium leading-relaxed text-white/80">
-                            "Create your organization, then sign in as tenant admin to manage assets, billing, and
-                            your team."
+                            &ldquo;Create your organization, then sign in as tenant admin to manage assets, billing, and
+                            your team.&rdquo;
                         </p>
                         <footer className="text-xs font-semibold uppercase tracking-widest text-white/35">
-                            DFile — Enterprise Asset Management
+                            DFile &mdash; Enterprise Asset Management
                         </footer>
                     </blockquote>
                 </div>
@@ -71,8 +71,8 @@ export default function RegisterOrganizationPage() {
                         </div>
 
                         <div className="flex justify-center lg:justify-start lg:hidden">
-                            <img src="/AMS.svg" alt="DFile" className="h-14 w-auto dark:hidden" />
-                            <img src="/AMS_dark.svg" alt="DFile" className="hidden h-14 w-auto dark:block" />
+                            <img src="/AMS.svg" alt="DFile Logo" className="h-14 w-auto dark:hidden" />
+                            <img src="/AMS_dark.svg" alt="DFile Logo" className="hidden h-14 w-auto dark:block" />
                         </div>
 
                         <div>
