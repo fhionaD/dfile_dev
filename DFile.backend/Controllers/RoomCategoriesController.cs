@@ -309,34 +309,100 @@ namespace DFile.backend.Controllers
             if (category == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && category.TenantId != tenantId) return NotFound();
 
-            // Prevent archiving if active room units are assigned
-            var activeRoomCount = await _context.Rooms
-                .Where(r => r.CategoryId == id && !r.IsArchived)
-                .Where(r => IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId)
-                .CountAsync();
+            var now = DateTime.UtcNow;
+            var userIdStr = userId?.ToString();
 
-            if (activeRoomCount > 0)
-                return Conflict(new { message = "This room category cannot be archived because active room units are assigned to it." });
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
-            category.IsArchived = true;
-            category.ArchivedAt = DateTime.UtcNow;
-            category.ArchivedBy = userId?.ToString();
-            category.UpdatedAt = DateTime.UtcNow;
-            category.UpdatedBy = userId;
-
-            _auditService.Add(HttpContext, new AuditLog
+            try
             {
-                Action = "Archive",
-                EntityType = "RoomCategory",
-                EntityId = id,
-                Module = "Configuration",
-                UserId = userId,
-                TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = true }),
-            });
+                // Cascade-archive any active room units assigned to this category (no 409 — rooms are archived with the category)
+                var activeRooms = await _context.Rooms
+                    .Where(r => r.CategoryId == id && !r.IsArchived)
+                    .Where(r => IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId)
+                    .ToListAsync();
 
-            await _context.SaveChangesAsync();
-            return NoContent();
+                foreach (var room in activeRooms)
+                {
+                    room.IsArchived = true;
+                    room.ArchivedAt = now;
+                    room.ArchivedBy = userIdStr;
+                    room.UpdatedAt = now;
+                    room.UpdatedBy = userId;
+
+                    _auditService.Add(HttpContext, new AuditLog
+                    {
+                        Action = "Archive",
+                        EntityType = "Room",
+                        EntityId = room.Id,
+                        Module = "Configuration",
+                        UserId = userId,
+                        TenantId = tenantId,
+                        NewValues = JsonSerializer.Serialize(new { room.Name, IsArchived = true, Reason = "Cascade from category archive" }),
+                    });
+                }
+
+                var activeSubs = await _context.RoomSubCategories
+                    .Where(s => s.RoomCategoryId == id && !s.IsArchived)
+                    .Where(s => IsSuperAdmin() || !tenantId.HasValue || s.TenantId == tenantId)
+                    .ToListAsync();
+
+                foreach (var sub in activeSubs)
+                {
+                    sub.IsArchived = true;
+                    sub.UpdatedAt = now;
+                    sub.UpdatedBy = userId;
+
+                    _auditService.Add(HttpContext, new AuditLog
+                    {
+                        Action = "Archive",
+                        EntityType = "RoomSubCategory",
+                        EntityId = sub.Id,
+                        Module = "Configuration",
+                        UserId = userId,
+                        TenantId = tenantId,
+                        NewValues = JsonSerializer.Serialize(new { sub.Name, IsArchived = true, Reason = "Cascade from category archive" }),
+                    });
+                }
+
+                category.IsArchived = true;
+                category.ArchivedAt = now;
+                category.ArchivedBy = userIdStr;
+                category.UpdatedAt = now;
+                category.UpdatedBy = userId;
+
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Archive",
+                    EntityType = "RoomCategory",
+                    EntityId = id,
+                    Module = "Configuration",
+                    UserId = userId,
+                    TenantId = tenantId,
+                    NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = true, CascadedRooms = activeRooms.Count, CascadedSubCategories = activeSubs.Count }),
+                });
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // 200 + body (not 204) so clients can confirm the new API build; old builds returned 409 Conflict here.
+                return Ok(new
+                {
+                    message = "Room category archived successfully.",
+                    cascadedRoomCount = activeRooms.Count,
+                    cascadedSubCategoryCount = activeSubs.Count,
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                if (ex is DbUpdateException)
+                {
+                    return Conflict(new { message = "Could not archive this room category. Try again or contact support if the problem persists." });
+                }
+
+                throw;
+            }
         }
 
         [HttpPatch("{id}/restore")]

@@ -57,7 +57,7 @@ function CategoryDetailsDialog({ detailRow, detailOpen, setDetailOpen, handleEdi
                     {[
                         { label: "Category Name", value: detailRow.category.name },
                         { label: "Sub-Category", value: detailRow.subCategory?.name || "—" },
-                        { label: "Description", value: detailRow.category.description || "—" },
+                        { label: "Description", value: detailRow.subCategory?.description || "—" },
                         { label: "Created By", value: detailRow.subCategory?.createdByName || detailRow.category.createdByName || "—" },
                         { label: "Created At", value: detailRow.subCategory?.createdAt ? new Date(detailRow.subCategory.createdAt).toLocaleDateString() : detailRow.category.createdAt ? new Date(detailRow.category.createdAt).toLocaleDateString() : "—" },
                         { label: "Updated By", value: detailRow.subCategory?.updatedByName || detailRow.category.updatedByName || detailRow.category.createdByName || "—" },
@@ -113,6 +113,7 @@ export default function LocationsPage() {
     const updateSubCategory = useUpdateRoomSubCategory();
     const [catSearch, setCatSearch] = useState("");
     const [archiveCatTarget, setArchiveCatTarget] = useState<string | null>(null);
+    const [restoreCatTarget, setRestoreCatTarget] = useState<string | null>(null);
     const [catPageIndex, setCatPageIndex] = useState(0);
     const [catPageSize, setCatPageSize] = useState(10);
 
@@ -197,7 +198,7 @@ export default function LocationsPage() {
             }
 
             addSubCategory.mutate(
-                { name: subCatName, description: "", roomCategoryId: existingCategory.id },
+                { name: subCatName, description: catCreateForm.description.trim(), roomCategoryId: existingCategory.id },
                 { onSuccess: () => setIsCatCreateOpen(false) }
             );
             return;
@@ -208,7 +209,7 @@ export default function LocationsPage() {
             {
                 onSuccess: (newCategory) => {
                     addSubCategory.mutate(
-                        { name: subCatName, description: "", roomCategoryId: newCategory.id },
+                        { name: subCatName, description: catCreateForm.description.trim(), roomCategoryId: newCategory.id },
                         { onSuccess: () => setIsCatCreateOpen(false) }
                     );
                 },
@@ -223,7 +224,8 @@ export default function LocationsPage() {
         setCatEditForm({
             name: row.category.name,
             subCategoryName: row.subCategory?.name || "",
-            description: row.category.description,
+            // Description belongs to the subcategory, not the shared parent category
+            description: row.subCategory?.description || "",
         });
         setIsCatEditOpen(true);
     };
@@ -235,11 +237,13 @@ export default function LocationsPage() {
         const nextDescription = catEditForm.description.trim();
         const nextSubCategoryName = catEditForm.subCategoryName.trim();
 
-        const hasCategoryChanges =
-            editingCategory.name !== nextCategoryName ||
-            (editingCategory.description || "") !== nextDescription;
-        const hasSubCategoryChanges = !!editingSubCategory &&
-            editingSubCategory.name !== nextSubCategoryName;
+        // Category-level: only the name is shared across subcategories
+        const hasCategoryChanges = editingCategory.name !== nextCategoryName;
+        // Subcategory-level: name AND description are independent per subcategory
+        const hasSubCategoryChanges = !!editingSubCategory && (
+            editingSubCategory.name !== nextSubCategoryName ||
+            (editingSubCategory.description || "") !== nextDescription
+        );
 
         const finish = () => {
             setIsCatEditOpen(false);
@@ -258,7 +262,7 @@ export default function LocationsPage() {
                     id: editingSubCategory.id,
                     payload: {
                         name: nextSubCategoryName,
-                        description: editingSubCategory.description || "",
+                        description: nextDescription,
                         rowVersion: editingSubCategory.rowVersion,
                     },
                 },
@@ -272,7 +276,7 @@ export default function LocationsPage() {
                     id: editingCategory.id,
                     payload: {
                         name: nextCategoryName,
-                        description: nextDescription,
+                        description: editingCategory.description || "",
                         rowVersion: editingCategory.rowVersion,
                     },
                 },
@@ -377,15 +381,21 @@ export default function LocationsPage() {
                                                 <button type="button" className="text-primary hover:underline text-left" onClick={(e) => { e.stopPropagation(); handleCatRowClick(row); }}>{row.category.name}</button>
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">{row.subCategory?.name || "—"}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.category.description || "—"}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.subCategory?.description || "—"}</TableCell>
                                             <TableCell className="text-muted-foreground text-xs">{new Date(row.category.updatedAt || row.category.createdAt || "").toLocaleDateString()}</TableCell>
                                             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                                 {catShowArchived ? (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreCategory.mutate(row.category.id)}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => setRestoreCatTarget(row.category.id)}>
                                                         <RotateCcw className="h-4 w-4" />
                                                     </Button>
                                                 ) : (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" title="Archive" onClick={() => setArchiveCatTarget(row.category.id)}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                        title="Archive"
+                                                        onClick={() => setArchiveCatTarget(row.category.id)}
+                                                    >
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
                                                 )}
@@ -531,17 +541,43 @@ export default function LocationsPage() {
             />
 
             {/* ════════════  CONFIRM DIALOGS  ════════════ */}
+            {(() => {
+                const targetCat = archiveCatTarget ? allCategories.find(c => c.id === archiveCatTarget) : null;
+                const cascadeRooms = targetCat?.roomCount ?? 0;
+                const cascadeSubs = targetCat?.subCategoryCount ?? 0;
+                const cascadeNote = cascadeRooms > 0
+                    ? ` This will also archive ${cascadeRooms} room unit${cascadeRooms !== 1 ? "s" : ""}${cascadeSubs > 0 ? ` and ${cascadeSubs} sub-categor${cascadeSubs !== 1 ? "ies" : "y"}` : ""} assigned to it.`
+                    : cascadeSubs > 0
+                        ? ` This will also archive ${cascadeSubs} sub-categor${cascadeSubs !== 1 ? "ies" : "y"} under it.`
+                        : "";
+                return (
+                    <ConfirmDialog
+                        open={archiveCatTarget !== null}
+                        onOpenChange={(open) => { if (!open) setArchiveCatTarget(null); }}
+                        title="Archive Room Category"
+                        description={`Are you sure you want to archive this room category?${cascadeNote}`}
+                        confirmLabel="Archive"
+                        confirmVariant="destructive"
+                        onConfirm={async () => {
+                            if (archiveCatTarget) {
+                                archiveCategory.mutate(archiveCatTarget);
+                                setArchiveCatTarget(null);
+                            }
+                        }}
+                    />
+                );
+            })()}
+
             <ConfirmDialog
-                open={archiveCatTarget !== null}
-                onOpenChange={(open) => { if (!open) setArchiveCatTarget(null); }}
-                title="Archive Room Category"
-                description="Are you sure you want to archive this room category? Categories with active room units cannot be archived."
-                confirmLabel="Archive"
-                confirmVariant="destructive"
+                open={restoreCatTarget !== null}
+                onOpenChange={(open) => { if (!open) setRestoreCatTarget(null); }}
+                title="Restore Room Category"
+                description="Are you sure you want to restore this room category? It will become active again."
+                confirmLabel="Restore"
                 onConfirm={async () => {
-                    if (archiveCatTarget) {
-                        archiveCategory.mutate(archiveCatTarget);
-                        setArchiveCatTarget(null);
+                    if (restoreCatTarget) {
+                        restoreCategory.mutate(restoreCatTarget);
+                        setRestoreCatTarget(null);
                     }
                 }}
             />

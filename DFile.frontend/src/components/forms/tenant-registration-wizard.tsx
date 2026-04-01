@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { Loader2, Check, Eye, EyeOff, Phone, ChevronLeft } from "lucide-react";
+import { Loader2, Check, Eye, EyeOff, Phone, ChevronLeft, Circle, CircleCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,13 @@ const STEPS = ["Account", "Organization", "Plan"] as const;
 
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const PASSWORD_REQUIREMENTS = [
+    { label: "At least one uppercase letter", test: /[A-Z]/ },
+    { label: "At least one lowercase letter", test: /[a-z]/ },
+    { label: "At least one number", test: /[0-9]/ },
+    { label: "At least one special character", test: /[^A-Za-z0-9]/ },
+] as const;
+
 type AvailabilityResponse = { available: boolean; message?: string };
 
 function parseApiErrorMessage(data: unknown): string {
@@ -79,6 +86,15 @@ async function fetchRegisterAvailability(email: string, tenantName?: string): Pr
     if (t) params.tenantName = t;
     const { data } = await api.get<AvailabilityResponse>("/api/Tenants/register/availability", { params });
     return data;
+}
+
+/** Renders an always-present error slot so fields don't shift when errors appear. */
+function FieldError({ message }: { message?: string }) {
+    return (
+        <div className="min-h-[18px]">
+            {message && <p className="text-xs text-destructive">{message}</p>}
+        </div>
+    );
 }
 
 export function TenantRegistrationWizard() {
@@ -102,6 +118,16 @@ export function TenantRegistrationWizard() {
     const [checkingAvailability, setCheckingAvailability] = useState(false);
     const [emailHint, setEmailHint] = useState<"idle" | "checking" | "available" | "taken">("idle");
 
+    const passwordMet = PASSWORD_REQUIREMENTS.map((req) => req.test.test(initialPassword));
+    const allPasswordMet = passwordMet.every(Boolean);
+
+    // Real-time derived state — drives live feedback independent of submit errors
+    const pwdTouched = initialPassword.length > 0;
+    const confirmTouched = confirmPassword.length > 0;
+    const passwordsMatch = initialPassword === confirmPassword;
+    const pwdHasError = (!pwdTouched && !!errors.initialPassword) || (pwdTouched && !allPasswordMet);
+    const confirmHasError = (!confirmTouched && !!errors.confirmPassword) || (confirmTouched && !passwordsMatch);
+
     const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         if (value === "") {
@@ -117,8 +143,13 @@ export function TenantRegistrationWizard() {
     const validateStep0 = (): boolean => {
         const next: Record<string, string> = {};
         if (!workEmail.trim()) next.workEmail = "Work email is required";
-        if (!initialPassword || initialPassword.length < 6)
+        if (!initialPassword) {
+            next.initialPassword = "Password is required";
+        } else if (initialPassword.length < 6) {
             next.initialPassword = "Password must be at least 6 characters";
+        } else if (!allPasswordMet) {
+            next.initialPassword = "Password does not meet all requirements";
+        }
         if (initialPassword !== confirmPassword) next.confirmPassword = "Passwords do not match";
         setErrors(next);
         return Object.keys(next).length === 0;
@@ -301,6 +332,7 @@ export function TenantRegistrationWizard() {
 
     return (
         <div className="space-y-6">
+            {/* Step indicator */}
             <div className="flex items-center justify-between gap-2">
                 <div className="flex gap-1 sm:gap-2">
                     {STEPS.map((label, i) => (
@@ -333,13 +365,16 @@ export function TenantRegistrationWizard() {
                 </div>
             </div>
 
+            {/* Step 0 — Account */}
             {step === 0 && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <div className="border-b pb-2">
                         <h3 className="text-lg font-semibold text-foreground">Account</h3>
                         <p className="text-sm text-muted-foreground">Your work email and password for signing in.</p>
                     </div>
-                    <div className="grid gap-2">
+
+                    {/* Work email — full width */}
+                    <div className="space-y-1.5">
                         <Label htmlFor="workEmail">
                             Work email <span className="text-red-500">*</span>
                         </Label>
@@ -360,79 +395,124 @@ export function TenantRegistrationWizard() {
                             }}
                             className={cn(errors.workEmail && "border-destructive")}
                         />
-                        {emailHint === "checking" && (
-                            <p className="text-xs text-muted-foreground">Checking email…</p>
-                        )}
-                        {emailHint === "available" && !errors.workEmail && (
-                            <p className="text-xs text-green-600 dark:text-green-500">Email is available.</p>
-                        )}
-                        {errors.workEmail && <p className="text-xs text-destructive">{errors.workEmail}</p>}
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label htmlFor="initialPassword">
-                                Password <span className="text-red-500">*</span>
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    id="initialPassword"
-                                    type={showPassword ? "text" : "password"}
-                                    autoComplete="new-password"
-                                    placeholder="Min 6 characters"
-                                    value={initialPassword}
-                                    onChange={(e) => setInitialPassword(e.target.value)}
-                                    minLength={6}
-                                    className={cn("pr-10", errors.initialPassword && "border-destructive")}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                >
-                                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                </button>
-                            </div>
-                            {errors.initialPassword && (
-                                <p className="text-xs text-destructive">{errors.initialPassword}</p>
+                        <div className="min-h-[18px]">
+                            {emailHint === "checking" && (
+                                <p className="text-xs text-muted-foreground">Checking email…</p>
                             )}
+                            {emailHint === "available" && !errors.workEmail && (
+                                <p className="text-xs text-green-600 dark:text-green-500">Email is available.</p>
+                            )}
+                            {errors.workEmail && <p className="text-xs text-destructive">{errors.workEmail}</p>}
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="confirmPassword">
-                                Confirm password <span className="text-red-500">*</span>
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    id="confirmPassword"
-                                    type={showConfirmPassword ? "text" : "password"}
-                                    autoComplete="new-password"
-                                    placeholder="Confirm password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className={cn("pr-10", errors.confirmPassword && "border-destructive")}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    </div>
+
+                    {/* Requirements checklist — above the password field */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-md border bg-muted/40 px-4 py-3">
+                        {PASSWORD_REQUIREMENTS.map((req, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                {passwordMet[i] ? (
+                                    <CircleCheck className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                                ) : (
+                                    <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                                )}
+                                <span
+                                    className={cn(
+                                        "text-xs",
+                                        passwordMet[i]
+                                            ? "text-green-600 dark:text-green-400"
+                                            : "text-muted-foreground",
+                                    )}
                                 >
-                                    {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                </button>
+                                    {req.label}
+                                </span>
                             </div>
-                            {errors.confirmPassword && (
+                        ))}
+                    </div>
+
+                    {/* Password — full width */}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="initialPassword">
+                            Password <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="initialPassword"
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                placeholder="Create a strong password"
+                                value={initialPassword}
+                                onChange={(e) => setInitialPassword(e.target.value)}
+                                className={cn("pr-10", pwdHasError && "border-destructive")}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                        <div className="min-h-[18px]">
+                            {!pwdTouched && errors.initialPassword ? (
+                                <p className="text-xs text-destructive">{errors.initialPassword}</p>
+                            ) : pwdTouched && !allPasswordMet ? (
+                                <p className="text-xs text-destructive">Password does not meet all requirements</p>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    {/* Confirm password — full width */}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="confirmPassword">
+                            Confirm password <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="confirmPassword"
+                                type={showConfirmPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                placeholder="Re-enter your password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className={cn("pr-10", confirmHasError && "border-destructive")}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                        <div className="min-h-[18px]">
+                            {confirmTouched ? (
+                                passwordsMatch ? (
+                                    <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                                        <CircleCheck className="h-3.5 w-3.5 shrink-0" /> Passwords match
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5 text-xs text-destructive">
+                                        <Circle className="h-3.5 w-3.5 shrink-0" /> Passwords do not match
+                                    </span>
+                                )
+                            ) : errors.confirmPassword ? (
                                 <p className="text-xs text-destructive">{errors.confirmPassword}</p>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* Step 1 — Organization */}
             {step === 1 && (
                 <div className="space-y-4">
                     <div className="border-b pb-2">
                         <h3 className="text-lg font-semibold text-foreground">Organization</h3>
                         <p className="text-sm text-muted-foreground">Name your organization and admin profile.</p>
                     </div>
-                    <div className="grid gap-2">
+
+                    {/* Organization name */}
+                    <div className="grid gap-1.5">
                         <Label htmlFor="tenantName">
                             Organization name <span className="text-red-500">*</span>
                         </Label>
@@ -443,47 +523,54 @@ export function TenantRegistrationWizard() {
                             onChange={(e) => setTenantName(e.target.value)}
                             className={cn("h-10", errors.tenantName && "border-destructive")}
                         />
-                        {errors.tenantName && <p className="text-xs text-destructive">{errors.tenantName}</p>}
+                        <FieldError message={errors.tenantName} />
                     </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="grid gap-2">
-                            <Label htmlFor="firstName">
+
+                    {/* Name fields — always 3 columns, never stack */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="firstName" className="block truncate text-sm">
                                 First name <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="firstName"
-                                placeholder="e.g. John"
+                                placeholder="First"
                                 value={firstName}
                                 onChange={(e) => setFirstName(e.target.value)}
-                                className={cn(errors.firstName && "border-destructive")}
+                                className={cn("h-10 w-full", errors.firstName && "border-destructive")}
                             />
-                            {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
+                            <FieldError message={errors.firstName} />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="middleName" className="text-muted-foreground">
-                                Middle name <span className="text-xs font-normal">(optional)</span>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="middleName" className="block truncate text-sm">
+                                Middle name
                             </Label>
                             <Input
                                 id="middleName"
+                                placeholder="Middle"
                                 value={middleName}
                                 onChange={(e) => setMiddleName(e.target.value)}
+                                className="h-10 w-full"
                             />
+                            <FieldError />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="lastName">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="lastName" className="block truncate text-sm">
                                 Last name <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="lastName"
-                                placeholder="e.g. Doe"
+                                placeholder="Last"
                                 value={lastName}
                                 onChange={(e) => setLastName(e.target.value)}
-                                className={cn(errors.lastName && "border-destructive")}
+                                className={cn("h-10 w-full", errors.lastName && "border-destructive")}
                             />
-                            {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
+                            <FieldError message={errors.lastName} />
                         </div>
                     </div>
-                    <div className="relative grid gap-2">
+
+                    {/* Contact number */}
+                    <div className="grid gap-1.5">
                         <Label htmlFor="contactNumber">Contact number</Label>
                         <div className="relative">
                             <Input
@@ -496,20 +583,19 @@ export function TenantRegistrationWizard() {
                             <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         </div>
                         <p className="text-right text-[10px] text-muted-foreground">{contactNumber.length}/11</p>
-                        {errors.contactNumber && (
-                            <p className="text-xs font-medium text-destructive">{errors.contactNumber}</p>
-                        )}
+                        <FieldError message={errors.contactNumber} />
                     </div>
                 </div>
             )}
 
+            {/* Step 2 — Plan */}
             {step === 2 && (
                 <div className="space-y-4">
                     <div className="border-b pb-2">
                         <h3 className="text-lg font-semibold text-foreground">Plan</h3>
                         <p className="text-sm text-muted-foreground">Choose a subscription. You can change this later.</p>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                         {plans.map((plan) => (
                             <Card
                                 key={plan.id}
@@ -534,20 +620,20 @@ export function TenantRegistrationWizard() {
                                         SELECTED
                                     </div>
                                 )}
-                                <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-left text-lg font-semibold">{plan.name}</CardTitle>
-                                    <CardDescription className="mt-1 text-left text-2xl font-bold text-primary">
+                                <CardHeader className="px-5 pb-3 pt-5">
+                                    <CardTitle className="text-left text-xl font-semibold">{plan.name}</CardTitle>
+                                    <CardDescription className="mt-1 text-left text-3xl font-bold text-primary">
                                         {plan.price}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0">
-                                    <ul className="space-y-2">
+                                <CardContent className="px-5 pb-5 pt-0">
+                                    <ul className="space-y-2.5">
                                         {plan.features.map((feature, i) => (
                                             <li
                                                 key={i}
-                                                className="flex items-start gap-2 text-left text-xs font-normal text-muted-foreground"
+                                                className="flex items-start gap-2 text-left text-sm font-normal text-muted-foreground"
                                             >
-                                                <Check className="h-4 w-4 shrink-0 text-green-500" />
+                                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
                                                 <span>{feature}</span>
                                             </li>
                                         ))}
@@ -563,20 +649,25 @@ export function TenantRegistrationWizard() {
                 <p className="text-center text-sm font-medium text-destructive">{errors.submit}</p>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <div>
-                    {step > 0 && (
+            {/* Actions */}
+            <div className="pt-2 space-y-3">
+                {/* Back button — left-aligned when visible */}
+                {step > 0 && (
+                    <div>
                         <Button type="button" variant="ghost" size="sm" onClick={goBack} className="gap-1">
                             <ChevronLeft className="h-4 w-4" />
                             Back
                         </Button>
-                    )}
-                </div>
-                <div className="flex gap-2">
+                    </div>
+                )}
+
+                {/* Primary button — centered */}
+                <div className="flex justify-center">
                     {step < 2 ? (
                         <Button
                             type="button"
                             size="lg"
+                            className="min-w-[160px]"
                             onClick={() => void goNext()}
                             disabled={checkingAvailability}
                         >
@@ -590,7 +681,7 @@ export function TenantRegistrationWizard() {
                             )}
                         </Button>
                     ) : (
-                        <Button type="button" size="lg" disabled={isLoading} className="min-w-[180px]" onClick={handleSubmit}>
+                        <Button type="button" size="lg" disabled={isLoading} className="min-w-[200px]" onClick={handleSubmit}>
                             {isLoading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -602,6 +693,14 @@ export function TenantRegistrationWizard() {
                         </Button>
                     )}
                 </div>
+
+                {/* Sign-in link — centered below button */}
+                <p className="text-center text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <Link href="/login" className="font-semibold text-primary hover:underline">
+                        Sign in
+                    </Link>
+                </p>
             </div>
         </div>
     );

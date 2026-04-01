@@ -1,375 +1,194 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import api from "@/lib/api";
-import { useRouter } from "next/navigation";
-import { Loader2, Check, Eye, EyeOff, Lock, Phone } from "lucide-react";
+import { 
+    Loader2, Check, Eye, EyeOff, Lock, Phone, 
+    Mail, User, Building2, ShieldCheck, ChevronRight,
+    CircleDashed, Shield
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardTitle, CardHeader, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
-enum SubscriptionPlanType {
-    Starter = 0,
-    Basic = 1,
-    Pro = 2
-}
-
-const plans = [
-    {
-        id: SubscriptionPlanType.Starter,
-        name: "Starter",
-        price: "Free",
-        features: [
-            "Max Rooms: 20",
-            "Max Personnel: 10",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: No",
-            "Reports: Standard"
-        ]
-    },
-    {
-        id: SubscriptionPlanType.Basic,
-        name: "Basic",
-        price: "₱1,499/mo",
-        features: [
-            "Max Rooms: 100",
-            "Max Personnel: 30",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: Able",
-            "Reports: Standard"
-        ]
-    },
-    {
-        id: SubscriptionPlanType.Pro,
-        name: "Pro",
-        price: "₱4,999/mo",
-        features: [
-            "Max Rooms: 200",
-            "Max Personnel: 200",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: Able",
-            "Reports: Able (Advanced)"
-        ]
-    }
-];
-
-export function TenantRegistrationForm() {
-    const router = useRouter();
+export default function EnhancedTenantForm() {
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanType>(SubscriptionPlanType.Starter);
-    
-    // Organization Details
     const [tenantName, setTenantName] = useState("");
-
-    // Admin Details
     const [firstName, setFirstName] = useState("");
-    const [middleName, setMiddleName] = useState("");
     const [lastName, setLastName] = useState("");
     const [workEmail, setWorkEmail] = useState("");
     const [contactNumber, setContactNumber] = useState("");
-    const [initialPassword, setInitialPassword] = useState("");
+    const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [success, setSuccess] = useState(false);
+    // Password Validation Criteria
+    const requirements = useMemo(() => [
+        { label: "8+ Chars", test: (p: string) => p.length >= 8 },
+        { label: "Uppercase", test: (p: string) => /[A-Z]/.test(p) },
+        { label: "Number", test: (p: string) => /[0-9]/.test(p) },
+        { label: "Special", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+    ], []);
 
-    const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        if (value === "") {
-            setContactNumber(value);
-            return;
-        }
-
-        // Only allow digits
-        if (!/^\d+$/.test(value)) return;
-
-        // Strict prefix check: must start with 09
-        if (value.length >= 1 && value[0] !== '0') return;
-        if (value.length >= 2 && value[1] !== '9') return;
-
-        if (value.length <= 11) {
-            setContactNumber(value);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setErrors({});
-
-        const newErrors: Record<string, string> = {};
-
-        if (contactNumber && contactNumber.length !== 11) {
-            newErrors.contactNumber = "Contact number must be exactly 11 digits starting with 09 (e.g., 09123456789)";
-        }
-
-        if (initialPassword !== confirmPassword) {
-            newErrors.confirmPassword = "Passwords do not match";
-        }
-
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            setIsLoading(false);
-            return;
-        }
-
-        try {
-            await api.post('/api/Tenants', {
-                tenantName,
-                adminFirstName: firstName,
-                adminLastName: lastName,
-                adminEmail: workEmail,
-                adminPassword: initialPassword,
-                subscriptionPlan: selectedPlan,
-            });
-            setIsLoading(false);
-            setSuccess(true);
-            setTimeout(() => {
-                setSuccess(false);
-                resetForm();
-            }, 3000);
-        } catch (err: unknown) {
-            setIsLoading(false);
-            const msg = (err as { response?: { data?: unknown } })?.response?.data;
-            setErrors({ submit: typeof msg === 'string' ? msg : 'Failed to create tenant. Please try again.' });
-        }
-    };
-
-    const resetForm = () => {
-        setTenantName("");
-        setFirstName("");
-        setMiddleName("");
-        setLastName("");
-        setWorkEmail("");
-        setContactNumber("");
-        setInitialPassword("");
-        setConfirmPassword("");
-        setSelectedPlan(SubscriptionPlanType.Starter);
-    };
-
-    if (success) {
-        return (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4 text-center bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                    <Check className="h-6 w-6 text-green-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-green-800 dark:text-green-300">Tenant Created Successfully</h3>
-                <p className="text-green-700 dark:text-green-400">The tenant organization and admin account have been set up.</p>
-                <Button onClick={() => setSuccess(false)} variant="outline" className="mt-4">Create Another</Button>
-            </div>
-        );
-    }
+    const metCount = requirements.filter(r => r.test(password)).length;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Organization Details Section */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b">
-                     <h3 className="text-lg font-semibold text-foreground">Organization Details</h3>
+        <div className="flex min-h-screen bg-white">
+            {/* LEFT SIDE: HERO SECTION */}
+            <div className="hidden lg:flex w-1/3 bg-[#0a192f] p-12 flex-col justify-between text-white relative overflow-hidden">
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-12">
+                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold">D</div>
+                        <span className="text-xl font-bold tracking-tight">DFILE</span>
+                    </div>
+                    <h1 className="text-4xl font-bold leading-tight mb-6">
+                        Manage assets, <br />
+                        <span className="text-blue-400">empower teams.</span>
+                    </h1>
+                    <p className="text-slate-400 text-lg max-w-sm">
+                        Create your organization and start tracking your enterprise assets in minutes.
+                    </p>
                 </div>
                 
-                <div className="grid gap-2">
-                    <Label htmlFor="tenantName">Organization / Tenant Name <span className="text-red-500">*</span></Label>
-                    <Input 
-                        id="tenantName" 
-                        placeholder="e.g. Acme Corporation" 
-                        value={tenantName}
-                        onChange={(e) => setTenantName(e.target.value)}
-                        required
-                        className="h-10"
-                    />
+                <div className="relative z-10 p-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                    <p className="text-sm italic text-slate-300">
+                        "This platform transformed how we handle our inventory across 50+ locations."
+                    </p>
+                    <p className="text-xs mt-4 text-slate-500 font-semibold">— ENTERPRISE ASSET MANAGEMENT</p>
                 </div>
+
+                {/* Abstract Background Decoration */}
+                <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl"></div>
             </div>
 
-            {/* Admin User Section */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b pt-4">
-                     <h3 className="text-lg font-semibold text-foreground">Tenant Admin Account</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="firstName" 
-                            placeholder="e.g. John" 
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="middleName">Middle Name <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
-                        <Input 
-                            id="middleName" 
-                            placeholder="" 
-                            value={middleName}
-                            onChange={(e) => setMiddleName(e.target.value)}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="lastName" 
-                            placeholder="e.g. Doe" 
-                            value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
-                            required
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                    <div className="grid gap-2">
-                        <Label htmlFor="workEmail">Work Email <span className="text-red-500">*</span></Label>
-                        <Input 
-                            id="workEmail" 
-                            type="email" 
-                            placeholder="admin@organization.com" 
-                            value={workEmail}
-                            onChange={(e) => setWorkEmail(e.target.value)}
-                            required
-                        />
-                    </div>
-                     <div className="grid gap-2 relative">
-                        <Label htmlFor="contactNumber">Contact Number</Label>
-                        <div className="relative">
-                            <Input 
-                                id="contactNumber" 
-                                placeholder="(Optional) 0912-345-6789" 
-                                value={contactNumber}
-                                onChange={handleContactChange}
-                                className="pl-10 h-10"
-                            />
-                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                        </div>
-                        <p className="text-[10px] text-muted-foreground text-right">{contactNumber.length}/11</p>
-                        {errors.contactNumber && (
-                            <p className="text-xs text-destructive font-medium absolute -bottom-4 right-0">{errors.contactNumber}</p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="initialPassword">Initial Password <span className="text-red-500">*</span></Label>
-                        <div className="relative">
-                            <Input 
-                                id="initialPassword" 
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Min 6 characters" 
-                                value={initialPassword}
-                                onChange={(e) => setInitialPassword(e.target.value)}
-                                required
-                                minLength={6}
-                                className="pr-10"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
+            {/* RIGHT SIDE: THE FORM */}
+            <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-20 bg-slate-50/30">
+                <div className="w-full max-w-xl">
+                    <div className="mb-10">
+                        <h2 className="text-3xl font-bold text-slate-900">Create your organization</h2>
+                        <p className="text-slate-500 mt-2">Register as a tenant admin to get started.</p>
+                        
+                        {/* Progress Tracker Mini */}
+                        <div className="flex gap-4 mt-6">
+                            <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
+                                <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
+                                Account
+                            </div>
+                            <div className="h-[1px] w-8 bg-slate-200 self-center"></div>
+                            <div className="text-slate-400 text-sm flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-[10px]">2</span>
+                                Org
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid gap-2 relative">
-                        <Label htmlFor="confirmPassword">Confirm Password <span className="text-red-500">*</span></Label>
-                        <div className="relative">
-                            <Input 
-                                id="confirmPassword" 
-                                type={showConfirmPassword ? "text" : "password"}
-                                placeholder="Confirm password" 
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                className="pr-10"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                                {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
+                    <form className="space-y-8">
+                        {/* Section: Organization */}
+                        <div className="space-y-4">
+                            <Label className="text-xs uppercase tracking-widest text-slate-500 font-bold">Organization Details</Label>
+                            <div className="relative group">
+                                <Building2 className="absolute left-3 top-3 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                <Input 
+                                    placeholder="Organization Name" 
+                                    className="pl-10 h-12 bg-white border-slate-200 focus:ring-blue-500 shadow-sm"
+                                    value={tenantName}
+                                    onChange={e => setTenantName(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        {errors.confirmPassword && (
-                            <p className="text-xs text-destructive font-medium absolute -bottom-5 left-0">{errors.confirmPassword}</p>
-                        )}
-                    </div>
-                </div>
-            </div>
 
-            {/* Plan Selection Section */}
-            <div className="space-y-4 pt-4">
-                 <div className="flex items-center gap-2 pb-2 border-b">
-                     <h3 className="text-lg font-semibold text-foreground">Subscription Plan</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {plans.map((plan) => (
-                        <Card 
-                            key={plan.id}
-                            className={cn(
-                                "cursor-pointer transition-all border-2 relative overflow-hidden",
-                                selectedPlan === plan.id 
-                                    ? "border-primary bg-primary/5 shadow-md scale-[1.01]" 
-                                    : "border-muted hover:border-primary/50 hover:shadow-sm"
-                            )}
-                            onClick={() => setSelectedPlan(plan.id)}
-                        >
-                            {selectedPlan === plan.id && (
-                                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-bl-md z-10">
-                                    SELECTED
+                        {/* Section: Admin Account */}
+                        <div className="space-y-4">
+                            <Label className="text-xs uppercase tracking-widest text-slate-500 font-bold">Admin Account</Label>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input placeholder="First Name" className="h-12 bg-white" />
+                                <Input placeholder="Last Name" className="h-12 bg-white" />
+                            </div>
+
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                <Input placeholder="Work Email" className="pl-10 h-12 bg-white" />
+                            </div>
+
+                            {/* Aligned Password Grid */}
+                            <div className="grid grid-cols-2 gap-4 items-start">
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                        <Input 
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Password" 
+                                            className="pl-10 h-12 bg-white"
+                                            value={password}
+                                            onChange={e => setPassword(e.target.value)}
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
-                            <CardHeader className="p-4 pb-2">
-                                <CardTitle className="text-lg font-semibold text-left">
-                                    {plan.name}
-                                </CardTitle>
-                                <CardDescription className="text-2xl font-bold text-primary mt-1 text-left">
-                                    {plan.price}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-4 pt-0">
-                                <ul className="space-y-2">
-                                    {plan.features.map((feature, i) => (
-                                        <li key={i} className="flex items-start gap-2 text-muted-foreground text-xs font-normal text-left">
-                                            <Check className="h-4 w-4 text-green-500 shrink-0" />
-                                            <span>{feature}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    ))}
+
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Shield className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                        <Input 
+                                            type="password"
+                                            placeholder="Confirm" 
+                                            className={cn(
+                                                "pl-10 h-12 bg-white transition-all",
+                                                confirmPassword && password !== confirmPassword ? "border-red-300 ring-red-50" : ""
+                                            )}
+                                            value={confirmPassword}
+                                            onChange={e => setConfirmPassword(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Clean Requirements UI */}
+                            <div className="p-4 bg-slate-100/50 rounded-xl border border-slate-100">
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-xs font-semibold text-slate-600 uppercase">Password Security</span>
+                                    <span className="text-xs font-bold text-blue-600">{Math.round((metCount / 4) * 100)}%</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                    {requirements.map((req, i) => {
+                                        const met = req.test(password);
+                                        return (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <div className={cn(
+                                                    "w-4 h-4 rounded-full flex items-center justify-center transition-all",
+                                                    met ? "bg-green-500 scale-110" : "bg-slate-200"
+                                                )}>
+                                                    {met && <Check className="text-white w-2.5 h-2.5" strokeWidth={4} />}
+                                                </div>
+                                                <span className={cn("text-[11px] font-medium transition-colors", met ? "text-slate-900" : "text-slate-400")}>
+                                                    {req.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button className="w-full h-12 bg-[#0a192f] hover:bg-[#162d4d] text-white font-bold rounded-xl shadow-lg shadow-blue-900/10 transition-all flex items-center justify-center gap-2">
+                            Continue to Organization
+                            <ChevronRight size={18} />
+                        </Button>
+
+                        <p className="text-center text-sm text-slate-500">
+                            Already have an account? <a href="#" className="text-blue-600 font-bold hover:underline">Sign in</a>
+                        </p>
+                    </form>
                 </div>
             </div>
-
-            {errors.submit && (
-                <p className="text-sm text-destructive font-medium text-center">{errors.submit}</p>
-            )}
-
-            <div className="flex justify-end pt-4">
-                <Button type="submit" size="lg" disabled={isLoading} className="min-w-[150px]">
-                    {isLoading ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating Tenant...
-                        </>
-                    ) : (
-                        "Create Tenant"
-                    )}
-                </Button>
-            </div>
-        </form>
+        </div>
     );
 }

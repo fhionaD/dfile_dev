@@ -73,6 +73,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     const [sorting, setSorting] = useState<SortingState>([]);
     const [selectedAssetForQR, setSelectedAssetForQR] = useState<Asset | null>(null);
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+    const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
     useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -174,7 +175,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                                     size="icon"
                                     className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10"
                                     title="Restore"
-                                    onClick={(e) => { e.stopPropagation(); restoreAssetMutation.mutate(asset.id); }}
+                                    onClick={(e) => { e.stopPropagation(); setRestoreTarget(asset.id); }}
                                 >
                                     <RotateCcw className="h-4 w-4" />
                                 </Button>
@@ -410,6 +411,21 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                     }
                 }}
                 isLoading={archiveAssetMutation.isPending}
+            />
+
+            <ConfirmDialog
+                open={restoreTarget !== null}
+                onOpenChange={(open) => { if (!open) setRestoreTarget(null); }}
+                title="Restore Asset"
+                description="Are you sure you want to restore this asset? It will become active again."
+                confirmLabel="Restore"
+                onConfirm={async () => {
+                    if (restoreTarget) {
+                        await restoreAssetMutation.mutateAsync(restoreTarget);
+                        setRestoreTarget(null);
+                    }
+                }}
+                isLoading={restoreAssetMutation.isPending}
             />
         </div>
     );

@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 const TenantList = dynamic(() => import("@/components/tenant-list").then(m => ({ default: m.TenantList })), {
     loading: () => <Card className="p-6"><Skeleton className="h-72 w-full" /></Card>,
 });
-const TenantRegistrationForm = dynamic(() => import("@/components/forms/tenant-registration-form").then(m => ({ default: m.TenantRegistrationForm })), {
+const TenantRegistrationForm = dynamic(() => import("@/components/forms/tenant-registration-form"), {
     loading: () => <Card className="p-6"><Skeleton className="h-72 w-full" /></Card>,
 });
 

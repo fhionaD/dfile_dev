@@ -33,6 +33,7 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
     const [selectedRoomForDetails, setSelectedRoomForDetails] = useState<Room | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+    const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
     // Get unique floors for filter
     const uniqueFloors = useMemo(() => {
@@ -199,7 +200,7 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
                                                         size="icon" 
                                                         className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10" 
                                                         title="Restore"
-                                                        onClick={(e) => { e.stopPropagation(); onRestoreRoom?.(room.id); }}
+                                                        onClick={(e) => { e.stopPropagation(); setRestoreTarget(room.id); }}
                                                     >
                                                         <RotateCcw className="h-4 w-4" />
                                                     </Button>
@@ -247,6 +248,20 @@ export function RoomListView({ rooms, roomCategories, showArchived, archivedCoun
                     if (archiveTarget) {
                         onArchiveRoom?.(archiveTarget);
                         setArchiveTarget(null);
+                    }
+                }}
+            />
+
+            <ConfirmDialog
+                open={restoreTarget !== null}
+                onOpenChange={(open) => { if (!open) setRestoreTarget(null); }}
+                title="Restore Room"
+                description="Are you sure you want to restore this room unit? It will become active again."
+                confirmLabel="Restore"
+                onConfirm={() => {
+                    if (restoreTarget) {
+                        onRestoreRoom?.(restoreTarget);
+                        setRestoreTarget(null);
                     }
                 }}
             />

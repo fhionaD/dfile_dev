@@ -5,6 +5,7 @@ import {
     Search, ArrowRightLeft, CheckCircle2, Package, DoorOpen, X,
     ChevronRight, MapPin, Layers, Tag, RotateCcw, Check
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
     const [roomSearch, setRoomSearch] = useState("");
     const [roomFloorFilter, setRoomFloorFilter] = useState("all");
     const [remarks, setRemarks] = useState("");
+    const [deallocateTarget, setDeallocateTarget] = useState<string | null>(null);
 
     const availableAssets = useMemo(() =>
         assets.filter(a => !a.isArchived && a.allocationState === "Unallocated" && a.status !== "Disposed" && a.status !== "Archived")
@@ -450,7 +452,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                                         variant="ghost"
                                                         size="sm"
                                                         className="h-7 text-xs text-destructive hover:bg-destructive/10 gap-1"
-                                                        onClick={() => onDeallocate(asset.id)}
+                                                        onClick={() => setDeallocateTarget(asset.id)}
                                                         disabled={isPending}
                                                     >
                                                         <RotateCcw className="h-3 w-3" />Deallocate
@@ -465,6 +467,21 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                     </div>
                 </TabsContent>
             </Tabs>
+
+            <ConfirmDialog
+                open={deallocateTarget !== null}
+                onOpenChange={(open) => { if (!open) setDeallocateTarget(null); }}
+                title="Deallocate Asset"
+                description="Are you sure you want to deallocate this asset? It will be returned to the unallocated pool."
+                confirmLabel="Deallocate"
+                confirmVariant="destructive"
+                onConfirm={() => {
+                    if (deallocateTarget) {
+                        onDeallocate(deallocateTarget);
+                        setDeallocateTarget(null);
+                    }
+                }}
+            />
         </div>
     );
 }

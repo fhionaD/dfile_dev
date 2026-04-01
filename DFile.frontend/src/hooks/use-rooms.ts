@@ -146,6 +146,7 @@ export function useUpdateRoomCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Room category updated');
         },
         onError: (error) => {
@@ -158,16 +159,35 @@ export function useUpdateRoomCategory() {
     });
 }
 
+type ArchiveRoomCategoryResponse = {
+    message?: string;
+    cascadedRoomCount?: number;
+    cascadedSubCategoryCount?: number;
+};
+
 export function useArchiveRoomCategory() {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.patch(`/api/roomcategories/${id}/archive`);
+            const { data } = await api.patch<ArchiveRoomCategoryResponse>(
+                `/api/roomcategories/${id}/archive`,
+                undefined,
+                { suppressGlobalError: true },
+            );
+            return data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
-            toast.success('Room category archived');
+            queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
+            const n = data?.cascadedRoomCount ?? 0;
+            const s = data?.cascadedSubCategoryCount ?? 0;
+            const parts: string[] = [];
+            if (n > 0) parts.push(`${n} room unit${n !== 1 ? 's' : ''}`);
+            if (s > 0) parts.push(`${s} sub-categor${s !== 1 ? 'ies' : 'y'}`);
+            const suffix = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+            toast.success((data?.message ?? 'Room category archived') + suffix);
         },
         onError: (error) => {
             if (axios.isAxiosError(error) && error.response?.status === 409) {
@@ -247,6 +267,8 @@ export function useUpdateRoomSubCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Sub-category updated');
         },
         onError: (error) => {

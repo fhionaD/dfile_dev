@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TenantRegistrationWizard } from "@/components/forms/tenant-registration-wizard";
 import { useAuth } from "@/contexts/auth-context";
@@ -61,15 +60,6 @@ export default function RegisterOrganizationPage() {
             <div className="flex min-h-svh flex-col bg-background lg:h-svh lg:min-h-0">
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
                     <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-6 sm:px-10 sm:py-8 lg:px-16 lg:py-10">
-                        <div className="flex items-center justify-end">
-                            <p className="text-center text-sm text-muted-foreground">
-                                Already have an account?{" "}
-                                <Link href="/login" className="font-semibold text-primary hover:underline">
-                                    Sign in
-                                </Link>
-                            </p>
-                        </div>
-
                         <div className="flex justify-center lg:justify-start lg:hidden">
                             <img src="/AMS.svg" alt="DFile Logo" className="h-14 w-auto dark:hidden" />
                             <img src="/AMS_dark.svg" alt="DFile Logo" className="hidden h-14 w-auto dark:block" />

@@ -68,13 +68,29 @@ function isAxiosNetworkError(error: unknown): boolean {
     return !!e.request && !e.response;
 }
 
+/**
+ * Skip the top global error banner when the caller already surfaces the error (toast / inline).
+ * Covers `suppressGlobalError` plus PATCH archive/restore on room entities — `use-rooms` mutations use Sonner toasts.
+ */
+function shouldSkipGlobalErrorBanner(error: unknown): boolean {
+    const cfg = (error as { config?: { suppressGlobalError?: boolean; url?: string; method?: string } })?.config;
+    if (!cfg) return false;
+    if (cfg.suppressGlobalError === true) return true;
+    const method = (cfg.method || 'get').toLowerCase();
+    if (method !== 'patch') return false;
+    const path = (cfg.url || '').split('?')[0].toLowerCase();
+    return (
+        /\/api\/roomcategories\/[^/]+\/(archive|restore)$/.test(path) ||
+        /\/api\/roomsubcategories\/[^/]+\/(archive|restore)$/.test(path) ||
+        /\/api\/rooms\/[^/]+\/(archive|restore)$/.test(path)
+    );
+}
+
 // Response Interceptor: Handle Global Errors
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Callers that handle their own errors (e.g. the login form) set this flag
-        // so the global interceptor stays silent and doesn't show duplicate banners.
-        if (error?.config?.suppressGlobalError) {
+        if (shouldSkipGlobalErrorBanner(error)) {
             return Promise.reject(error);
         }
 
