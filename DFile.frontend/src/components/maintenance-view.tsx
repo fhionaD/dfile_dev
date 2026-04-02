@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface MaintenanceViewProps {
 }
 
 export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }: MaintenanceViewProps) {
+    const router = useRouter();
     const [showArchived, setShowArchived] = useState(false);
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
@@ -331,7 +333,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                                 <TableRow
                                     key={record.id}
                                     className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => { setSelectedRecord(record); setIsDetailsModalOpen(true); }}
+                                    onClick={() => router.push(`/maintenance/schedules?highlight=${record.id}`)}
                                 >
                                     <TableCell>
                                         <div className="space-y-0.5">

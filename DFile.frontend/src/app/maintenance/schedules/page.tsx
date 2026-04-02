@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
@@ -9,15 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarClock, Search, Clock, CheckCircle2, Calendar, Wrench, AlertCircle, Plus, RefreshCw } from "lucide-react";
-import { useAllocatedAssetsForMaintenance, useMaintenanceRecords, useUpdateMaintenanceStatus, useUpdateMaintenanceRecord } from "@/hooks/use-maintenance";
-import { useAssets } from "@/hooks/use-assets";
+import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, Wrench, AlertCircle, RefreshCw, Trash2, Settings } from "lucide-react";
+import { useAllocatedAssetsForMaintenance, useMaintenanceRecords, useUpdateMaintenanceStatus, useUpdateMaintenanceRecord, useArchiveMaintenanceRecord } from "@/hooks/use-maintenance";
+import { useAssets, useArchiveAsset } from "@/hooks/use-assets";
+import { useDeallocateAsset } from "@/hooks/use-allocations";
+import { useMaintenanceSettings, MaintenanceSettings } from "@/hooks/use-maintenance-settings";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { InspectionDiagnosisModal } from "@/components/modals/inspection-diagnosis-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getErrorMessage } from "@/lib/api";
 import { MaintenanceRecord } from "@/types/asset";
+import { toast } from "sonner";
 
 // ── Occurrence expansion ──────────────────────────────────────────────────────
 
@@ -94,6 +98,19 @@ function generateOccurrences(record: MaintenanceRecord): ScheduleOccurrence[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function SchedulesPage() {
+    const searchParams = useSearchParams();
+    const highlightId = searchParams.get('highlight');
+    
+    const [highlightedRowId, setHighlightedRowId] = useState<string | null>(highlightId);
+    
+    // Auto-clear highlight after animation completes
+    useEffect(() => {
+        if (highlightedRowId) {
+            const timer = setTimeout(() => setHighlightedRowId(null), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [highlightedRowId]);
+    
     const { data: records = [], isLoading } = useMaintenanceRecords();
     const { data: assets = [] } = useAssets();
     const {
@@ -109,6 +126,7 @@ export default function SchedulesPage() {
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [selectedAssetIdForSchedule, setSelectedAssetIdForSchedule] = useState<string | null>(null);
     const [advanceTarget, setAdvanceTarget] = useState<{ id: string; nextStatus: string } | null>(null);
+    const [completedRecordIds, setCompletedRecordIds] = useState<Set<string>>(new Set());
     const NEXT_STATUS: Record<string, string> = {
         "Open": "Inspection",
         "Inspection": "Quoted",
@@ -120,8 +138,60 @@ export default function SchedulesPage() {
     const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [inspectionTarget, setInspectionTarget] = useState<MaintenanceRecord | null>(null);
+    const [archiveTarget, setArchiveTarget] = useState<{ assetId: string; assetName: string } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ assetId: string; assetName: string } | null>(null);
+    const [assetTabView, setAssetTabView] = useState<'allocated' | 'archived'>('allocated');
+    const [scheduleTabView, setScheduleTabView] = useState<'active' | 'archived'>('active');
+    const [archiveScheduleTarget, setArchiveScheduleTarget] = useState<{ id: string; description: string } | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
+    
+    // Use hybrid settings management (localStorage + backend)
+    const { settings, updateSetting, isSaving } = useMaintenanceSettings();
+    
+    // Destructure settings for convenience
+    const enableAnimations = settings.enableAnimations;
+    const enableAutoCost = settings.enableAutoCost;
+    const enableGlint = settings.enableGlint;
+    const enableGlassmorphism = settings.enableGlassmorphism;
+    const enableMinimalUI = settings.enableMinimalUI;
+    const enableDataCaching = settings.enableDataCaching;
+    const enableBatchOperations = settings.enableBatchOperations;
+    // Settings persistence is now handled by useMaintenanceSettings hook (offline-first + backend sync)
+
+    const handleSettingChange = (settingName: string, key: string) => {
+        const typedKey = key as keyof MaintenanceSettings;
+        const newValue = !settings[typedKey];
+        updateSetting(typedKey, newValue as boolean);
+        toast.success('Setting saved successfully', {
+            description: `${settingName} has been ${newValue ? 'enabled' : 'disabled'}`,
+            duration: 2000,
+        });
+    };
+
+    const handleGlassmorphismChange = () => {
+        const newValue = !settings.enableGlassmorphism;
+        updateSetting('enableGlassmorphism', newValue);
+        
+        if (newValue) {
+            toast.warning('Performance Notice', {
+                description: 'Glassmorphism effect increases CPU/GPU usage. Disable if experiencing performance issues.',
+                duration: 4000,
+            });
+        } else {
+            toast.success('Setting saved successfully', {
+                description: 'Glassmorphism Effect has been disabled',
+                duration: 2000,
+            });
+        }
+    };
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const updateRecordMutation = useUpdateMaintenanceRecord();
+    const deallocateAssetMutation = useDeallocateAsset();
+    const { data: archivedAssets = [], isLoading: archivedLoading, isError: archivedError, error: archivedErr, refetch: refetchArchived } = useAssets(true);
+    const { data: archivedSchedules = [], isLoading: archivedSchedulesLoading } = useMaintenanceRecords(true);
+    const deleteAssetMutation = useArchiveAsset();
+    const archiveAssetMutation = useArchiveAsset();
+    const archiveScheduleMutation = useArchiveMaintenanceRecord();
 
     const getAssetDisplay = (assetId: string) => {
         const asset = assets.find(a => a.id === assetId);
@@ -133,36 +203,48 @@ export default function SchedulesPage() {
 
     /** Original parent records — used for summary counts and modal lookups. */
     const parentScheduledRecords = useMemo(() =>
-        records.filter(r => !r.isArchived && ((r.frequency && r.frequency !== "One-time") || r.status === "Scheduled")),
+        records.filter(r => !r.isArchived),
         [records],
     );
 
-    /** All occurrences expanded from parent records — drives the table. */
+    /** Archived parent records */
+    const archivedScheduledRecords = useMemo(() =>
+        archivedSchedules.filter(r => r.isArchived),
+        [archivedSchedules],
+    );
+
+    /** Display parent records directly without occurrence expansion */
+    const scheduledRecords = useMemo(() => 
+        scheduleTabView === 'active' ? parentScheduledRecords : archivedScheduledRecords, 
+        [parentScheduledRecords, archivedScheduledRecords, scheduleTabView]
+    );
+
+    /** All occurrences expanded from parent records — used only for upcoming section */
     const scheduledOccurrences = useMemo(() =>
         parentScheduledRecords.flatMap(r => generateOccurrences(r)),
         [parentScheduledRecords],
     );
 
     const filtered = useMemo(() => {
-        return scheduledOccurrences.filter(occ => {
-            if (frequencyFilter !== "all" && occ.frequency !== frequencyFilter) return false;
-            if (statusFilter !== "all" && occ.status !== statusFilter) return false;
+        return scheduledRecords.filter(record => {
+            if (frequencyFilter !== "all" && record.frequency !== frequencyFilter) return false;
+            if (statusFilter !== "all" && record.status !== statusFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const assetInfo = getAssetDisplay(occ.assetId);
+                const assetInfo = getAssetDisplay(record.assetId);
                 return (
-                    occ.description.toLowerCase().includes(q) ||
-                    occ.assetId.toLowerCase().includes(q) ||
+                    record.description.toLowerCase().includes(q) ||
+                    record.assetId.toLowerCase().includes(q) ||
                     assetInfo.name.toLowerCase().includes(q) ||
                     assetInfo.code.toLowerCase().includes(q) ||
-                    (occ.assetName || "").toLowerCase().includes(q) ||
-                    (occ.assetCode || "").toLowerCase().includes(q) ||
-                    occ.occurrenceDate.includes(q)
+                    (record.assetName || "").toLowerCase().includes(q) ||
+                    (record.assetCode || "").toLowerCase().includes(q) ||
+                    (record.startDate || "").includes(q)
                 );
             }
             return true;
         });
-    }, [scheduledOccurrences, searchQuery, frequencyFilter, statusFilter, getAssetDisplay]);
+    }, [scheduledRecords, searchQuery, frequencyFilter, statusFilter, getAssetDisplay]);
 
     const filteredAllocatedAssets = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
@@ -190,9 +272,8 @@ export default function SchedulesPage() {
         Scheduled: "info", Pending: "warning", "In Progress": "warning", Completed: "success",
     };
 
-    /** Retrieve the original MaintenanceRecord for modal state (never pass a virtual occurrence). */
-    const getParentRecord = (occ: ScheduleOccurrence): MaintenanceRecord =>
-        records.find(r => r.id === occ.parentId) ?? (occ as unknown as MaintenanceRecord);
+    /** Retrieve the original MaintenanceRecord (no longer needed since we're using parent records directly). */
+    const getParentRecord = (record: MaintenanceRecord): MaintenanceRecord => record;
 
     return (
         <div className="space-y-6">
@@ -206,7 +287,174 @@ export default function SchedulesPage() {
                         <p className="text-sm text-muted-foreground">Recurring and scheduled maintenance plans</p>
                     </div>
                 </div>
+                <div className="flex gap-2">
+                    <div className="relative group">
+                        <Button variant="outline" size="icon" onClick={() => setShowSettings(!showSettings)}>
+                            <Settings className="h-4 w-4" />
+                        </Button>
+                        {/* "On Testing" Ribbon */}
+                        <div className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full transform rotate-12 shadow-lg pointer-events-none">
+                            On Testing
+                        </div>
+                        {/* Hover Tooltip */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-50">
+                            <div className="relative bg-slate-900 text-white text-xs px-4 py-3 rounded-lg shadow-xl w-72 whitespace-normal">
+                                <p className="font-semibold mb-1">⚠️ Testing Mode</p>
+                                <p className="text-white/90">Some features are not working and only based on the working device. If you turn on glassmorphism make sure you have a dedicated GPU.</p>
+                                {/* Tooltip arrow */}
+                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-slate-900"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <Button onClick={() => { setSelectedRecord(null); setSelectedAssetIdForSchedule(null); setIsScheduleModalOpen(true); }} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Create Ticket
+                    </Button>
+                </div>
             </div>
+
+            {/* Settings Panel */}
+            {showSettings && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Card className={`p-6 space-y-4 shadow-2xl border border-white/20 bg-white/5 dark:bg-black/20 backdrop-blur-xl ring-1 ring-white/10`}>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold">Display Settings</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>Close</Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Tab Animations</p>
+                                    <p className="text-xs text-muted-foreground">Enable smooth transitions between tabs</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Tab Animations', 'enableAnimations')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableAnimations ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableAnimations ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Auto Cost Estimation</p>
+                                    <p className="text-xs text-muted-foreground">Automatically estimate costs based on category</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Auto Cost Estimation', 'enableAutoCost')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableAutoCost ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableAutoCost ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Completion Glint Effect</p>
+                                    <p className="text-xs text-muted-foreground">Show shimmer animation when tasks complete</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Completion Glint Effect', 'enableGlint')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableGlint ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableGlint ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Glassmorphism Effect</p>
+                                    <p className="text-xs text-muted-foreground">Apply frosted glass style to modals • ⚠️ Increases usage</p>
+                                </div>
+                                <button
+                                    onClick={handleGlassmorphismChange}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableGlassmorphism ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableGlassmorphism ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Optimization Settings</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Minimal UI</p>
+                                    <p className="text-xs text-muted-foreground">Hide decorative elements for faster loading</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Minimal UI', 'enableMinimalUI')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableMinimalUI ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableMinimalUI ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Data Caching</p>
+                                    <p className="text-xs text-muted-foreground">Cache records locally for offline access</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Data Caching', 'enableDataCaching')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableDataCaching ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableDataCaching ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
+                                <div className="mb-3">
+                                    <p className="text-sm font-medium mb-1">Batch Operations</p>
+                                    <p className="text-xs text-muted-foreground">Group updates for improved performance</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSettingChange('Batch Operations', 'enableBatchOperations')}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        enableBatchOperations ? 'bg-primary' : 'bg-muted-foreground/30'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                            enableBatchOperations ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
 
             {/* Summary */}
             <section className="grid gap-4 sm:grid-cols-3">
@@ -310,33 +558,59 @@ export default function SchedulesPage() {
                 );
             })()}
 
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search by asset, description, date..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+            {/* Filters and Tab Switcher */}
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search by asset, description, date..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                    </div>
+                    <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+                        <SelectTrigger className="w-[160px]"><SelectValue placeholder="Frequency" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Frequencies</SelectItem>
+                            <SelectItem value="Daily">Daily</SelectItem>
+                            <SelectItem value="Weekly">Weekly</SelectItem>
+                            <SelectItem value="Monthly">Monthly</SelectItem>
+                            <SelectItem value="Quarterly">Quarterly</SelectItem>
+                            <SelectItem value="Yearly">Yearly</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="Open">Open</SelectItem>
+                            <SelectItem value="Scheduled">Scheduled</SelectItem>
+                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
-                <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
-                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Frequency" /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Frequencies</SelectItem>
-                        <SelectItem value="Daily">Daily</SelectItem>
-                        <SelectItem value="Weekly">Weekly</SelectItem>
-                        <SelectItem value="Monthly">Monthly</SelectItem>
-                        <SelectItem value="Quarterly">Quarterly</SelectItem>
-                        <SelectItem value="Yearly">Yearly</SelectItem>
-                    </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="Open">Open</SelectItem>
-                        <SelectItem value="Scheduled">Scheduled</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                </Select>
+                <div className="flex gap-2 bg-muted p-1 rounded-lg">
+                    <button
+                        onClick={() => setScheduleTabView('active')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                            scheduleTabView === 'active'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        Active
+                        <Badge variant="secondary" className="ml-2 font-mono text-xs">{parentScheduledRecords.length}</Badge>
+                    </button>
+                    <button
+                        onClick={() => setScheduleTabView('archived')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                            scheduleTabView === 'archived'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        Archived
+                        <Badge variant="secondary" className="ml-2 font-mono text-xs">{archivedScheduledRecords.length}</Badge>
+                    </button>
+                </div>
             </div>
 
             {/* Schedules Table */}
@@ -362,88 +636,133 @@ export default function SchedulesPage() {
                         <p className="text-xs mt-1">Schedule maintenance from the allocated assets below</p>
                     </div>
                 ) : (
-                    <div className="rounded-md border overflow-auto">
+                    <div className="rounded-md border overflow-auto bg-background/50 backdrop-blur-sm">
                         <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Asset</TableHead>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead>Frequency</TableHead>
-                                    <TableHead>Priority</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>End Date</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
+                            <TableHeader className="bg-muted/60 border-b-2 border-muted">
+                                <TableRow className="hover:bg-muted/80 transition-colors">
+                                    <TableHead className="font-bold text-foreground">Asset</TableHead>
+                                    <TableHead className="font-bold text-foreground">Description</TableHead>
+                                    <TableHead className="font-bold text-foreground">Frequency</TableHead>
+                                    <TableHead className="font-bold text-foreground">Priority</TableHead>
+                                    <TableHead className="font-bold text-foreground">Status</TableHead>
+                                    <TableHead className="font-bold text-foreground">Date</TableHead>
+                                    <TableHead className="font-bold text-foreground">End Date</TableHead>
+                                    <TableHead className="text-right font-bold text-foreground">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filtered.map(occ => {
-                                    const assetInfo = getAssetDisplay(occ.assetId);
-                                    const isRecurring = occ.totalOccurrences > 1;
+                                {filtered.map(record => {
+                                    const assetInfo = getAssetDisplay(record.assetId);
+                                    const isNewlyCompleted = enableGlint && completedRecordIds.has(record.id);
+                                    const isHighlighted = highlightedRowId === record.id;
                                     return (
                                         <TableRow
-                                            key={occ.id}
-                                            className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => { setSelectedRecord(getParentRecord(occ)); setIsDetailsModalOpen(true); }}
+                                            key={record.id}
+                                            className={`cursor-pointer hover:bg-muted/70 transition-all duration-300 border-b border-muted/50 ${
+                                                isNewlyCompleted || isHighlighted ? 'relative overflow-hidden' : ''
+                                            }`}
+                                            onClick={() => { setSelectedRecord(record); setIsDetailsModalOpen(true); }}
                                         >
+                                            {(isNewlyCompleted || isHighlighted) && (
+                                                <>
+                                                    <td colSpan={8} className="absolute inset-0 pointer-events-none">
+                                                        <div 
+                                                            className={`absolute inset-0 ${isHighlighted ? 'bg-gradient-to-r from-transparent via-blue-200/40 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent'}`}
+                                                            style={{
+                                                                animation: `${isHighlighted ? 'shimmer-highlight' : 'shimmer-completed'} ${isHighlighted ? '1.2s' : '5s'} ease-in-out`,
+                                                                animationFillMode: 'forwards'
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <style jsx>{`
+                                                        @keyframes shimmer-completed {
+                                                            0% { transform: translateX(-100%); opacity: 0; }
+                                                            10% { opacity: 1; }
+                                                            50% { transform: translateX(100%); opacity: 1; }
+                                                            90% { opacity: 1; }
+                                                            100% { transform: translateX(200%); opacity: 0; }
+                                                        }
+                                                        @keyframes shimmer-highlight {
+                                                            0% { transform: translateX(-100%); opacity: 0; background-color: rgba(59, 130, 246, 0.3); }
+                                                            15% { opacity: 1; }
+                                                            50% { transform: translateX(100%); opacity: 1; background-color: rgba(59, 130, 246, 0.1); }
+                                                            85% { opacity: 1; background-color: rgba(59, 130, 246, 0.05); }
+                                                            100% { transform: translateX(200%); opacity: 0; background-color: transparent; }
+                                                        }
+                                                    `}</style>
+                                                </>
+                                            )}
                                             {/* Asset */}
-                                            <TableCell>
+                                            <TableCell className="py-3 px-4">
                                                 <div className="space-y-0.5">
-                                                    <span className="text-sm font-medium block truncate max-w-[180px]">
-                                                        {occ.assetName || assetInfo.name}
+                                                    <span className="text-sm font-semibold text-foreground block truncate max-w-[180px]">
+                                                        {record.assetName || assetInfo.name}
                                                     </span>
-                                                    {(occ.assetCode || assetInfo.code) && (
-                                                        <span className="text-xs text-muted-foreground font-mono block">
-                                                            {occ.assetCode || assetInfo.code}
+                                                    {(record.assetCode || assetInfo.code) && (
+                                                        <span className="text-xs text-muted-foreground/80 font-mono block">
+                                                            {record.assetCode || assetInfo.code}
                                                         </span>
                                                     )}
                                                 </div>
                                             </TableCell>
 
                                             {/* Description */}
-                                            <TableCell className="font-medium max-w-[200px] truncate">{occ.description}</TableCell>
+                                            <TableCell className="font-semibold text-foreground max-w-[200px] truncate py-3 px-4">{record.description}</TableCell>
 
-                                            {/* Frequency + occurrence badge */}
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <RefreshCw className="h-3 w-3 text-muted-foreground" />
-                                                        <span className="text-sm">{occ.frequency ?? "One-time"}</span>
-                                                    </div>
-                                                    {isRecurring && (
-                                                        <span className="text-xs font-mono text-primary/80 font-semibold">
-                                                            #{occ.occurrenceIndex + 1} of {occ.totalOccurrences}
-                                                        </span>
-                                                    )}
+                                            {/* Frequency */}
+                                            <TableCell className="py-3 px-4">
+                                                <div className="flex items-center gap-1.5 text-foreground font-medium">
+                                                    <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                                                    <span className="text-sm">{record.frequency ?? "One-time"}</span>
                                                 </div>
                                             </TableCell>
 
                                             {/* Priority */}
-                                            <TableCell>
-                                                <StatusText variant={priorityVariant[occ.priority] ?? "muted"}>{occ.priority}</StatusText>
+                                            <TableCell className="py-3 px-4">
+                                                <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority}</StatusText>
                                             </TableCell>
 
                                             {/* Status */}
-                                            <TableCell>
-                                                <StatusText variant={statusVariant[occ.status] ?? "muted"}>{occ.status}</StatusText>
+                                            <TableCell className="py-3 px-4">
+                                                <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
                                             </TableCell>
 
-                                            {/* Occurrence date */}
-                                            <TableCell className="text-sm tabular-nums">
-                                                {occ.occurrenceDate
-                                                    ? new Date(occ.occurrenceDate).toLocaleDateString()
+                                            {/* Start date */}
+                                            <TableCell className="text-sm tabular-nums font-medium text-foreground py-3 px-4">
+                                                {record.startDate
+                                                    ? new Date(record.startDate).toLocaleDateString()
                                                     : "—"}
                                             </TableCell>
 
-                                            {/* End date (from parent record) */}
-                                            <TableCell className="text-sm text-muted-foreground tabular-nums">
-                                                {occ.endDate ? new Date(occ.endDate).toLocaleDateString() : "—"}
+                                            {/* End date */}
+                                            <TableCell className="text-sm font-medium text-foreground tabular-nums py-3 px-4">
+                                                {record.endDate ? new Date(record.endDate).toLocaleDateString() : "—"}
                                             </TableCell>
 
                                             {/* Action */}
-                                            <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                                            <TableCell className="text-right py-3 px-4" onClick={e => e.stopPropagation()}>
                                                 {(() => {
-                                                    const nextStatus = NEXT_STATUS[occ.status];
+                                                    // Show Archive button for completed schedules in active tab
+                                                    if (scheduleTabView === 'active' && record.status === "Completed") {
+                                                        return (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setArchiveScheduleTarget({ id: record.id, description: record.description });
+                                                                }}
+                                                            >
+                                                                Archive
+                                                            </Button>
+                                                        );
+                                                    }
+
+                                                    // Show status for archived schedules
+                                                    if (scheduleTabView === 'archived') {
+                                                        return <StatusText variant="muted">Archived</StatusText>;
+                                                    }
+
+                                                    const nextStatus = NEXT_STATUS[record.status];
                                                     if (!nextStatus) return <StatusText variant="success">Done</StatusText>;
 
                                                     const needsInspection = nextStatus === "Inspection";
@@ -454,14 +773,13 @@ export default function SchedulesPage() {
                                                             size="sm"
                                                             variant={nextStatus === "Completed" ? "default" : "outline"}
                                                             onClick={() => {
-                                                                const orig = getParentRecord(occ);
                                                                 if (needsInspection) {
-                                                                    setInspectionTarget(orig);
+                                                                    setInspectionTarget(record);
                                                                 } else if (needsQuotation) {
-                                                                    setSelectedRecord(orig);
+                                                                    setSelectedRecord(record);
                                                                     setIsDetailsModalOpen(true);
                                                                 } else {
-                                                                    setAdvanceTarget({ id: occ.parentId, nextStatus });
+                                                                    setAdvanceTarget({ id: record.id, nextStatus });
                                                                 }
                                                             }}
                                                             className={nextStatus === "Completed" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
@@ -480,74 +798,174 @@ export default function SchedulesPage() {
                 )}
             </div>
 
-            {/* Allocated Assets Table */}
+            {/* Assets Management - Tabbed Interface */}
             <div>
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-semibold">Allocated Assets</h2>
-                        <Badge variant="secondary" className="font-mono text-xs">{filteredAllocatedAssets.length}</Badge>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Assets Management</h2>
+                    <div className="flex gap-2 bg-muted p-1 rounded-lg">
+                        <button
+                            onClick={() => setAssetTabView('allocated')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                                assetTabView === 'allocated'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Allocated Assets
+                            <Badge variant="secondary" className="ml-2 font-mono text-xs">{filteredAllocatedAssets.length}</Badge>
+                        </button>
+                        <button
+                            onClick={() => setAssetTabView('archived')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                                assetTabView === 'archived'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            Archived Assets
+                            <Badge variant="secondary" className="ml-2 font-mono text-xs">{archivedAssets.length}</Badge>
+                        </button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Click &quot;Schedule&quot; to create preventive maintenance</p>
                 </div>
 
-                {assetsLoading ? (
-                    <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                ) : assetsError ? (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-6 text-center space-y-3">
-                        <AlertCircle className="h-10 w-10 mx-auto text-destructive opacity-80" />
-                        <p className="font-medium text-destructive">Could not load allocated assets</p>
-                        <p className="text-sm text-muted-foreground max-w-md mx-auto">{getErrorMessage(assetsErr, "Check that the API is running and NEXT_PUBLIC_API_URL is set for next dev.")}</p>
-                        <Button variant="outline" size="sm" onClick={() => refetchAllocated()}>Retry</Button>
+                {/* Allocated Assets Tab */}
+                <div className={`${enableAnimations ? 'transition-all duration-300 ease-in-out' : ''} ${
+                    assetTabView === 'allocated'
+                        ? 'opacity-100 visible'
+                        : 'opacity-0 invisible absolute'
+                }`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-muted-foreground">Click &quot;Archive&quot; to remove from allocated assets</p>
                     </div>
-                ) : filteredAllocatedAssets.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground rounded-md border">
-                        <Wrench className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                        <p>No allocated assets found</p>
-                    </div>
-                ) : (
-                    <div className="rounded-md border overflow-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Asset</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Allocated Room</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredAllocatedAssets.map(a => (
-                                    <TableRow key={`${a.assetId}-${a.roomId ?? "no-room"}-${a.allocatedAt ?? "no-time"}`}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex flex-col">
-                                                <span>{a.assetName || a.assetId}</span>
-                                                <span className="text-xs text-muted-foreground font-mono">{a.assetCode || a.tagNumber || a.assetId}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{a.categoryName || "—"}</TableCell>
-                                        <TableCell>{a.roomCode ? `${a.roomCode}${a.roomName ? ` (${a.roomName})` : ""}` : "—"}</TableCell>
-                                        <TableCell>
-                                            <StatusText variant="info">Allocated</StatusText>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedAssetIdForSchedule(a.assetId);
-                                                    setIsScheduleModalOpen(true);
-                                                }}
-                                            >
-                                                <Plus className="h-4 w-4 mr-1.5" />
-                                                Schedule
-                                            </Button>
-                                        </TableCell>
+
+                    {assetsLoading ? (
+                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                    ) : assetsError ? (
+                        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-6 text-center space-y-3">
+                            <AlertCircle className="h-10 w-10 mx-auto text-destructive opacity-80" />
+                            <p className="font-medium text-destructive">Could not load allocated assets</p>
+                            <p className="text-sm text-muted-foreground max-w-md mx-auto">{getErrorMessage(assetsErr, "Check that the API is running and NEXT_PUBLIC_API_URL is set for next dev.")}</p>
+                            <Button variant="outline" size="sm" onClick={() => refetchAllocated()}>Retry</Button>
+                        </div>
+                    ) : filteredAllocatedAssets.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground rounded-md border">
+                            <Wrench className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                            <p>No allocated assets found</p>
+                        </div>
+                    ) : (
+                        <div className="rounded-md border overflow-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Asset</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Allocated Room</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredAllocatedAssets.map(a => (
+                                        <TableRow key={`${a.assetId}-${a.roomId ?? "no-room"}-${a.allocatedAt ?? "no-time"}`}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex flex-col">
+                                                    <span>{a.assetName || a.assetId}</span>
+                                                    <span className="text-xs text-muted-foreground font-mono">{a.assetCode || a.tagNumber || a.assetId}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{a.categoryName || "—"}</TableCell>
+                                            <TableCell>{a.roomCode ? `${a.roomCode}${a.roomName ? ` (${a.roomName})` : ""}` : "—"}</TableCell>
+                                            <TableCell>
+                                                <StatusText variant="info">Allocated</StatusText>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => {
+                                                        setArchiveTarget({ assetId: a.assetId, assetName: a.assetName || a.assetId });
+                                                    }}
+                                                >
+                                                    Archive
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </div>
+
+                {/* Archived Assets Tab */}
+                <div className={`${enableAnimations ? 'transition-all duration-300 ease-in-out' : ''} ${
+                    assetTabView === 'archived'
+                        ? 'opacity-100 visible'
+                        : 'opacity-0 invisible absolute'
+                }`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-muted-foreground">Click &quot;Delete&quot; to permanently remove archived assets</p>
                     </div>
-                )}
+
+                    {archivedLoading ? (
+                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                    ) : archivedError ? (
+                        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-6 text-center space-y-3">
+                            <AlertCircle className="h-10 w-10 mx-auto text-destructive opacity-80" />
+                            <p className="font-medium text-destructive">Could not load archived assets</p>
+                            <p className="text-sm text-muted-foreground max-w-md mx-auto">{getErrorMessage(archivedErr, "Check that the API is running.")}</p>
+                            <Button variant="outline" size="sm" onClick={() => refetchArchived()}>Retry</Button>
+                        </div>
+                    ) : archivedAssets.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground rounded-md border">
+                            <Wrench className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                            <p>No archived assets found</p>
+                        </div>
+                    ) : (
+                        <div className="rounded-md border overflow-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Asset</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Asset Code</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {archivedAssets.map(a => (
+                                        <TableRow key={a.id}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex flex-col">
+                                                    <span>{a.desc || a.id}</span>
+                                                    <span className="text-xs text-muted-foreground font-mono">{a.tagNumber || a.id}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{a.categoryName || "—"}</TableCell>
+                                            <TableCell className="font-mono text-sm">{a.assetCode || "—"}</TableCell>
+                                            <TableCell>
+                                                <StatusText variant="muted">Archived</StatusText>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => {
+                                                        setDeleteTarget({ assetId: a.id, assetName: a.desc || a.id });
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4 mr-1.5" />
+                                                    Delete
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <CreateMaintenanceModal
@@ -558,12 +976,16 @@ export default function SchedulesPage() {
                     if (!open) setSelectedAssetIdForSchedule(null);
                 }}
                 defaultAssetId={selectedAssetIdForSchedule}
+                enableAutoCost={enableAutoCost}
+                enableGlassmorphism={enableGlassmorphism}
             />
 
             <MaintenanceDetailsModal
                 open={isDetailsModalOpen}
                 onOpenChange={setIsDetailsModalOpen}
                 record={selectedRecord}
+                enableGlassmorphism={enableGlassmorphism}
+                onOpenInspectionModal={(record) => setInspectionTarget(record)}
                 onEdit={() => {
                     setIsDetailsModalOpen(false);
                     if (selectedRecord) {
@@ -578,6 +1000,7 @@ export default function SchedulesPage() {
                 onOpenChange={(open) => { if (!open) setInspectionTarget(null); }}
                 assetName={inspectionTarget?.assetName || inspectionTarget?.assetId}
                 isLoading={updateRecordMutation.isPending}
+                enableGlassmorphism={enableGlassmorphism}
                 onSubmit={async ({ inspectionNotes, diagnosisOutcome }) => {
                     if (!inspectionTarget) return;
                     await updateRecordMutation.mutateAsync({
@@ -611,10 +1034,69 @@ export default function SchedulesPage() {
                 onConfirm={async () => {
                     if (advanceTarget) {
                         await updateStatusMutation.mutateAsync({ id: advanceTarget.id, status: advanceTarget.nextStatus });
+                        
+                        // If status is Completed, add to glint animation set
+                        if (advanceTarget.nextStatus === "Completed") {
+                            setCompletedRecordIds(prev => new Set(prev).add(advanceTarget.id));
+                            // Remove from set after 5 seconds
+                            setTimeout(() => {
+                                setCompletedRecordIds(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(advanceTarget.id);
+                                    return newSet;
+                                });
+                            }, 5000);
+                        }
+                        
                         setAdvanceTarget(null);
                     }
                 }}
                 isLoading={updateStatusMutation.isPending}
+            />
+
+            <ConfirmDialog
+                open={archiveTarget !== null}
+                onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+                title="Archive Asset"
+                description={`Are you sure you want to archive "${archiveTarget?.assetName}"? This will remove it from allocated assets and move it to archived.`}
+                confirmLabel="Archive"
+                onConfirm={async () => {
+                    if (archiveTarget) {
+                        await archiveAssetMutation.mutateAsync(archiveTarget.assetId);
+                        setArchiveTarget(null);
+                    }
+                }}
+                isLoading={archiveAssetMutation.isPending}
+            />
+
+            <ConfirmDialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+                title="Delete Archived Asset"
+                description={`Are you sure you want to permanently delete "${deleteTarget?.assetName}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                onConfirm={async () => {
+                    if (deleteTarget) {
+                        await deleteAssetMutation.mutateAsync(deleteTarget.assetId);
+                        setDeleteTarget(null);
+                    }
+                }}
+                isLoading={deleteAssetMutation.isPending}
+            />
+
+            <ConfirmDialog
+                open={archiveScheduleTarget !== null}
+                onOpenChange={(open) => { if (!open) setArchiveScheduleTarget(null); }}
+                title="Archive Maintenance Schedule"
+                description={`Are you sure you want to archive "${archiveScheduleTarget?.description}"? This will move it to the archived schedules tab.`}
+                confirmLabel="Archive"
+                onConfirm={async () => {
+                    if (archiveScheduleTarget) {
+                        await archiveScheduleMutation.mutateAsync(archiveScheduleTarget.id);
+                        setArchiveScheduleTarget(null);
+                    }
+                }}
+                isLoading={archiveScheduleMutation.isPending}
             />
         </div>
     );

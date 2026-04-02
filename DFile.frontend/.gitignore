@@ -51,3 +51,7 @@ DFile.backend/wwwroot/forbidden/
 
 # Visual Studio
 .vs/
+
+# appsettings distributor
+DFile.backend/appsettings.json
+Dfile.backend/appsettings.Development.json

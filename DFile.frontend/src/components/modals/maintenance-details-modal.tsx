@@ -24,6 +24,8 @@ interface MaintenanceDetailsModalProps {
     record: MaintenanceRecord | null;
     onEdit?: () => void;
     onRequestReplacement?: (assetId: string) => void;
+    onOpenInspectionModal?: (record: MaintenanceRecord) => void;
+    enableGlassmorphism?: boolean;
 }
 
 const STATUS_FLOW = ["Open", "Inspection", "Quoted", "In Progress", "Completed"] as const;
@@ -53,7 +55,7 @@ const priorityVariant: Record<string, "success" | "warning" | "danger"> = {
     High: "danger",
 };
 
-export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, onRequestReplacement }: MaintenanceDetailsModalProps) {
+export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, onRequestReplacement, onOpenInspectionModal, enableGlassmorphism = false }: MaintenanceDetailsModalProps) {
     const { data: assets = [] } = useAssets();
     const updateMutation = useUpdateMaintenanceRecord();
     const uploadMutation = useUploadAttachment();
@@ -107,6 +109,16 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
 
     const handleAdvanceStatus = async () => {
         if (!nextStatus || !record) return;
+        
+        // If advancing to Inspection, open InspectionDiagnosisModal instead
+        if (nextStatus === "Inspection") {
+            if (onOpenInspectionModal) {
+                onOpenInspectionModal(record);
+                onOpenChange(false);
+            }
+            return;
+        }
+        
         if (isInspectionPhase && !diagnosisOutcome && !record.diagnosisOutcome) return;
         setIsAdvancing(true);
         try {
@@ -166,7 +178,9 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh]">
+            <DialogContent className={`max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh] ${
+                enableGlassmorphism ? 'border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-2xl ring-1 ring-white/10' : ''
+            }`}>
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 bg-primary/10 flex items-center justify-center text-primary rounded-xl">
@@ -300,193 +314,10 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                     </div>
 
                     {/* Inspection Panel */}
-                    {(isInspectionPhase || record.diagnosisOutcome) && (
-                        <>
-                            <Separator />
-                            <div>
-                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <Search size={16} className="text-primary" /> Inspection & Diagnosis
-                                </h4>
-                                <div className="bg-muted/10 p-4 border border-border/50 rounded-lg space-y-4">
-                                    {isInspectionPhase ? (
-                                        <>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-medium text-muted-foreground">Inspection Notes</Label>
-                                                <Textarea
-                                                    value={inspectionNotes}
-                                                    onChange={(e) => setInspectionNotes(e.target.value)}
-                                                    placeholder="Describe findings from the inspection..."
-                                                    className="min-h-[80px] bg-background text-sm resize-none"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-medium text-muted-foreground">Diagnosis Outcome</Label>
-                                                <div className="flex gap-3">
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant={diagnosisOutcome === "Repairable" ? "default" : "outline"}
-                                                        onClick={() => setDiagnosisOutcome("Repairable")}
-                                                        className={diagnosisOutcome === "Repairable" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
-                                                    >
-                                                        <CheckCircle2 size={14} className="mr-1.5" /> Repairable
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant={diagnosisOutcome === "Not Repairable" ? "default" : "outline"}
-                                                        onClick={() => setDiagnosisOutcome("Not Repairable")}
-                                                        className={diagnosisOutcome === "Not Repairable" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
-                                                    >
-                                                        <AlertTriangle size={14} className="mr-1.5" /> Not Repairable
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                onClick={handleSaveInspection}
-                                                disabled={isAdvancing || !diagnosisOutcome}
-                                                className="w-full bg-primary text-primary-foreground"
-                                            >
-                                                <ClipboardCheck size={14} className="mr-2" />
-                                                Save Inspection Results
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {record.inspectionNotes && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                                                    <p className="text-sm">{record.inspectionNotes}</p>
-                                                </div>
-                                            )}
-                                            <div>
-                                                <p className="text-xs text-muted-foreground mb-1">Outcome</p>
-                                                <StatusText variant={record.diagnosisOutcome === "Repairable" ? "success" : "danger"}>
-                                                    {record.diagnosisOutcome}
-                                                </StatusText>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    )}
+                    {/* REMOVED - Use InspectionDiagnosisModal instead */}
 
                     {/* Quotation Panel */}
-                    {(isQuotedPhase || record.quotationNotes || (record.status !== "Open" && record.status !== "Inspection" && record.cost)) && (
-                        <>
-                            <Separator />
-                            <div>
-                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <PhilippinePeso size={16} className="text-primary" /> Quotation Details
-                                </h4>
-                                <div className="bg-muted/10 p-4 border border-border/50 rounded-lg space-y-4">
-                                    {isQuotedPhase ? (
-                                        <>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-medium text-muted-foreground">Repair Cost Estimate (₱)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={quotationCost || ""}
-                                                        onChange={(e) => setQuotationCost(Number(e.target.value))}
-                                                        placeholder="0.00"
-                                                        className="h-9 bg-background text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-medium text-muted-foreground">Quotation Notes</Label>
-                                                <Textarea
-                                                    value={quotationNotes}
-                                                    onChange={(e) => setQuotationNotes(e.target.value)}
-                                                    placeholder="Describe repair scope, parts needed, labor estimate..."
-                                                    className="min-h-[60px] bg-background text-sm resize-none"
-                                                />
-                                            </div>
-
-                                            {/* File Upload */}
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-medium text-muted-foreground">Attachments (Optional)</Label>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        ref={fileInputRef}
-                                                        type="file"
-                                                        className="hidden"
-                                                        onChange={handleFileUpload}
-                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => fileInputRef.current?.click()}
-                                                        disabled={uploadMutation.isPending}
-                                                    >
-                                                        <Upload size={14} className="mr-1.5" />
-                                                        {uploadMutation.isPending ? "Uploading..." : "Upload File"}
-                                                    </Button>
-                                                    <span className="text-xs text-muted-foreground">Max 10MB</span>
-                                                </div>
-                                                {uploadedFiles.length > 0 && (
-                                                    <div className="mt-2 space-y-1">
-                                                        {uploadedFiles.map((url) => (
-                                                            <div key={url} className="flex items-center gap-2 text-xs bg-muted/50 p-2 rounded-md">
-                                                                <FileText size={12} className="text-muted-foreground shrink-0" />
-                                                                <span className="truncate flex-1 text-foreground">{url.split("/").pop()}</span>
-                                                                <Button type="button" size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handleRemoveFile(url)}>
-                                                                    <X size={10} />
-                                                                </Button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <Button
-                                                size="sm"
-                                                onClick={handleSaveQuotation}
-                                                disabled={isAdvancing}
-                                                className="w-full bg-primary text-primary-foreground"
-                                            >
-                                                <ClipboardCheck size={14} className="mr-2" /> Save Quotation
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {record.cost !== undefined && record.cost !== null && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Cost Estimate</p>
-                                                    <p className="text-lg font-semibold">₱{record.cost.toLocaleString()}</p>
-                                                </div>
-                                            )}
-                                            {record.quotationNotes && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                                                    <p className="text-sm">{record.quotationNotes}</p>
-                                                </div>
-                                            )}
-                                            {record.attachments && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Attachments</p>
-                                                    <div className="space-y-1">
-                                                        {record.attachments.split(",").filter(Boolean).map(url => (
-                                                            <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                                                               className="flex items-center gap-2 text-xs text-primary hover:underline">
-                                                                <FileText size={12} /> {url.split("/").pop()}
-                                                            </a>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    )}
+                    {/* REMOVED - Use MaintenanceDetailsModal in quotation phase instead */}
 
                     {/* Beyond Repair Warning */}
                     {isNotRepairable && (
