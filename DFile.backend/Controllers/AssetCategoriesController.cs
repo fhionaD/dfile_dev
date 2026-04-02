@@ -301,6 +301,13 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && category.TenantId != null && category.TenantId != tenantId)
                 return NotFound();
 
+            var assetsInCategoryQuery = _context.Assets.Where(a => a.CategoryId == id && !a.IsArchived);
+            if (!IsSuperAdmin() && tenantId.HasValue)
+                assetsInCategoryQuery = assetsInCategoryQuery.Where(a => a.TenantId == tenantId);
+
+            if (await assetsInCategoryQuery.AnyAsync())
+                return BadRequest(new { message = "Cannot archive category with registered assets." });
+
             category.IsArchived = true;
             category.UpdatedAt = DateTime.UtcNow;
             category.UpdatedBy = userId;

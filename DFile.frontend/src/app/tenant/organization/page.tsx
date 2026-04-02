@@ -2,9 +2,15 @@
 
 import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Building2, ShieldCheck, Users, Plus, Search, Archive, RotateCcw, Layers, ClipboardList } from "lucide-react";
+import { Building2, ShieldCheck, Users, Plus, Archive, RotateCcw, Layers, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    ArchiveViewToggleButton,
+    DataTablePrimaryButton,
+    DataTableSearch,
+    DataTableToolbar,
+} from "@/components/data-table/data-table-toolbar";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,10 +36,10 @@ export default function OrganizationPage() {
 
     // ── Roles state ──
     const [roleShowArchived, setRoleShowArchived] = useState(false);
-    const { data: roles = [], isLoading: rolesLoading } = useRoles(roleShowArchived);
-    const { data: roleCountOpposite = [] } = useRoles(!roleShowArchived);
-    const roleArchivedCount = roleShowArchived ? roles.length : roleCountOpposite.length;
-    const roleActiveCount = roleShowArchived ? roleCountOpposite.length : roles.length;
+    const { data: rolesActive = [], isLoading: loadingRolesActive } = useRoles(false);
+    const { data: rolesArchived = [], isLoading: loadingRolesArchived } = useRoles(true);
+    const roles = roleShowArchived ? rolesArchived : rolesActive;
+    const rolesLoading = loadingRolesActive || loadingRolesArchived;
     const { data: allDepartments = [] } = useDepartments(false);
     const addRoleMutation = useAddRole();
     const updateRoleMutation = useUpdateRole();
@@ -60,10 +66,10 @@ export default function OrganizationPage() {
 
     // ── Personnel state ──
     const [empShowArchived, setEmpShowArchived] = useState(false);
-    const { data: employees = [], isLoading: empLoading } = useEmployees(empShowArchived);
-    const { data: empCountOpposite = [] } = useEmployees(!empShowArchived);
-    const empArchivedCount = empShowArchived ? employees.length : empCountOpposite.length;
-    const empActiveCount = empShowArchived ? empCountOpposite.length : employees.length;
+    const { data: employeesActive = [], isLoading: loadingEmpActive } = useEmployees(false);
+    const { data: employeesArchived = [], isLoading: loadingEmpArchived } = useEmployees(true);
+    const employees = empShowArchived ? employeesArchived : employeesActive;
+    const empLoading = loadingEmpActive || loadingEmpArchived;
     const addEmpMutation = useAddEmployee();
     const updateEmpMutation = useUpdateEmployee();
     const archiveEmpMutation = useArchiveEmployee();
@@ -209,58 +215,66 @@ export default function OrganizationPage() {
                 </TabsList>
 
                 {/* ════════════  ROLES TAB  ════════════ */}
-                <TabsContent value="roles" className="space-y-4 mt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-semibold">{roleShowArchived ? "Archived Roles" : "Roles"}</h2>
-                            <span className="text-sm text-muted-foreground">({filteredRoles.length})</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1 sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search roles..." value={roleSearch} onChange={(e) => setRoleSearch(e.target.value)} className="pl-10 h-10" />
-                            </div>
-                            <Button onClick={openUnifiedCreate} className="gap-2 h-10">
-                                <Plus className="h-4 w-4" /> Define Role
-                            </Button>
-                            <Button variant={roleShowArchived ? "default" : "outline"} className="h-10" onClick={() => setRoleShowArchived(!roleShowArchived)}>
-                                {roleShowArchived ? (
-                                    <><RotateCcw className="h-4 w-4 mr-2" />Active ({roleActiveCount})</>
-                                ) : (
-                                    <><Archive className="h-4 w-4 mr-2" />Archived ({roleArchivedCount})</>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+                <TabsContent value="roles" className="mt-4 space-y-4">
+                    <div className="overflow-hidden rounded-md border">
+                        <DataTableToolbar
+                            left={
+                                <DataTableSearch
+                                    value={roleSearch}
+                                    onChange={setRoleSearch}
+                                    placeholder="Search roles..."
+                                    ariaLabel="Search roles"
+                                />
+                            }
+                            right={
+                                <>
+                                    <DataTablePrimaryButton onClick={openUnifiedCreate}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Define Role
+                                    </DataTablePrimaryButton>
+                                    <ArchiveViewToggleButton
+                                        showArchived={roleShowArchived}
+                                        onToggle={() => setRoleShowArchived(!roleShowArchived)}
+                                        activeCount={rolesActive.length}
+                                        archivedCount={rolesArchived.length}
+                                    />
+                                </>
+                            }
+                        />
 
-                    {rolesLoading ? (
-                        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filteredRoles.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground rounded-md border min-h-[520px] flex flex-col items-center justify-center">
-                            <ShieldCheck className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>{roleShowArchived ? "No archived roles" : "No roles found"}</p>
-                            {!roleShowArchived && <p className="text-xs mt-1">Define a role to get started</p>}
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto min-h-[520px]">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Designation</TableHead>
-                                        <TableHead>Department</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead className="w-[80px] text-center">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {paginateData(filteredRoles, rolePageIndex, rolePageSize).map(r => (
-                                        <TableRow key={r.id}>
-                                            <TableCell className="font-medium">
-                                                <button type="button" className="text-primary hover:underline text-left" onClick={() => openRoleEdit(r)}>{r.designation}</button>
-                                            </TableCell>
-                                            <TableCell>{r.department}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{r.scope}</TableCell>
-                                            <TableCell className="text-center">
+                        {rolesLoading ? (
+                            <div className="space-y-3 p-6">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                        ) : filteredRoles.length === 0 ? (
+                            <div className="flex min-h-[520px] flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                                <ShieldCheck className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                                <p>{roleShowArchived ? "No archived roles" : "No roles found"}</p>
+                                {!roleShowArchived && <p className="mt-1 text-xs">Define a role to get started</p>}
+                            </div>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <Table className="w-full table-fixed">
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[22%]">Designation</TableHead>
+                                                <TableHead className="w-[22%]">Department</TableHead>
+                                                <TableHead className="w-[40%]">Description</TableHead>
+                                                <TableHead className="w-[120px] text-center">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {paginateData(filteredRoles, rolePageIndex, rolePageSize).map(r => (
+                                                <TableRow key={r.id}>
+                                                    <TableCell className="max-w-0 font-medium">
+                                                        <button type="button" className="block w-full truncate text-left text-primary hover:underline" onClick={() => openRoleEdit(r)}>{r.designation}</button>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0">
+                                                        <span className="block truncate">{r.department}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0 text-sm text-muted-foreground">
+                                                        <span className="block truncate">{r.scope}</span>
+                                                    </TableCell>
+                                                    <TableCell className="w-[120px] text-center">
                                                 {roleShowArchived ? (
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreRoleMutation.mutateAsync(r.id)}>
                                                         <RotateCcw className="h-4 w-4" />
@@ -270,75 +284,89 @@ export default function OrganizationPage() {
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                            <TablePagination
-                                totalItems={filteredRoles.length}
-                                pageSize={rolePageSize}
-                                pageIndex={rolePageIndex}
-                                onPageChange={setRolePageIndex}
-                                onPageSizeChange={setRolePageSize}
-                            />
-                        </div>
-                    )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <TablePagination
+                                    totalItems={filteredRoles.length}
+                                    pageSize={rolePageSize}
+                                    pageIndex={rolePageIndex}
+                                    onPageChange={setRolePageIndex}
+                                    onPageSizeChange={setRolePageSize}
+                                />
+                            </>
+                        )}
+                    </div>
                 </TabsContent>
 
                 {/* ════════════  PERSONNEL TAB  ════════════ */}
-                <TabsContent value="personnel" className="space-y-4 mt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-semibold">{empShowArchived ? "Archived Personnel" : "Personnel"}</h2>
-                            <span className="text-sm text-muted-foreground">({filteredEmps.length})</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1 sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search personnel..." value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} className="pl-10 h-10" />
-                            </div>
-                            <Button onClick={() => { setSelectedEmployee(null); setIsAddEmpOpen(true); }} className="gap-2 h-10">
-                                <Plus className="h-4 w-4" /> Add Personnel
-                            </Button>
-                            <Button variant={empShowArchived ? "default" : "outline"} className="h-10" onClick={() => setEmpShowArchived(!empShowArchived)}>
-                                {empShowArchived ? (
-                                    <><RotateCcw className="h-4 w-4 mr-2" />Active ({empActiveCount})</>
-                                ) : (
-                                    <><Archive className="h-4 w-4 mr-2" />Archived ({empArchivedCount})</>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+                <TabsContent value="personnel" className="mt-4 space-y-4">
+                    <div className="overflow-hidden rounded-md border">
+                        <DataTableToolbar
+                            left={
+                                <DataTableSearch
+                                    value={empSearch}
+                                    onChange={setEmpSearch}
+                                    placeholder="Search personnel..."
+                                    ariaLabel="Search personnel"
+                                />
+                            }
+                            right={
+                                <>
+                                    <DataTablePrimaryButton onClick={() => { setSelectedEmployee(null); setIsAddEmpOpen(true); }}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Add Personnel
+                                    </DataTablePrimaryButton>
+                                    <ArchiveViewToggleButton
+                                        showArchived={empShowArchived}
+                                        onToggle={() => setEmpShowArchived(!empShowArchived)}
+                                        activeCount={employeesActive.length}
+                                        archivedCount={employeesArchived.length}
+                                    />
+                                </>
+                            }
+                        />
 
-                    {empLoading ? (
-                        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : filteredEmps.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground rounded-md border min-h-[520px] flex flex-col items-center justify-center">
-                            <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>{empShowArchived ? "No archived personnel" : "No personnel found"}</p>
-                            {!empShowArchived && <p className="text-xs mt-1">Define roles first, then register personnel</p>}
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto min-h-[520px]">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Department</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead className="w-[80px] text-center">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {paginateData(filteredEmps, empPageIndex, empPageSize).map(emp => (
-                                        <TableRow key={emp.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleEmployeeClick(emp)}>
-                                            <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{emp.email}</TableCell>
-                                            <TableCell>{emp.department}</TableCell>
-                                            <TableCell>{emp.role}</TableCell>
-                                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {empLoading ? (
+                            <div className="space-y-3 p-6">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                        ) : filteredEmps.length === 0 ? (
+                            <div className="flex min-h-[520px] flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                                <Users className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                                <p>{empShowArchived ? "No archived personnel" : "No personnel found"}</p>
+                                {!empShowArchived && <p className="mt-1 text-xs">Define roles first, then register personnel</p>}
+                            </div>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <Table className="w-full table-fixed">
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[20%]">Name</TableHead>
+                                                <TableHead className="w-[26%]">Email</TableHead>
+                                                <TableHead className="w-[18%]">Department</TableHead>
+                                                <TableHead className="w-[18%]">Role</TableHead>
+                                                <TableHead className="w-[120px] text-center">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {paginateData(filteredEmps, empPageIndex, empPageSize).map(emp => (
+                                                <TableRow key={emp.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleEmployeeClick(emp)}>
+                                                    <TableCell className="max-w-0 font-medium">
+                                                        <span className="block truncate">{emp.firstName} {emp.lastName}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0 text-sm text-muted-foreground">
+                                                        <span className="block truncate">{emp.email}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0">
+                                                        <span className="block truncate">{emp.department}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0">
+                                                        <span className="block truncate">{emp.role}</span>
+                                                    </TableCell>
+                                                    <TableCell className="w-[120px] text-center" onClick={(e) => e.stopPropagation()}>
                                                 {empShowArchived ? (
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => restoreEmpMutation.mutateAsync(emp.id)}>
                                                         <RotateCcw className="h-4 w-4" />
@@ -348,20 +376,22 @@ export default function OrganizationPage() {
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                            <TablePagination
-                                totalItems={filteredEmps.length}
-                                pageSize={empPageSize}
-                                pageIndex={empPageIndex}
-                                onPageChange={setEmpPageIndex}
-                                onPageSizeChange={setEmpPageSize}
-                            />
-                        </div>
-                    )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <TablePagination
+                                    totalItems={filteredEmps.length}
+                                    pageSize={empPageSize}
+                                    pageIndex={empPageIndex}
+                                    onPageChange={setEmpPageIndex}
+                                    onPageSizeChange={setEmpPageSize}
+                                />
+                            </>
+                        )}
+                    </div>
                 </TabsContent>
             </Tabs>
 

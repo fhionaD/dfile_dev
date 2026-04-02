@@ -76,9 +76,16 @@ function shouldSkipGlobalErrorBanner(error: unknown): boolean {
     const cfg = (error as { config?: { suppressGlobalError?: boolean; url?: string; method?: string } })?.config;
     if (!cfg) return false;
     if (cfg.suppressGlobalError === true) return true;
-    const method = (cfg.method || 'get').toLowerCase();
-    if (method !== 'patch') return false;
     const path = (cfg.url || '').split('?')[0].toLowerCase();
+    const method = (cfg.method || 'get').toLowerCase();
+    /** Business-rule failures: mutations show Sonner toasts; avoid duplicate global banner. */
+    if (method === 'put' && (
+        /\/api\/assetcategories\/archive\//.test(path) ||
+        /\/api\/assets\/archive\//.test(path)
+    )) {
+        return true;
+    }
+    if (method !== 'patch') return false;
     return (
         /\/api\/roomcategories\/[^/]+\/(archive|restore)$/.test(path) ||
         /\/api\/roomsubcategories\/[^/]+\/(archive|restore)$/.test(path) ||

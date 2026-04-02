@@ -11,21 +11,29 @@ import {
 } from "@tanstack/react-table";
 import {
     FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
-    Archive, RotateCcw, Search, Filter, Package, Plus,
+    Archive, RotateCcw, Filter, Package, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    ArchiveViewToggleButton,
+    DataTablePrimaryButton,
+    DataTableSearch,
+    DataTableToolbar,
+    dataTableFilterTriggerClass,
+} from "@/components/data-table/data-table-toolbar";
+import { cn } from "@/lib/utils";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { Asset } from "@/types/asset";
-import { useAssetsPaged, useArchiveAsset, useRestoreAsset } from "@/hooks/use-assets";
+import { useAssetsPaged, useArchiveAsset, useRestoreAsset, useAssetArchiveCounts } from "@/hooks/use-assets";
 import { useCategories } from "@/hooks/use-categories";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const statusVariant: Record<string, "success" | "info" | "warning" | "danger"> = {
     "In Use": "success",
@@ -83,6 +91,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     }, [showArchived, debouncedSearch, statusFilter, categoryFilter]);
 
     const { data: categories = [] } = useCategories(false);
+    const { data: assetArchiveCounts } = useAssetArchiveCounts();
     const uniqueCategories = useMemo(
         () => categories.map((c) => c.categoryName).filter(Boolean).sort(),
         [categories],
@@ -121,21 +130,21 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                 accessorKey: "desc",
                 header: ({ column }) => <SortableHeader column={column}>Asset Name</SortableHeader>,
                 cell: ({ row }) => (
-                    <span className="text-sm text-foreground">{row.getValue("desc")}</span>
+                    <span className="block truncate text-sm text-foreground">{row.getValue("desc")}</span>
                 ),
             },
             {
                 accessorKey: "categoryName",
                 header: ({ column }) => <SortableHeader column={column}>Category</SortableHeader>,
                 cell: ({ row }) => (
-                    <span className="text-sm text-muted-foreground">{row.getValue("categoryName")}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{row.getValue("categoryName")}</span>
                 ),
             },
             {
                 accessorKey: "room",
                 header: ({ column }) => <SortableHeader column={column}>Room</SortableHeader>,
                 cell: ({ row }) => (
-                    <span className="text-sm text-muted-foreground">{row.getValue("room")}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{row.getValue("room")}</span>
                 ),
             },
             {
@@ -156,6 +165,9 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                 cell: ({ row }: { row: { original: Asset } }) => {
                     const asset = row.original;
                     const isArchived = asset.status === "Archived";
+                    const isAllocated =
+                        (asset.allocationState ?? "").toLowerCase() === "allocated" ||
+                        Boolean(asset.roomId && String(asset.roomId).trim() !== "");
                     return (
                         <div className="flex items-center justify-center gap-1">
                             {isArchived ? (
@@ -168,6 +180,23 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                                 >
                                     <RotateCcw className="h-4 w-4" />
                                 </Button>
+                            ) : isAllocated ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground"
+                                                disabled
+                                                aria-label="Cannot archive allocated asset"
+                                            >
+                                                <Archive className="h-4 w-4" />
+                                            </Button>
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">Cannot archive allocated asset</TooltipContent>
+                                </Tooltip>
                             ) : (
                                 <Button
                                     variant="ghost"
@@ -184,8 +213,17 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                 },
             }] : []),
         ],
-        [restoreAssetMutation, readOnly],
+        [readOnly],
     );
+
+    const colHeadClass: Record<string, string> = {
+        assetCode: "w-[12%]",
+        desc: "w-[26%]",
+        categoryName: "w-[18%]",
+        room: "w-[14%]",
+        value: "w-[14%]",
+        actions: "w-[120px]",
+    };
 
     /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table useReactTable is intentionally excluded from React Compiler memoization */
     const table = useReactTable({
@@ -246,93 +284,78 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
 
     return (
         <div className="space-y-6">
-            <div className="rounded-md border overflow-hidden">
-                {/* Toolbar */}
-                <div className="p-6 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
-                    <div className="flex flex-1 flex-wrap gap-3 w-full lg:w-auto items-center">
-                        <div className="relative flex-1 min-w-[200px] max-w-sm">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                            <Input
-                                placeholder="Search assets..."
+            <div className="overflow-hidden rounded-md border">
+                <TooltipProvider delayDuration={300}>
+                <DataTableToolbar
+                    left={
+                        <>
+                            <DataTableSearch
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 h-10"
-                                aria-label="Search assets"
+                                onChange={setSearchQuery}
+                                placeholder="Search assets..."
+                                ariaLabel="Search assets"
                             />
-                        </div>
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[150px] h-10">
-                                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Status</SelectItem>
-                                {Object.keys(statusVariant).map((s) => (
-                                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-[150px] h-10">
-                                <Package className="w-4 h-4 mr-2 text-muted-foreground" />
-                                <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Categories</SelectItem>
-                                {uniqueCategories.map((cat) => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
-                        {!readOnly && onRegisterAsset && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="h-10"
-                                onClick={onRegisterAsset}
-                                aria-label="Register new asset"
-                            >
-                                <Plus size={16} className="mr-2" />
-                                Register Asset
+                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className={dataTableFilterTriggerClass}>
+                                    <Filter className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="All">All Status</SelectItem>
+                                    {Object.keys(statusVariant).map((s) => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                <SelectTrigger className={dataTableFilterTriggerClass}>
+                                    <Package className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <SelectValue placeholder="Category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="All">All Categories</SelectItem>
+                                    {uniqueCategories.map((cat) => (
+                                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
+                    }
+                    right={
+                        <>
+                            {!readOnly && onRegisterAsset && (
+                                <DataTablePrimaryButton onClick={onRegisterAsset} aria-label="Register new asset">
+                                    <Plus size={16} className="mr-2" />
+                                    Register Asset
+                                </DataTablePrimaryButton>
+                            )}
+                            <Button variant="outline" size="sm" className="h-10 min-w-[100px] rounded-lg px-4" onClick={handleExportCSV}>
+                                <FileBarChart size={16} className="mr-2" />
+                                Export
                             </Button>
-                        )}
-                        <Button variant="outline" size="sm" className="h-10" onClick={handleExportCSV}>
-                            <FileBarChart size={16} className="mr-2" />
-                            Export
-                        </Button>
-                        {!readOnly && (
-                            <Button
-                                variant={showArchived ? "default" : "outline"}
-                                size="sm"
-                                className="h-10"
-                                onClick={() => setShowArchived(!showArchived)}
-                            >
-                                {showArchived ? (
-                                    <>
-                                        <RotateCcw size={16} className="mr-2" />
-                                        View active
-                                    </>
-                                ) : (
-                                    <>
-                                        <Archive size={16} className="mr-2" />
-                                        View archived
-                                    </>
-                                )}
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                            {!readOnly && (
+                                <ArchiveViewToggleButton
+                                    showArchived={showArchived}
+                                    onToggle={() => setShowArchived(!showArchived)}
+                                    activeCount={assetArchiveCounts?.active}
+                                    archivedCount={assetArchiveCounts?.archived}
+                                />
+                            )}
+                        </>
+                    }
+                />
 
                 {/* Table */}
                 <div className="overflow-x-auto">
-                    <Table className="w-full">
+                    <Table className="w-full table-fixed">
                         <TableHeader>
                             {table.getHeaderGroups().map((headerGroup) => (
                                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-y border-border/40">
                                     {headerGroup.headers.map((header) => (
-                                        <TableHead key={header.id}>
+                                        <TableHead
+                                            key={header.id}
+                                            className={cn(colHeadClass[header.column.id] ?? "")}
+                                        >
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(header.column.columnDef.header, header.getContext())}
@@ -350,7 +373,13 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                                         onClick={() => onAssetClick?.(row.original)}
                                     >
                                         {row.getVisibleCells().map((cell) => (
-                                            <TableCell key={cell.id}>
+                                            <TableCell
+                                                key={cell.id}
+                                                className={cn(
+                                                    colHeadClass[cell.column.id] ?? "",
+                                                    ["desc", "categoryName", "room"].includes(cell.column.id) && "max-w-0",
+                                                )}
+                                            >
                                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                             </TableCell>
                                         ))}
@@ -378,6 +407,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                     onPageSizeChange={setPageSize}
                     pageSizeOptions={[5, 10, 20, 50]}
                 />
+                </TooltipProvider>
             </div>
 
             <ConfirmDialog
@@ -388,8 +418,11 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                 confirmLabel="Archive"
                 confirmVariant="destructive"
                 onConfirm={async () => {
-                    if (archiveTarget) {
+                    if (!archiveTarget) return;
+                    try {
                         await archiveAssetMutation.mutateAsync(archiveTarget);
+                        setArchiveTarget(null);
+                    } catch {
                         setArchiveTarget(null);
                     }
                 }}

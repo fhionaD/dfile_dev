@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { MapPin, Layers, DoorOpen, Plus, Search, Archive, RotateCcw, Edit } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { MapPin, Layers, DoorOpen, Plus, Archive, RotateCcw, Edit, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    ArchiveViewToggleButton,
+    DataTablePrimaryButton,
+    DataTableSearch,
+    DataTableToolbar,
+    dataTableFilterTriggerClass,
+} from "@/components/data-table/data-table-toolbar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -19,6 +27,7 @@ import {
     useAddRoom, useUpdateRoom, useArchiveRoom, useRestoreRoom,
     useAddRoomCategory, useUpdateRoomCategory, useArchiveRoomCategory, useRestoreRoomCategory,
     useAddRoomSubCategory, useUpdateRoomSubCategory,
+    useRoomCategoryCounts,
 } from "@/hooks/use-rooms";
 import { Room, RoomCategory, RoomSubCategory } from "@/types/asset";
 
@@ -100,10 +109,8 @@ export default function LocationsPage() {
     // ── Room Category state ──
     const [catShowArchived, setCatShowArchived] = useState(false);
     const { data: categories = [], isLoading: catsLoading } = useRoomCategories(catShowArchived);
-    const { data: catCountOpposite = [] } = useRoomCategories(!catShowArchived);
-    const catArchivedCount = catShowArchived ? categories.length : catCountOpposite.length;
-    const catActiveCount = catShowArchived ? catCountOpposite.length : categories.length;
     const { data: allCategories = [] } = useRoomCategories(false);
+    const { data: roomCategoryCounts } = useRoomCategoryCounts();
     const { data: allSubCategories = [] } = useRoomSubCategories(undefined, false);
     const addCategory = useAddRoomCategory();
     const updateCategory = useUpdateRoomCategory();
@@ -112,6 +119,7 @@ export default function LocationsPage() {
     const addSubCategory = useAddRoomSubCategory();
     const updateSubCategory = useUpdateRoomSubCategory();
     const [catSearch, setCatSearch] = useState("");
+    const [catCategoryNameFilter, setCatCategoryNameFilter] = useState("All");
     const [archiveCatTarget, setArchiveCatTarget] = useState<string | null>(null);
     const [restoreCatTarget, setRestoreCatTarget] = useState<string | null>(null);
     const [catPageIndex, setCatPageIndex] = useState(0);
@@ -133,10 +141,9 @@ export default function LocationsPage() {
 
     // ── Room Units state ──
     const [showArchived, setShowArchived] = useState(false);
-    const { data: rooms = [], isLoading: roomsLoading } = useRooms(showArchived);
-    const { data: roomCountOpposite = [] } = useRooms(!showArchived);
-    const archivedCount = showArchived ? rooms.length : roomCountOpposite.length;
-    const activeCount = showArchived ? roomCountOpposite.length : rooms.length;
+    const { data: rooms = [] } = useRooms(showArchived);
+    const { data: roomsActiveForCount = [] } = useRooms(false);
+    const { data: roomsArchivedForCount = [] } = useRooms(true);
     const archiveRoom = useArchiveRoom();
     const restoreRoom = useRestoreRoom();
     const addRoom = useAddRoom();
@@ -146,6 +153,15 @@ export default function LocationsPage() {
 
     // ── Filtered categories ──
     const filteredCategories = useMemo(() => categories, [categories]);
+
+    const uniqueRoomCategoryNames = useMemo(() => {
+        const names = filteredCategories.map((c) => c.name).filter(Boolean);
+        return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    }, [filteredCategories]);
+
+    useEffect(() => {
+        setCatPageIndex(0);
+    }, [catSearch, catCategoryNameFilter, catShowArchived]);
 
     const categorySubCategoryRows = useMemo(() => {
         const q = catSearch.trim().toLowerCase();
@@ -166,14 +182,19 @@ export default function LocationsPage() {
             }));
         });
 
-        if (!q) return rows;
+        const byCategory =
+            catCategoryNameFilter === "All"
+                ? rows
+                : rows.filter((r) => r.category.name === catCategoryNameFilter);
 
-        return rows.filter(r =>
+        if (!q) return byCategory;
+
+        return byCategory.filter(r =>
             r.category.name.toLowerCase().includes(q) ||
             (r.category.description || "").toLowerCase().includes(q) ||
             (r.subCategory?.name || "").toLowerCase().includes(q)
         );
-    }, [filteredCategories, allSubCategories, catSearch]);
+    }, [filteredCategories, allSubCategories, catSearch, catCategoryNameFilter]);
 
     // ── Category create handlers ──
     const openCatCreate = () => {
@@ -330,60 +351,84 @@ export default function LocationsPage() {
                 </TabsList>
 
                 {/* ════════════  ROOM CATEGORY TAB  ════════════ */}
-                <TabsContent value="categories" className="space-y-4 mt-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-semibold">{catShowArchived ? "Archived Room Categories" : "Room Categories"}</h2>
-                            <span className="text-sm text-muted-foreground">({categorySubCategoryRows.length})</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1 sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search categories..." value={catSearch} onChange={(e) => setCatSearch(e.target.value)} className="pl-10 h-10" />
-                            </div>
-                            <Button onClick={openCatCreate} className="gap-2 h-10">
-                                <Plus className="h-4 w-4" /> Define Category
-                            </Button>
-                            <Button variant={catShowArchived ? "default" : "outline"} className="h-10" onClick={() => setCatShowArchived(!catShowArchived)}>
-                                {catShowArchived ? (
-                                    <><RotateCcw className="h-4 w-4 mr-2" />Active ({catActiveCount})</>
-                                ) : (
-                                    <><Archive className="h-4 w-4 mr-2" />Archived ({catArchivedCount})</>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+                <TabsContent value="categories" className="mt-4 space-y-4">
+                    <div className="overflow-hidden rounded-md border">
+                        <DataTableToolbar
+                            left={
+                                <>
+                                    <DataTableSearch
+                                        value={catSearch}
+                                        onChange={setCatSearch}
+                                        placeholder="Search categories..."
+                                        ariaLabel="Search room categories"
+                                    />
+                                    <Select value={catCategoryNameFilter} onValueChange={setCatCategoryNameFilter}>
+                                        <SelectTrigger className={dataTableFilterTriggerClass}>
+                                            <Package className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <SelectValue placeholder="Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="All">All categories</SelectItem>
+                                            {uniqueRoomCategoryNames.map((name) => (
+                                                <SelectItem key={name} value={name}>{name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </>
+                            }
+                            right={
+                                <>
+                                    <DataTablePrimaryButton onClick={openCatCreate}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Define Category
+                                    </DataTablePrimaryButton>
+                                    <ArchiveViewToggleButton
+                                        showArchived={catShowArchived}
+                                        onToggle={() => setCatShowArchived(!catShowArchived)}
+                                        activeCount={roomCategoryCounts?.active}
+                                        archivedCount={roomCategoryCounts?.archived}
+                                    />
+                                </>
+                            }
+                        />
 
-                    {catsLoading ? (
-                        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-                    ) : categorySubCategoryRows.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground rounded-md border min-h-[520px] flex flex-col items-center justify-center">
-                            <Layers className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                            <p>{catShowArchived ? "No archived room categories" : "No room categories found"}</p>
-                            {!catShowArchived && <p className="text-xs mt-1">Define a category to get started</p>}
-                        </div>
-                    ) : (
-                        <div className="rounded-md border overflow-auto min-h-[520px]">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Category</TableHead>
-                                        <TableHead>Sub-categories</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Updated</TableHead>
-                                        <TableHead className="w-[80px] text-center">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {paginateData(categorySubCategoryRows, catPageIndex, catPageSize).map((row) => (
-                                        <TableRow key={row.key} className="cursor-pointer hover:bg-muted/50" onClick={() => handleCatRowClick(row)}>
-                                            <TableCell className="font-medium">
-                                                <button type="button" className="text-primary hover:underline text-left" onClick={(e) => { e.stopPropagation(); handleCatRowClick(row); }}>{row.category.name}</button>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">{row.subCategory?.name || "—"}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{row.subCategory?.description || "—"}</TableCell>
-                                            <TableCell className="text-muted-foreground text-xs">{new Date(row.category.updatedAt || row.category.createdAt || "").toLocaleDateString()}</TableCell>
-                                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {catsLoading ? (
+                            <div className="space-y-3 p-6">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                        ) : categorySubCategoryRows.length === 0 ? (
+                            <div className="flex min-h-[520px] flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                                <Layers className="mx-auto mb-4 h-12 w-12 opacity-20" />
+                                <p>{catShowArchived ? "No archived room categories" : "No room categories found"}</p>
+                                {!catShowArchived && <p className="mt-1 text-xs">Define a category to get started</p>}
+                            </div>
+                        ) : (
+                            <>
+                                <div className="overflow-x-auto">
+                                    <Table className="w-full table-fixed">
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[20%]">Category</TableHead>
+                                                <TableHead className="w-[18%]">Sub-categories</TableHead>
+                                                <TableHead className="w-[34%]">Description</TableHead>
+                                                <TableHead className="w-[14%]">Updated</TableHead>
+                                                <TableHead className="w-[120px] text-center">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {paginateData(categorySubCategoryRows, catPageIndex, catPageSize).map((row) => (
+                                                <TableRow key={row.key} className="cursor-pointer hover:bg-muted/50" onClick={() => handleCatRowClick(row)}>
+                                                    <TableCell className="max-w-0 font-medium">
+                                                        <button type="button" className="block w-full truncate text-left text-primary hover:underline" onClick={(e) => { e.stopPropagation(); handleCatRowClick(row); }}>{row.category.name}</button>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0 text-muted-foreground">
+                                                        <span className="block truncate">{row.subCategory?.name || "—"}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0 text-sm text-muted-foreground">
+                                                        <span className="block truncate">{row.subCategory?.description || "—"}</span>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-0 text-xs text-muted-foreground">
+                                                        <span className="block truncate">{new Date(row.category.updatedAt || row.category.createdAt || "").toLocaleDateString()}</span>
+                                                    </TableCell>
+                                                    <TableCell className="w-[120px] text-center" onClick={(e) => e.stopPropagation()}>
                                                 {catShowArchived ? (
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => setRestoreCatTarget(row.category.id)}>
                                                         <RotateCcw className="h-4 w-4" />
@@ -399,20 +444,22 @@ export default function LocationsPage() {
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                            <TablePagination
-                                totalItems={categorySubCategoryRows.length}
-                                pageSize={catPageSize}
-                                pageIndex={catPageIndex}
-                                onPageChange={setCatPageIndex}
-                                onPageSizeChange={setCatPageSize}
-                            />
-                        </div>
-                    )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <TablePagination
+                                    totalItems={categorySubCategoryRows.length}
+                                    pageSize={catPageSize}
+                                    pageIndex={catPageIndex}
+                                    onPageChange={setCatPageIndex}
+                                    onPageSizeChange={setCatPageSize}
+                                />
+                            </>
+                        )}
+                    </div>
                 </TabsContent>
 
                 {/* ════════════  ROOM UNITS TAB  ════════════ */}
@@ -421,9 +468,9 @@ export default function LocationsPage() {
                         rooms={rooms}
                         roomCategories={allCategories.map(c => ({ id: c.id, name: c.name }))}
                         showArchived={showArchived}
-                        archivedCount={archivedCount}
-                        activeCount={activeCount}
                         onToggleArchived={() => setShowArchived(!showArchived)}
+                        activeCount={roomsActiveForCount.length}
+                        archivedCount={roomsArchivedForCount.length}
                         onCreateRoom={() => { setEditingRoom(null); setCreateRoomOpen(true); }}
                         onArchiveRoom={(id) => archiveRoom.mutate(id)}
                         onRestoreRoom={(id) => restoreRoom.mutate(id)}

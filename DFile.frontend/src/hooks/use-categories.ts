@@ -74,14 +74,20 @@ export function useArchiveCategory() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/AssetCategories/archive/${id}`);
+            await api.put(`/api/AssetCategories/archive/${id}`, undefined, { suppressGlobalError: true });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
-            toast.success('Category archived');
+            toast.success('Category archived successfully');
         },
-        onError: () => {
-            toast.error('Failed to archive category');
+        onError: (error: unknown) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            if (axiosErr.response?.status === 400) {
+                const msg = String(axiosErr.response.data?.message ?? '');
+                toast.error(msg || 'Cannot archive category with registered assets.');
+                return;
+            }
+            toast.error(parseApiError(error, 'Something went wrong. Please try again.'));
         }
     });
 }

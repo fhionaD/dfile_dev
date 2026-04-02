@@ -549,6 +549,12 @@ namespace DFile.backend.Controllers
             if (asset == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId) return NotFound();
 
+            var allocQuery = _context.AssetAllocations.Where(aa => aa.AssetId == id && aa.Status == "Active");
+            if (!IsSuperAdmin() && tenantId.HasValue)
+                allocQuery = allocQuery.Where(aa => aa.TenantId == tenantId);
+            if (await allocQuery.AnyAsync())
+                return BadRequest(new { message = "Cannot archive allocated asset." });
+
             asset.LifecycleStatus = LifecycleStatus.Archived;
             asset.IsArchived = true;
             asset.UpdatedAt = DateTime.UtcNow;

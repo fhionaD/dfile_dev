@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { DoorOpen, Building2, Layers, Users, Archive, RotateCcw } from "lucide-react";
+import { DoorOpen, Building2, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { Room, RoomSubCategory } from "@/types/asset";
+import { cn } from "@/lib/utils";
 
 interface RoomCategory {
     id: string;
@@ -95,7 +96,6 @@ export function RoomModal({ open, onOpenChange, roomCategories, subCategories = 
         }
     };
 
-    const getCategoryName = (id?: string) => roomCategories.find(c => c.id === id)?.name || id || "—";
     const getSubCategoryName = (id?: string) => {
         if (!id) return "—";
         return subCategories.find(sc => sc.id === id)?.name || "—";
@@ -103,22 +103,35 @@ export function RoomModal({ open, onOpenChange, roomCategories, subCategories = 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-xl rounded-2xl border-border p-0 overflow-hidden flex flex-col">
-                <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10  text-primary"><DoorOpen size={20} /></div>
-                        <div>
-                            <DialogTitle className="text-lg font-semibold text-foreground">
-                                {isEditing ? (initialData ? "Edit Room Details" : "Create Room Unit") : "Room Details"}
+            <DialogContent
+                className={cn(
+                    "!gap-0 flex max-h-[min(85vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border-border p-0",
+                )}
+            >
+                <DialogHeader className="shrink-0 space-y-0 border-b border-border bg-muted/40 p-4">
+                    <div className="flex items-start gap-3 pr-8">
+                        <div className="shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+                            <DoorOpen size={18} />
+                        </div>
+                        <div className="min-w-0">
+                            <DialogTitle className="text-base font-semibold leading-tight text-foreground">
+                                {isEditing ? (initialData ? "Edit room details" : "Create room unit") : "Room details"}
                             </DialogTitle>
-                            <DialogDescription className="text-muted-foreground text-xs mt-1">
-                                {isEditing ? "Update room information and status" : "View room information and status"}
+                            <DialogDescription className="mt-1 text-xs text-muted-foreground">
+                                {isEditing ? "Update room information" : "Room number, category, sub-category, and floor"}
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <form id="room-form" onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
+                <form
+                    id="room-form"
+                    onSubmit={handleSubmit}
+                    className={cn(
+                        "overflow-y-auto bg-background p-4",
+                        isEditing ? "max-h-[min(65vh,480px)] space-y-5" : "space-y-3",
+                    )}
+                >
                     <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                             <Building2 size={12} /> Room Number <span className="text-destructive">*</span>
@@ -210,51 +223,28 @@ export function RoomModal({ open, onOpenChange, roomCategories, subCategories = 
                             <div className="text-sm font-medium p-2 bg-muted/20 rounded-md border border-transparent">{formData.floor || "—"}</div>
                         )}
                     </div>
-
-                    {!isEditing && (
-                         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                            <div className="space-y-1">
-                                <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Status</Label>
-                                <div className={`text-sm font-medium inline-block px-2 py-0.5 rounded ${
-                                    formData.status === "Available" ? "bg-emerald-500/10 text-emerald-700" :
-                                    formData.status === "Maintenance" ? "bg-amber-500/10 text-amber-700" :
-                                    formData.status === "Deactivated" ? "bg-red-500/10 text-red-700" :
-                                    "bg-muted text-muted-foreground"
-                                }`}>
-                                    {formData.status || "Unknown"}
-                                </div>
-                            </div>
-                             <div className="space-y-1">
-                                <Label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">ID</Label>
-                                <div className="text-sm font-mono text-foreground">{formData.unitId || "—"}</div>
-                            </div>
-                        </div>
-                    )}
                 </form>
 
-                <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-between items-center w-full sm:justify-between">
-                    <div></div>
-                    <div className="flex gap-3">
-                        {isEditing ? (
-                            <>
-                                <Button type="button" variant="outline" onClick={handleCancel} className="h-10 text-sm">
-                                    Cancel
-                                </Button>
-                                <Button type="submit" form="room-form" className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
-                                    {initialData ? "Save Changes" : "Initialize Unit"}
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-10 text-sm">
-                                    Close
-                                </Button>
-                                <Button type="button" onClick={() => setIsEditing(true)} className="h-10 text-sm px-4 bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">
-                                    Edit Details
-                                </Button>
-                            </>
-                        )}
-                    </div>
+                <DialogFooter className="shrink-0 gap-2 border-t border-border bg-muted/40 p-4 sm:justify-end">
+                    {isEditing ? (
+                        <>
+                            <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" form="room-form" size="sm" className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
+                                {initialData ? "Save changes" : "Initialize unit"}
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                                Close
+                            </Button>
+                            <Button type="button" size="sm" onClick={() => setIsEditing(true)} className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
+                                Edit details
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

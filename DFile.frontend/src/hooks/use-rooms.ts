@@ -4,6 +4,8 @@ import { Room, RoomCategory, RoomSubCategory } from '@/types/asset';
 import { toast } from 'sonner';
 import axios from 'axios';
 
+type PairCounts = { active: number; archived: number };
+
 // ── Room hooks ───────────────────────────────────────────────
 
 export function useRooms(showArchived: boolean = false) {
@@ -102,6 +104,17 @@ export function useRestoreRoom() {
 
 // ── Room Category hooks ──────────────────────────────────────
 
+export function useRoomCategoryCounts() {
+    return useQuery({
+        queryKey: ['room-category-counts'],
+        queryFn: async () => {
+            const { data } = await api.get<PairCounts>('/api/roomcategories/counts');
+            return data;
+        },
+        staleTime: 30_000,
+    });
+}
+
 export function useRoomCategories(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['room-categories', showArchived],
@@ -124,6 +137,7 @@ export function useAddRoomCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             toast.success('Room category added');
         },
         onError: (error) => {
@@ -146,6 +160,7 @@ export function useUpdateRoomCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Room category updated');
         },
@@ -179,6 +194,7 @@ export function useArchiveRoomCategory() {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             const n = data?.cascadedRoomCount ?? 0;
@@ -190,11 +206,44 @@ export function useArchiveRoomCategory() {
             toast.success((data?.message ?? 'Room category archived') + suffix);
         },
         onError: (error) => {
-            if (axios.isAxiosError(error) && error.response?.status === 409) {
-                toast.error(error.response.data?.message || 'Failed to archive room category.');
-            } else {
-                toast.error('Failed to archive room category');
+            const archiveConflictDescription =
+                'This room category is currently assigned to one or more room units. Please update or remove those room units before archiving this category.';
+
+            if (!axios.isAxiosError(error) || !error.response) {
+                toast.error('Unable to archive this category', { description: 'Please try again.' });
+                return;
             }
+
+            const { status, data } = error.response;
+            const payload =
+                typeof data === 'object' && data !== null
+                    ? (data as { title?: string; message?: string })
+                    : {};
+
+            if (status === 409) {
+                toast.error('⚠️ Unable to Archive Category', {
+                    description: payload.message || archiveConflictDescription,
+                });
+                return;
+            }
+
+            if (status === 404) {
+                toast.error('Category not found', {
+                    description: payload.message || 'This room category could not be found.',
+                });
+                return;
+            }
+
+            if (status === 500) {
+                toast.error('Unable to archive this category', {
+                    description:
+                        payload.message ||
+                        'An unexpected error occurred while archiving. Please try again or contact support.',
+                });
+                return;
+            }
+
+            toast.error('Unable to archive this category', { description: 'Please try again.' });
         },
     });
 }
@@ -208,6 +257,7 @@ export function useRestoreRoomCategory() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             toast.success('Room category restored');
         },
         onError: (error) => {

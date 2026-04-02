@@ -100,12 +100,20 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
         (typeof base.assetCode === "string" && base.assetCode.trim() ? base.assetCode.trim() : undefined);
     if (assetCode && looksLikeUuid(assetCode)) assetCode = undefined;
 
+    let allocationState =
+        pickStringField(a, ["allocationState", "AllocationState"]) ??
+        (typeof base.allocationState === "string" ? base.allocationState : undefined);
+    const roomIdFromApi = pickStringField(a, ["roomId", "RoomId"]);
+    if (!allocationState && roomIdFromApi)
+        allocationState = "Allocated";
+
     return {
         ...base,
         id,
         tagNumber,
         assetCode,
         purchaseDate,
+        allocationState,
         desc:
             pickStringField(a, ["assetName", "AssetName", "desc", "Desc"]) ??
             (typeof base.desc === "string" ? base.desc : undefined) ??

@@ -1,5 +1,5 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import api from '@/lib/api';
 import { parseApiError } from '@/lib/api-errors';
 import { mapAssetFromApi } from '@/lib/normalize-asset-from-api';
@@ -65,6 +65,28 @@ export function useAssets(showArchived: boolean = false) {
     });
 }
 
+/** Active vs archived totals for archive toggle (lightweight paged HEAD counts). */
+export function useAssetArchiveCounts() {
+    return useQuery({
+        queryKey: ['asset-archive-counts'],
+        queryFn: async () => {
+            const [activeRes, archivedRes] = await Promise.all([
+                api.get<{ totalCount: number }>("/api/assets", {
+                    params: { showArchived: false, page: 1, pageSize: 1 },
+                }),
+                api.get<{ totalCount: number }>("/api/assets", {
+                    params: { showArchived: true, page: 1, pageSize: 1 },
+                }),
+            ]);
+            return {
+                active: activeRes.data?.totalCount ?? 0,
+                archived: archivedRes.data?.totalCount ?? 0,
+            };
+        },
+        staleTime: 30_000,
+    });
+}
+
 export function useAsset(
     id: string,
     options?: { enabled?: boolean; refetchOnMount?: boolean | "always" },
@@ -92,6 +114,7 @@ export function useAddAsset() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['asset-archive-counts'] });
             toast.success('Asset added successfully');
         },
         onError: (error: Error) => {
@@ -110,6 +133,7 @@ export function useUpdateAsset() {
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['asset-archive-counts'] });
             queryClient.invalidateQueries({ queryKey: ['assets', 'detail', variables.id] });
             toast.success('Asset updated successfully');
         },
@@ -124,14 +148,19 @@ export function useArchiveAsset() {
 
     return useMutation({
         mutationFn: async (id: string) => {
-            await api.put(`/api/assets/archive/${id}`);
+            await api.put(`/api/assets/archive/${id}`, undefined, { suppressGlobalError: true });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['asset-archive-counts'] });
             toast.success('Asset archived successfully');
         },
-        onError: () => {
-            toast.error('Failed to archive asset');
+        onError: (error: unknown) => {
+            if (axios.isAxiosError(error) && error.response?.status === 400) {
+                toast.error(parseApiError(error, 'Cannot archive allocated asset.'));
+                return;
+            }
+            toast.error(parseApiError(error, 'Something went wrong. Please try again.'));
         },
     });
 }
@@ -145,6 +174,7 @@ export function useRestoreAsset() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['asset-archive-counts'] });
             toast.success('Asset restored successfully');
         },
         onError: () => {
