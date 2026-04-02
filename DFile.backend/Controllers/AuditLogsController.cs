@@ -1,4 +1,3 @@
-using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -27,17 +26,22 @@ namespace DFile.backend.Controllers
             _context = context;
         }
 
+        /// <summary>Tenant-scoped for Admin; platform-wide for Super Admin. Maintenance/Finance cannot access.</summary>
         [HttpGet]
         public async Task<ActionResult<object>> GetAuditLogs(
             [FromQuery] string? entityType = null,
             [FromQuery] string? action = null,
             [FromQuery] string? module = null,
+            [FromQuery] string? userRole = null,
             [FromQuery] int? userId = null,
             [FromQuery] DateTime? dateFrom = null,
             [FromQuery] DateTime? dateTo = null,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 25)
         {
+            if (!IsSuperAdmin() && !User.IsInRole("Admin"))
+                return Forbid();
+
             var tenantId = GetCurrentTenantId();
             var query = _context.AuditLogs.AsNoTracking().AsQueryable();
 
@@ -55,14 +59,29 @@ namespace DFile.backend.Controllers
             if (!string.IsNullOrEmpty(module))
                 query = query.Where(a => a.Module == module);
 
+            if (!string.IsNullOrEmpty(userRole))
+                query = query.Where(a => a.UserRole == userRole);
+
             if (userId.HasValue)
                 query = query.Where(a => a.UserId == userId.Value);
 
             if (dateFrom.HasValue)
-                query = query.Where(a => a.CreatedAt >= dateFrom.Value);
+            {
+                var from = dateFrom.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(dateFrom.Value, DateTimeKind.Utc)
+                    : dateFrom.Value.ToUniversalTime();
+                query = query.Where(a => a.CreatedAt >= from);
+            }
 
             if (dateTo.HasValue)
-                query = query.Where(a => a.CreatedAt <= dateTo.Value);
+            {
+                var to = dateTo.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(dateTo.Value, DateTimeKind.Utc)
+                    : dateTo.Value.ToUniversalTime();
+                if (to.TimeOfDay == TimeSpan.Zero)
+                    to = to.Date.AddDays(1).AddTicks(-1);
+                query = query.Where(a => a.CreatedAt <= to);
+            }
 
             var totalCount = await query.CountAsync();
             if (page < 1) page = 1;
@@ -83,6 +102,8 @@ namespace DFile.backend.Controllers
                     a.EntityType,
                     a.EntityId,
                     a.Module,
+                    a.Description,
+                    a.UserRole,
                     a.UserId,
                     UserName = a.User != null ? a.User.FirstName + " " + a.User.LastName : null,
                     a.TenantId,

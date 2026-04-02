@@ -2,9 +2,11 @@ using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace DFile.backend.Controllers
 {
@@ -16,10 +18,18 @@ namespace DFile.backend.Controllers
     public class MaintenanceController : TenantAwareController
     {
         private readonly AppDbContext _context;
+        private readonly IAuditService _auditService;
 
-        public MaintenanceController(AppDbContext context)
+        public MaintenanceController(AppDbContext context, IAuditService auditService)
         {
             _context = context;
+            _auditService = auditService;
+        }
+
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
         }
 
         [HttpGet]
@@ -183,6 +193,18 @@ namespace DFile.backend.Controllers
             };
 
             _context.MaintenanceRecords.Add(record);
+
+            var userId = GetCurrentUserId();
+            _auditService.AddEntry(HttpContext,
+                IsSuperAdmin() ? null : tenantId,
+                userId,
+                null,
+                "Maintenance",
+                "Create",
+                "MaintenanceRecord",
+                record.Id,
+                $"Maintenance record created ({record.Type}, status {record.Status}) for asset {asset.AssetCode ?? dto.AssetId}.");
+
             await _context.SaveChangesAsync();
 
             // Re-attach Asset for DTO mapping
@@ -218,6 +240,8 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId)
                 return BadRequest(new { message = "Asset does not belong to your organization." });
 
+            var previousStatus = existing.Status;
+
             existing.AssetId = dto.AssetId;
             existing.Description = dto.Description;
             existing.Status = dto.Status;
@@ -232,6 +256,16 @@ namespace DFile.backend.Controllers
             existing.InspectionNotes = dto.InspectionNotes;
             existing.QuotationNotes = dto.QuotationNotes;
             existing.UpdatedAt = DateTime.UtcNow;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Update",
+                "MaintenanceRecord",
+                id,
+                $"Maintenance record updated: status {previousStatus} → {dto.Status}.");
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -249,6 +283,17 @@ namespace DFile.backend.Controllers
 
             record.IsArchived = true;
             record.UpdatedAt = DateTime.UtcNow;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Archive",
+                "MaintenanceRecord",
+                id,
+                "Maintenance record archived.");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -265,6 +310,17 @@ namespace DFile.backend.Controllers
 
             record.IsArchived = false;
             record.UpdatedAt = DateTime.UtcNow;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Restore",
+                "MaintenanceRecord",
+                id,
+                "Maintenance record restored from archive.");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -278,6 +334,16 @@ namespace DFile.backend.Controllers
 
             if (record == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Delete",
+                "MaintenanceRecord",
+                id,
+                "Maintenance record deleted.");
 
             _context.MaintenanceRecords.Remove(record);
             await _context.SaveChangesAsync();
@@ -359,6 +425,16 @@ namespace DFile.backend.Controllers
                 TargetRole = "Admin",
                 TenantId = tenantId,
             });
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Update",
+                "Asset",
+                asset.Id,
+                $"Repair outcome: not repairable (maintenance ticket {record.Id}). Asset flagged for replacement.");
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Asset marked as beyond repair. Admin has been notified." });

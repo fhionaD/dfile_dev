@@ -94,6 +94,7 @@ namespace DFile.backend.Controllers
                 Module = "Allocation",
                 UserId = userId,
                 TenantId = tenantId,
+                Description = $"Allocated asset {asset.AssetCode} to room {room.RoomCode}.",
                 NewValues = JsonSerializer.Serialize(new
                 {
                     AssetId = dto.AssetId,
@@ -145,6 +146,7 @@ namespace DFile.backend.Controllers
                 Module = "Allocation",
                 UserId = userId,
                 TenantId = tenantId,
+                Description = $"Deallocated asset {asset.AssetCode} from active room assignment.",
                 OldValues = JsonSerializer.Serialize(new { AllocationId = allocation.Id }),
                 NewValues = JsonSerializer.Serialize(new { Status = "Inactive", DeallocatedAt = allocation.DeallocatedAt }),
             });

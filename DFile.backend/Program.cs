@@ -12,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<DFile.backend.Authorization.PermissionAuthorizationFilter>();
+}).AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
 builder.Services.AddScoped<DFile.backend.Controllers.RequireTenantFilter>();
 builder.Services.AddScoped<DFile.backend.Services.PermissionService>();

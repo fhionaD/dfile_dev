@@ -461,11 +461,17 @@ namespace DFile.backend.Data
             // ── AuditLog ───────────────────────────────────────────
             modelBuilder.Entity<AuditLog>(e =>
             {
+                e.Property(a => a.Description).HasMaxLength(2000);
+                e.Property(a => a.UserRole).HasMaxLength(128);
+
                 e.HasIndex(a => a.CreatedAt)
                     .HasDatabaseName("IX_AuditLogs_CreatedAt");
 
                 e.HasIndex(a => new { a.TenantId, a.EntityType })
                     .HasDatabaseName("IX_AuditLogs_Tenant_Entity");
+
+                e.HasIndex(a => new { a.TenantId, a.UserRole })
+                    .HasDatabaseName("IX_AuditLogs_Tenant_UserRole");
 
                 e.HasOne(a => a.User)
                     .WithMany()

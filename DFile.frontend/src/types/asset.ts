@@ -245,6 +245,9 @@ export interface AuditLog {
     action: string;
     entityType: string;
     entityId?: string;
+    module?: string;
+    description?: string;
+    userRole?: string;
     userId?: number;
     userName?: string;
     tenantId?: number;

@@ -2,6 +2,7 @@ using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +15,12 @@ namespace DFile.backend.Controllers
     public class PurchaseOrdersController : TenantAwareController
     {
         private readonly AppDbContext _context;
+        private readonly IAuditService _auditService;
 
-        public PurchaseOrdersController(AppDbContext context)
+        public PurchaseOrdersController(AppDbContext context, IAuditService auditService)
         {
             _context = context;
+            _auditService = auditService;
         }
 
         private int? GetCurrentUserId()
@@ -120,6 +123,18 @@ namespace DFile.backend.Controllers
             }
 
             _context.PurchaseOrders.Add(order);
+
+            var uidCreate = GetCurrentUserId();
+            _auditService.AddEntry(HttpContext,
+                IsSuperAdmin() ? null : tenantId,
+                uidCreate,
+                null,
+                "Procurement",
+                "Create",
+                "PurchaseOrder",
+                order.Id,
+                $"Purchase order {order.OrderCode} created for {order.AssetName ?? "items"} (Pending).");
+
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetPurchaseOrder), new { id = order.Id }, MapToResponseDto(order, new Dictionary<int, string>()));
@@ -172,6 +187,16 @@ namespace DFile.backend.Controllers
                 }
             }
 
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Procurement",
+                "Update",
+                "PurchaseOrder",
+                id,
+                $"Purchase order {existing.OrderCode} updated (status {existing.Status}).");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -195,6 +220,16 @@ namespace DFile.backend.Controllers
             order.ApprovedAt = DateTime.UtcNow;
             order.UpdatedAt = DateTime.UtcNow;
 
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                userId,
+                null,
+                "Procurement",
+                "Approve",
+                "PurchaseOrder",
+                id,
+                $"Finance approved purchase order {order.OrderCode}.");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -211,6 +246,17 @@ namespace DFile.backend.Controllers
 
             order.IsArchived = true;
             order.UpdatedAt = DateTime.UtcNow;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Procurement",
+                "Archive",
+                "PurchaseOrder",
+                id,
+                $"Purchase order {order.OrderCode} archived.");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -227,6 +273,17 @@ namespace DFile.backend.Controllers
 
             order.IsArchived = false;
             order.UpdatedAt = DateTime.UtcNow;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Procurement",
+                "Restore",
+                "PurchaseOrder",
+                id,
+                $"Purchase order {order.OrderCode} restored from archive.");
+
             await _context.SaveChangesAsync();
             return NoContent();
         }

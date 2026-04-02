@@ -2,17 +2,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { parseApiError } from '@/lib/api-errors';
+import { mapAssetFromApi } from '@/lib/normalize-asset-from-api';
 import { Asset, CreateAssetPayload, UpdateAssetPayload, UpdateAssetFinancialPayload } from '@/types/asset';
 import { toast } from 'sonner';
 
-function mapAssetFromApi(a: Record<string, unknown>): Asset {
-    return {
-        ...(a as unknown as Asset),
-        desc: (a.assetName as string) || (a.desc as string) || "—",
-        value: typeof a.purchasePrice === "number" ? a.purchasePrice : ((a.value as number) || 0),
-        room: (a.roomName as string) || (a.room as string) || "—",
-    };
-}
+export { mapAssetFromApi } from '@/lib/normalize-asset-from-api';
 
 export interface AssetsPagedResult {
     totalCount: number;
@@ -71,19 +65,20 @@ export function useAssets(showArchived: boolean = false) {
     });
 }
 
-export function useAsset(id: string) {
+export function useAsset(
+    id: string,
+    options?: { enabled?: boolean; refetchOnMount?: boolean | "always" },
+) {
+    const enabled = (options?.enabled ?? true) && !!id;
     return useQuery({
-        queryKey: ['assets', id],
+        queryKey: ["assets", "detail", id],
         queryFn: async () => {
             const { data } = await api.get<Record<string, unknown>>(`/api/assets/${id}`);
-            return {
-                ...data,
-                desc: (data.assetName as string) || (data.desc as string) || "—",
-                value: typeof data.purchasePrice === "number" ? data.purchasePrice : ((data.value as number) || 0),
-                room: (data.roomName as string) || (data.room as string) || "—",
-            } as Asset;
+            return mapAssetFromApi(data);
         },
-        enabled: !!id,
+        enabled,
+        refetchOnMount: options?.refetchOnMount ?? "always",
+        staleTime: 0,
     });
 }
 
@@ -115,7 +110,7 @@ export function useUpdateAsset() {
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
-            queryClient.invalidateQueries({ queryKey: ['assets', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['assets', 'detail', variables.id] });
             toast.success('Asset updated successfully');
         },
         onError: (error: Error) => {
@@ -185,7 +180,7 @@ export function useUpdateAssetFinancial() {
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
-            queryClient.invalidateQueries({ queryKey: ['assets', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['assets', 'detail', variables.id] });
             toast.success('Financial data updated successfully');
         },
         onError: () => {

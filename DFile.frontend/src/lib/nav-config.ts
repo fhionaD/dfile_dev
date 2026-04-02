@@ -1,6 +1,6 @@
 import {
-    LayoutDashboard, Building2, MapPin, Tag, ShoppingCart, QrCode, ArrowRightLeft,
-    PieChart, Package, TrendingDown, Trash2, FileBarChart,
+    LayoutDashboard, Building2, MapPin, Tag, ShoppingCart, Package, ArrowRightLeft,
+    PieChart, TrendingDown, Trash2, FileBarChart,
     Wrench, CalendarClock, HeartPulse,
     ShieldCheck, AlertTriangle, BarChart3, KeyRound, ShieldAlert,
 } from "lucide-react";
@@ -28,7 +28,7 @@ const TENANT_NAV: PermNavSection[] = [
     {
         label: "Asset Management",
         items: [
-            { href: "/tenant/inventory", label: "Registration & Tagging", icon: QrCode, requiredModules: ["Assets"] },
+            { href: "/tenant/inventory", label: "Registration & Tagging", icon: Package, requiredModules: ["Assets"] },
             { href: "/tenant/allocation", label: "Allocation", icon: ArrowRightLeft, requiredModules: ["Assets"] },
         ],
     },

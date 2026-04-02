@@ -31,6 +31,14 @@ namespace DFile.backend.Models
 
         public string? Module { get; set; }
 
+        /// <summary>Role claim snapshot at write time (e.g. Admin, Finance, Maintenance).</summary>
+        [MaxLength(128)]
+        public string? UserRole { get; set; }
+
+        /// <summary>Human-readable summary for tenant audit views.</summary>
+        [MaxLength(2000)]
+        public string? Description { get; set; }
+
         public string? IpAddress { get; set; }
 
         public string? UserAgent { get; set; }

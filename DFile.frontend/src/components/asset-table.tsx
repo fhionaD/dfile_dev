@@ -10,13 +10,12 @@ import {
     useReactTable,
 } from "@tanstack/react-table";
 import {
-    QrCode, FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
+    FileBarChart, ArrowUpDown, ArrowUp, ArrowDown,
     Archive, RotateCcw, Search, Filter, Package, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { QRCodeModal } from "@/components/modals/qr-code-modal";
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -71,7 +70,6 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     const [statusFilter, setStatusFilter] = useState("All");
     const [categoryFilter, setCategoryFilter] = useState("All");
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [selectedAssetForQR, setSelectedAssetForQR] = useState<Asset | null>(null);
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
     const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
@@ -160,15 +158,6 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                     const isArchived = asset.status === "Archived";
                     return (
                         <div className="flex items-center justify-center gap-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                title="QR Code"
-                                onClick={(e) => { e.stopPropagation(); setSelectedAssetForQR(asset); }}
-                            >
-                                <QrCode className="h-4 w-4" />
-                            </Button>
                             {isArchived ? (
                                 <Button
                                     variant="ghost"
@@ -257,12 +246,6 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
 
     return (
         <div className="space-y-6">
-            <QRCodeModal
-                open={!!selectedAssetForQR}
-                onOpenChange={(open) => !open && setSelectedAssetForQR(null)}
-                asset={selectedAssetForQR}
-            />
-
             <div className="rounded-md border overflow-hidden">
                 {/* Toolbar */}
                 <div className="p-6 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">

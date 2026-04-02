@@ -368,6 +368,7 @@ namespace DFile.backend.Controllers
                 Module = "Asset Management",
                 UserId = userId,
                 TenantId = effectiveTenantId,
+                Description = $"Asset registered: {asset.AssetName} ({asset.AssetCode}).",
                 NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.TagNumber, asset.CategoryId, Status = StatusLabels.GetValueOrDefault(asset.LifecycleStatus, "Unknown") }),
             });
 
@@ -520,6 +521,16 @@ namespace DFile.backend.Controllers
 
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                userId,
+                null,
+                "Finance",
+                "Update",
+                "Asset",
+                id,
+                "Financial data updated (purchase price, acquisition cost, useful life, residual, book value).");
 
             await _context.SaveChangesAsync();
             return NoContent();
