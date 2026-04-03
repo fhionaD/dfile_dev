@@ -12,7 +12,11 @@ import { useAssets } from "@/hooks/use-assets";
 import { usePurchaseOrders } from "@/hooks/use-procurement";
 import { useMaintenanceRecords } from "@/hooks/use-maintenance";
 
-export function FinanceDashboard() {
+interface FinanceDashboardProps {
+    cardClassName?: string;
+}
+
+export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) {
     const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
     const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders();
@@ -143,10 +147,10 @@ export function FinanceDashboard() {
         return (
             <div className="space-y-6">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[...Array(4)].map((_, i) => <Card key={i}><div className="p-6"><Skeleton className="h-20 w-full" /></div></Card>)}
+                    {[...Array(4)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-20 w-full" /></div></Card>)}
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {[...Array(4)].map((_, i) => <Card key={i}><div className="p-6"><Skeleton className="h-56 w-full" /></div></Card>)}
+                    {[...Array(4)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-56 w-full" /></div></Card>)}
                 </div>
             </div>
         );
@@ -175,7 +179,7 @@ export function FinanceDashboard() {
             {/* KPI Row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Portfolio Value */}
-                <Card className="relative overflow-hidden">
+                <Card className={`relative overflow-hidden ${cardClassName}`}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Portfolio Value</p>
@@ -188,7 +192,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Depreciation */}
-                <Card className="relative overflow-hidden">
+                <Card className={`relative overflow-hidden ${cardClassName}`}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Depreciation</p>
@@ -204,7 +208,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Maintenance Spend */}
-                <Card className="relative overflow-hidden">
+                <Card className={`relative overflow-hidden ${cardClassName}`}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Maintenance Spend</p>
@@ -217,7 +221,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Procurement Spend */}
-                <Card className="relative overflow-hidden">
+                <Card className={`relative overflow-hidden ${cardClassName}`}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement</p>
@@ -252,7 +256,7 @@ export function FinanceDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                 {/* Monthly Cost Trend - Bar Chart */}
-                <Card>
+                <Card className={cardClassName}>
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Monthly Maintenance Cost</CardTitle>
@@ -286,7 +290,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Cost by Status - Horizontal bars */}
-                <Card>
+                <Card className={cardClassName}>
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Cost Breakdown by Status</CardTitle>
@@ -326,7 +330,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Cost by Priority */}
-                <Card>
+                <Card className={cardClassName}>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Cost by Priority Level</CardTitle>
                     </CardHeader>
@@ -357,7 +361,7 @@ export function FinanceDashboard() {
                 </Card>
 
                 {/* Top Vendor Spend */}
-                <Card>
+                <Card className={cardClassName}>
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Top Vendor Spend</CardTitle>
@@ -395,7 +399,7 @@ export function FinanceDashboard() {
             </div>
 
             {/* Cost by Room */}
-            <Card>
+            <Card className={cardClassName}>
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base">Cost Distribution by Room</CardTitle>

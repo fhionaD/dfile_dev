@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, Wrench, AlertCircle, RefreshCw, Trash2, Settings } from "lucide-react";
+import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, Wrench, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useAllocatedAssetsForMaintenance, useMaintenanceRecords, useUpdateMaintenanceStatus, useUpdateMaintenanceRecord, useArchiveMaintenanceRecord } from "@/hooks/use-maintenance";
 import { useAssets, useArchiveAsset } from "@/hooks/use-assets";
 import { useDeallocateAsset } from "@/hooks/use-allocations";
 import { useMaintenanceSettings, MaintenanceSettings } from "@/hooks/use-maintenance-settings";
+import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { InspectionDiagnosisModal } from "@/components/modals/inspection-diagnosis-modal";
@@ -101,6 +102,21 @@ export default function SchedulesPage() {
     const searchParams = useSearchParams();
     const highlightId = searchParams.get('highlight');
     
+    // Get all settings from context (includes glassmorphism, minimal UI, data caching, batch operations)
+    const { 
+        enableGlassmorphism, 
+        enableMinimalUI, 
+        enableDataCaching, 
+        enableBatchOperations,
+        enableAnimations,
+        enableGlint,
+        enableAutoCost
+    } = useMaintenanceContext();
+    
+    const cardClassName = enableGlassmorphism 
+        ? "border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-xl ring-1 ring-white/10" 
+        : "";
+    
     const [highlightedRowId, setHighlightedRowId] = useState<string | null>(highlightId);
     
     // Auto-clear highlight after animation completes
@@ -143,47 +159,10 @@ export default function SchedulesPage() {
     const [assetTabView, setAssetTabView] = useState<'allocated' | 'archived'>('allocated');
     const [scheduleTabView, setScheduleTabView] = useState<'active' | 'archived'>('active');
     const [archiveScheduleTarget, setArchiveScheduleTarget] = useState<{ id: string; description: string } | null>(null);
-    const [showSettings, setShowSettings] = useState(false);
     
-    // Use hybrid settings management (localStorage + backend)
-    const { settings, updateSetting, isSaving } = useMaintenanceSettings();
-    
-    // Destructure settings for convenience
-    const enableAnimations = settings.enableAnimations;
-    const enableAutoCost = settings.enableAutoCost;
-    const enableGlint = settings.enableGlint;
-    const enableGlassmorphism = settings.enableGlassmorphism;
-    const enableMinimalUI = settings.enableMinimalUI;
-    const enableDataCaching = settings.enableDataCaching;
-    const enableBatchOperations = settings.enableBatchOperations;
-    // Settings persistence is now handled by useMaintenanceSettings hook (offline-first + backend sync)
+    // Settings are now accessed through MaintenanceContext (global state management)
+    // No need for local settings management here
 
-    const handleSettingChange = (settingName: string, key: string) => {
-        const typedKey = key as keyof MaintenanceSettings;
-        const newValue = !settings[typedKey];
-        updateSetting(typedKey, newValue as boolean);
-        toast.success('Setting saved successfully', {
-            description: `${settingName} has been ${newValue ? 'enabled' : 'disabled'}`,
-            duration: 2000,
-        });
-    };
-
-    const handleGlassmorphismChange = () => {
-        const newValue = !settings.enableGlassmorphism;
-        updateSetting('enableGlassmorphism', newValue);
-        
-        if (newValue) {
-            toast.warning('Performance Notice', {
-                description: 'Glassmorphism effect increases CPU/GPU usage. Disable if experiencing performance issues.',
-                duration: 4000,
-            });
-        } else {
-            toast.success('Setting saved successfully', {
-                description: 'Glassmorphism Effect has been disabled',
-                duration: 2000,
-            });
-        }
-    };
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const updateRecordMutation = useUpdateMaintenanceRecord();
     const deallocateAssetMutation = useDeallocateAsset();
@@ -288,24 +267,6 @@ export default function SchedulesPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <div className="relative group">
-                        <Button variant="outline" size="icon" onClick={() => setShowSettings(!showSettings)}>
-                            <Settings className="h-4 w-4" />
-                        </Button>
-                        {/* "On Testing" Ribbon */}
-                        <div className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full transform rotate-12 shadow-lg pointer-events-none">
-                            On Testing
-                        </div>
-                        {/* Hover Tooltip */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-50">
-                            <div className="relative bg-slate-900 text-white text-xs px-4 py-3 rounded-lg shadow-xl w-72 whitespace-normal">
-                                <p className="font-semibold mb-1">⚠️ Testing Mode</p>
-                                <p className="text-white/90">Some features are not working and only based on the working device. If you turn on glassmorphism make sure you have a dedicated GPU.</p>
-                                {/* Tooltip arrow */}
-                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-slate-900"></div>
-                            </div>
-                        </div>
-                    </div>
                     <Button onClick={() => { setSelectedRecord(null); setSelectedAssetIdForSchedule(null); setIsScheduleModalOpen(true); }} className="gap-2">
                         <Plus className="h-4 w-4" />
                         Create Ticket
@@ -313,152 +274,9 @@ export default function SchedulesPage() {
                 </div>
             </div>
 
-            {/* Settings Panel */}
-            {showSettings && (
-                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Card className={`p-6 space-y-4 shadow-2xl border border-white/20 bg-white/5 dark:bg-black/20 backdrop-blur-xl ring-1 ring-white/10`}>
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold">Display Settings</h3>
-                            <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>Close</Button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Tab Animations</p>
-                                    <p className="text-xs text-muted-foreground">Enable smooth transitions between tabs</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Tab Animations', 'enableAnimations')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableAnimations ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableAnimations ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Auto Cost Estimation</p>
-                                    <p className="text-xs text-muted-foreground">Automatically estimate costs based on category</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Auto Cost Estimation', 'enableAutoCost')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableAutoCost ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableAutoCost ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Completion Glint Effect</p>
-                                    <p className="text-xs text-muted-foreground">Show shimmer animation when tasks complete</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Completion Glint Effect', 'enableGlint')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableGlint ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableGlint ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Glassmorphism Effect</p>
-                                    <p className="text-xs text-muted-foreground">Apply frosted glass style to modals • ⚠️ Increases usage</p>
-                                </div>
-                                <button
-                                    onClick={handleGlassmorphismChange}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableGlassmorphism ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableGlassmorphism ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Optimization Settings</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Minimal UI</p>
-                                    <p className="text-xs text-muted-foreground">Hide decorative elements for faster loading</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Minimal UI', 'enableMinimalUI')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableMinimalUI ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableMinimalUI ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Data Caching</p>
-                                    <p className="text-xs text-muted-foreground">Cache records locally for offline access</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Data Caching', 'enableDataCaching')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableDataCaching ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableDataCaching ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                            <div className={`flex flex-col justify-between p-4 rounded-lg border transition-all shadow-lg border-white/20 bg-white/10 dark:bg-white/5 backdrop-blur-md hover:bg-white/20 dark:hover:bg-white/10`}>
-                                <div className="mb-3">
-                                    <p className="text-sm font-medium mb-1">Batch Operations</p>
-                                    <p className="text-xs text-muted-foreground">Group updates for improved performance</p>
-                                </div>
-                                <button
-                                    onClick={() => handleSettingChange('Batch Operations', 'enableBatchOperations')}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                        enableBatchOperations ? 'bg-primary' : 'bg-muted-foreground/30'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                                            enableBatchOperations ? 'translate-x-6' : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
-
             {/* Summary */}
             <section className="grid gap-4 sm:grid-cols-3">
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Scheduled / Pending</p>
@@ -467,7 +285,7 @@ export default function SchedulesPage() {
                         {isLoading ? <Skeleton className="h-8 w-16" /> : <p className="text-2xl font-bold text-blue-600">{scheduledCount}</p>}
                     </div>
                 </Card>
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">In Progress</p>
@@ -476,7 +294,7 @@ export default function SchedulesPage() {
                         {isLoading ? <Skeleton className="h-8 w-16" /> : <p className="text-2xl font-bold text-amber-600">{inProgressCount}</p>}
                     </div>
                 </Card>
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Completed</p>
@@ -505,7 +323,7 @@ export default function SchedulesPage() {
                 if (upcoming.length === 0 && !isLoading) return null;
 
                 return (
-                    <Card>
+                    <Card className={cardClassName}>
                         <div className="p-5 space-y-3">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -636,7 +454,7 @@ export default function SchedulesPage() {
                         <p className="text-xs mt-1">Schedule maintenance from the allocated assets below</p>
                     </div>
                 ) : (
-                    <div className="rounded-md border overflow-auto bg-background/50 backdrop-blur-sm">
+                    <div className={`rounded-md border overflow-auto ${cardClassName} bg-background/50 backdrop-blur-sm`}>
                         <Table>
                             <TableHeader className="bg-muted/60 border-b-2 border-muted">
                                 <TableRow className="hover:bg-muted/80 transition-colors">
@@ -853,7 +671,7 @@ export default function SchedulesPage() {
                             <p>No allocated assets found</p>
                         </div>
                     ) : (
-                        <div className="rounded-md border overflow-auto">
+                        <div className={`rounded-md border overflow-auto ${cardClassName}`}>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -922,7 +740,7 @@ export default function SchedulesPage() {
                             <p>No archived assets found</p>
                         </div>
                     ) : (
-                        <div className="rounded-md border overflow-auto">
+                        <div className={`rounded-md border overflow-auto ${cardClassName}`}>
                             <Table>
                                 <TableHeader>
                                     <TableRow>

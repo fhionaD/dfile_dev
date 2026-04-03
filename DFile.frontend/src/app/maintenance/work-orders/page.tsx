@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { useAssets } from "@/hooks/use-assets";
+import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { MaintenanceRecord, Asset } from "@/types/asset";
 
 const MaintenanceOperations = dynamic(() => import("@/components/maintenance-operations").then(m => ({ default: m.MaintenanceOperations })), {
@@ -16,6 +17,12 @@ const AcquisitionModal = dynamic(() => import("@/components/modals/acquisition-m
 
 export default function WorkOrdersPage() {
     const { data: assets = [] } = useAssets();
+    
+    // Get glassmorphism setting from context
+    const { enableGlassmorphism } = useMaintenanceContext();
+    const cardClassName = enableGlassmorphism 
+        ? "border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-xl ring-1 ring-white/10" 
+        : "";
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -50,6 +57,7 @@ export default function WorkOrdersPage() {
                 <MaintenanceOperations
                     onCreateRequest={handleCreateRequest}
                     onRecordClick={handleRecordClick}
+                    cardClassName={cardClassName}
                 />
             </section>
 

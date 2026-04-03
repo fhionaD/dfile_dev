@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMaintenanceRecords, useArchiveMaintenanceRecord } from "@/hooks/use-maintenance";
+import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/stat-card";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
@@ -25,6 +26,7 @@ interface MaintenanceViewProps {
 
 export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }: MaintenanceViewProps) {
     const router = useRouter();
+    const { enableGlassmorphism } = useMaintenanceContext();
     const [showArchived, setShowArchived] = useState(false);
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
@@ -148,11 +150,15 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         Low: "success",
     };
 
+    const cardClassName = enableGlassmorphism 
+        ? "border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-xl ring-1 ring-white/10" 
+        : "";
+
     return (
         <div className="space-y-8">
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Open Requests</p>
@@ -164,7 +170,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </div>
                 </Card>
                 
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Overdue</p>
@@ -176,7 +182,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </div>
                 </Card>
 
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">In Repair</p>
@@ -188,7 +194,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </div>
                 </Card>
 
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Attention Needed</p>
@@ -200,7 +206,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </div>
                 </Card>
 
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Scheduled (Week)</p>
@@ -212,7 +218,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                     </div>
                 </Card>
 
-                <Card>
+                <Card className={cardClassName}>
                     <div className="p-6 flex items-center justify-between">
                         <div className="space-y-1">
                             <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
@@ -306,7 +312,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
             </div>
 
             {/* Main Content */}
-            <div className="rounded-md border overflow-auto">
+            <div className={`rounded-md border overflow-auto ${cardClassName}`}>
                 <Table>
                     <TableHeader>
                         <TableRow>

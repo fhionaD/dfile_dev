@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-    LogOut, Menu, Bell, ChevronRight,
+    LogOut, Menu, Bell, ChevronRight, Settings,
     PanelLeftClose, PanelLeft
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -34,6 +34,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MaintenanceSettingsModal } from "@/components/modals/maintenance-settings-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { UserRole } from "@/types/asset";
 import { getDashboardPath } from "@/lib/role-routing";
@@ -277,6 +278,7 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
     const router = useRouter();
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isLogoutOpen, setIsLogoutOpen] = useState(false);
     // Prevent double-navigation in race conditions.
@@ -388,6 +390,21 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
                         <div className="flex items-center gap-2">
                             <ThemeToggle />
 
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent"
+                                        onClick={() => setIsSettingsModalOpen(true)}
+                                        aria-label="Maintenance Settings"
+                                    >
+                                        <Settings size={18} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">Maintenance Settings</TooltipContent>
+                            </Tooltip>
+
                             <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -461,6 +478,12 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* ── Maintenance Settings Modal ── */}
+            <MaintenanceSettingsModal 
+                open={isSettingsModalOpen} 
+                onOpenChange={setIsSettingsModalOpen} 
+            />
         </TooltipProvider>
     );
 }

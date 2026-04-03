@@ -18,9 +18,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 interface MaintenanceOperationsProps {
     onCreateRequest: () => void;
     onRecordClick: (record: any) => void;
+    cardClassName?: string;
 }
 
-export function MaintenanceOperations({ onCreateRequest, onRecordClick }: MaintenanceOperationsProps) {
+export function MaintenanceOperations({ onCreateRequest, onRecordClick, cardClassName = "" }: MaintenanceOperationsProps) {
     const [showArchived, setShowArchived] = useState(false);
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
@@ -162,7 +163,7 @@ export function MaintenanceOperations({ onCreateRequest, onRecordClick }: Mainte
                 </div>
             </div>
 
-            <div className="rounded-md border overflow-auto">
+            <div className={`rounded-md border overflow-auto ${cardClassName}`}>
                 <Table className="w-full table-fixed">
                     <TableHeader>
                         <TableRow>
