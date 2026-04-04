@@ -1,10 +1,12 @@
 using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
+using DFile.backend.Mapping;
 using DFile.backend.Models;
 using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace DFile.backend.Controllers
@@ -16,17 +18,25 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly INotificationService _notificationService;
 
-        public PurchaseOrdersController(AppDbContext context, IAuditService auditService)
+        public PurchaseOrdersController(AppDbContext context, IAuditService auditService, INotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
+            _notificationService = notificationService;
         }
 
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private static string? NormalizeSerial(string? value)
+        {
+            var normalized = value?.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         [HttpGet]
@@ -201,6 +211,136 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
+        [HttpPut("{id}/receive")]
+        [RequirePermission("PurchaseOrders", "CanEdit")]
+        public async Task<ActionResult<AssetResponseDto>> ReceivePurchaseOrder(string id, [FromBody] ReceivePurchaseOrderDto dto)
+        {
+            if (dto.DeliveryDate.Date > DateTime.UtcNow.Date)
+                return BadRequest(new { message = "Delivery date cannot be in the future." });
+
+            var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+            var order = await _context.PurchaseOrders.Include(p => p.Items).FirstOrDefaultAsync(p => p.Id == id);
+
+            if (order == null) return NotFound();
+            if (!IsSuperAdmin() && tenantId.HasValue && order.TenantId != tenantId) return NotFound();
+            if (order.Status != "Approved")
+                return BadRequest(new { message = $"Only approved orders can be received. Current status: {order.Status}" });
+            if (!string.IsNullOrEmpty(order.AssetId))
+                return BadRequest(new { message = "This purchase order has already been received." });
+
+            var effectiveTenantId = order.TenantId;
+            if (!IsSuperAdmin() && tenantId.HasValue)
+                effectiveTenantId = tenantId;
+
+            string? categoryId = dto.CategoryId;
+            if (string.IsNullOrEmpty(categoryId))
+                categoryId = order.Items.Select(i => i.CategoryId).FirstOrDefault(cid => !string.IsNullOrEmpty(cid));
+            if (string.IsNullOrEmpty(categoryId) && !string.IsNullOrWhiteSpace(order.Category))
+            {
+                var match = await _context.AssetCategories
+                    .Where(c => !c.IsArchived && c.CategoryName == order.Category
+                        && (c.TenantId == effectiveTenantId || c.TenantId == null))
+                    .OrderBy(c => c.TenantId == effectiveTenantId ? 0 : 1)
+                    .FirstOrDefaultAsync();
+                categoryId = match?.Id;
+            }
+
+            if (string.IsNullOrEmpty(categoryId))
+                return BadRequest(new { message = "Could not resolve an asset category. Provide categoryId on the request or attach categories to PO line items." });
+
+            var category = await _context.AssetCategories.FindAsync(categoryId);
+            if (category == null || category.IsArchived)
+                return BadRequest(new { message = "Invalid or archived asset category." });
+
+            var normalizedSerial = NormalizeSerial(order.SerialNumber);
+            if (!string.IsNullOrEmpty(normalizedSerial))
+            {
+                var serialExists = await _context.Assets.AnyAsync(a =>
+                    a.SerialNumber != null &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
+                if (serialExists)
+                    return Conflict(new { message = "Serial Number already exists for an asset in this tenant." });
+            }
+
+            var asset = new Asset
+            {
+                Id = Guid.NewGuid().ToString(),
+                AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
+                TagNumber = await RecordCodeGenerator.GenerateTagNumberAsync(_context),
+                AssetName = order.AssetName,
+                CategoryId = categoryId,
+                LifecycleStatus = LifecycleStatus.Registered,
+                CurrentCondition = AssetCondition.Good,
+                HandlingTypeSnapshot = category.HandlingType.ToString(),
+                Manufacturer = order.Manufacturer,
+                Model = order.Model,
+                SerialNumber = normalizedSerial,
+                PurchaseDate = dto.DeliveryDate,
+                Vendor = order.Vendor,
+                AcquisitionCost = order.PurchasePrice,
+                UsefulLifeYears = order.UsefulLifeYears,
+                PurchasePrice = order.PurchasePrice,
+                ResidualValue = null,
+                SalvagePercentage = category.SalvagePercentage,
+                SalvageValue = Math.Round(order.PurchasePrice * category.SalvagePercentage / 100m, 2),
+                CurrentBookValue = order.PurchasePrice,
+                MonthlyDepreciation = order.UsefulLifeYears > 0
+                    ? Math.Round(order.PurchasePrice / (order.UsefulLifeYears * 12), 2)
+                    : 0,
+                DepreciationMonthsApplied = 0,
+                TenantId = effectiveTenantId,
+                PurchaseOrderId = order.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                UpdatedBy = userId,
+                IsArchived = false
+            };
+
+            _context.Assets.Add(asset);
+            order.AssetId = asset.Id;
+            order.Status = "Delivered";
+            order.UpdatedAt = DateTime.UtcNow;
+
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"Purchase order {order.OrderCode} was received. Asset {asset.AssetCode} was created.",
+                Type = "Success",
+                Module = "PurchaseOrders",
+                EntityType = "Asset",
+                EntityId = asset.Id,
+                TargetRole = "Admin",
+                TenantId = order.TenantId,
+            });
+
+            _auditService.AddEntry(HttpContext,
+                effectiveTenantId,
+                userId,
+                null,
+                "Procurement",
+                "Receive",
+                "PurchaseOrder",
+                order.Id,
+                $"Received PO {order.OrderCode}; created asset {asset.AssetCode}.");
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
+            }
+
+            var userNames = userId.HasValue
+                ? await _context.Users.Where(u => u.Id == userId.Value).ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName)
+                : new Dictionary<int, string>();
+
+            return Ok(AssetResponseMapper.ToDto(asset, category, userNames, null));
+        }
+
         [HttpPatch("{id}/approve")]
         [RequirePermission("PurchaseOrders", "CanApprove")]
         public async Task<IActionResult> ApprovePurchaseOrder(string id)
@@ -230,6 +370,7 @@ namespace DFile.backend.Controllers
                 id,
                 $"Finance approved purchase order {order.OrderCode}.");
 
+            await _notificationService.NotifyPurchaseOrderApprovedAsync(order);
             await _context.SaveChangesAsync();
             return NoContent();
         }

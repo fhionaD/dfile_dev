@@ -10,31 +10,24 @@ namespace dfile.backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<bool>(
-                name: "IsSalvageOverride",
-                table: "Assets",
-                type: "bit",
-                nullable: false,
-                defaultValue: false);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "SalvagePercentage",
-                table: "Assets",
-                type: "decimal(5,2)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "SalvageValue",
-                table: "Assets",
-                type: "decimal(18,2)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "SalvagePercentage",
-                table: "AssetCategories",
-                type: "decimal(5,2)",
-                nullable: false,
-                defaultValue: 0m);
+            // Idempotent: databases that already have these columns (manual/script changes) were failing
+            // with "Column name ... specified more than once" when history was missing this migration.
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.Assets', 'IsSalvageOverride') IS NULL
+    ALTER TABLE [Assets] ADD [IsSalvageOverride] bit NOT NULL CONSTRAINT [DF_Assets_IsSalvageOverride_20260328] DEFAULT CAST(0 AS bit);
+");
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.Assets', 'SalvagePercentage') IS NULL
+    ALTER TABLE [Assets] ADD [SalvagePercentage] decimal(5,2) NULL;
+");
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.Assets', 'SalvageValue') IS NULL
+    ALTER TABLE [Assets] ADD [SalvageValue] decimal(18,2) NULL;
+");
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.AssetCategories', 'SalvagePercentage') IS NULL
+    ALTER TABLE [AssetCategories] ADD [SalvagePercentage] decimal(5,2) NOT NULL CONSTRAINT [DF_AssetCategories_SalvagePct_20260328] DEFAULT 0;
+");
         }
 
         /// <inheritdoc />

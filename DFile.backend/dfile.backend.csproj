@@ -10,6 +10,11 @@
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
 
+  <!-- Debug: skip native apphost so `dotnet build` does not fail when dfile.backend.exe is still running. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Ensure web.config and wwwroot are always included in publish output -->
     <Content Update="web.config" CopyToPublishDirectory="Always" />
@@ -31,5 +36,11 @@
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
+
+  <!-- Rebuild Next static export into wwwroot (stop `dotnet run` first if wwwroot files are locked). -->
+  <!-- Usage: dotnet msbuild -t:BuildFrontendToWwwroot -->
+  <Target Name="BuildFrontendToWwwroot">
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildThisFileDirectory)..\DFile.frontend" />
+  </Target>
 
 </Project>

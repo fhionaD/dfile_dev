@@ -19,11 +19,13 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly INotificationService _notificationService;
 
-        public MaintenanceController(AppDbContext context, IAuditService auditService)
+        public MaintenanceController(AppDbContext context, IAuditService auditService, INotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
+            _notificationService = notificationService;
         }
 
         private int? GetCurrentUserId()
@@ -37,27 +39,75 @@ namespace DFile.backend.Controllers
         public async Task<ActionResult<IEnumerable<MaintenanceRecordResponseDto>>> GetMaintenanceRecords([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
+            // Project in SQL: avoids materializing full Asset + Category graphs and reduces memory/IO.
             var query = _context.MaintenanceRecords
-                .Include(r => r.Asset)
-                    .ThenInclude(a => a!.Category)
+                .AsNoTracking()
                 .Where(r => r.IsArchived == showArchived);
 
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
                 // Include legacy rows where record tenant is null but linked asset belongs to tenant.
-                query = query.Where(r => r.TenantId == tenantId || (r.TenantId == null && r.Asset != null && r.Asset.TenantId == tenantId));
+                query = query.Where(r =>
+                    r.TenantId == tenantId ||
+                    (r.TenantId == null && r.Asset != null && r.Asset.TenantId == tenantId));
             }
 
-            var records = await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
+            var rows = await query
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new MaintenanceRecordListRow(
+                    r.Id,
+                    r.AssetId,
+                    r.Asset != null ? r.Asset.AssetName : null,
+                    r.Asset != null ? r.Asset.AssetCode : null,
+                    r.Asset != null ? r.Asset.TagNumber : null,
+                    r.Asset != null && r.Asset.Category != null ? r.Asset.Category.CategoryName : null,
+                    r.Description,
+                    r.Status,
+                    r.Priority,
+                    r.Type,
+                    r.Frequency,
+                    r.StartDate,
+                    r.EndDate,
+                    r.Cost,
+                    r.Attachments,
+                    r.DiagnosisOutcome,
+                    r.InspectionNotes,
+                    r.QuotationNotes,
+                    r.DateReported,
+                    r.IsArchived,
+                    r.CreatedAt,
+                    r.UpdatedAt,
+                    r.TenantId))
+                .ToListAsync();
 
-            // Batch-fetch active allocations for all assets referenced by these records
-            var assetIds = records.Select(r => r.AssetId).Distinct().ToList();
-            var activeAllocations = await _context.AssetAllocations
-                .Include(aa => aa.Room)
-                .Where(aa => assetIds.Contains(aa.AssetId) && aa.Status == "Active")
-                .ToDictionaryAsync(aa => aa.AssetId);
+            var assetIds = rows.Select(r => r.AssetId).Distinct().ToList();
+            // Chunk IN lists: very large tenant lists can hit SQL Server parameter limits and degrade plans.
+            const int allocChunkSize = 900;
+            var roomByAsset = new Dictionary<string, (string? RoomId, string? RoomCode, string? RoomName)>(StringComparer.Ordinal);
+            for (var off = 0; off < assetIds.Count; off += allocChunkSize)
+            {
+                var chunk = assetIds.Skip(off).Take(allocChunkSize).ToList();
+                var allocationRows = await _context.AssetAllocations
+                    .AsNoTracking()
+                    .Where(aa => chunk.Contains(aa.AssetId) && aa.Status == "Active")
+                    .Select(aa => new
+                    {
+                        aa.AssetId,
+                        aa.RoomId,
+                        RoomCode = aa.Room != null ? aa.Room.RoomCode : null,
+                        RoomName = aa.Room != null ? aa.Room.Name : null
+                    })
+                    .ToListAsync();
 
-            var result = records.Select(r => MapToDto(r, activeAllocations)).ToList();
+                foreach (var a in allocationRows)
+                {
+                    if (roomByAsset.ContainsKey(a.AssetId)) continue;
+                    roomByAsset[a.AssetId] = (a.RoomId, a.RoomCode, a.RoomName);
+                }
+            }
+
+            var utcNow = DateTime.UtcNow;
+            var result = rows.Select(r => MapListRowToDto(r, roomByAsset, utcNow)).ToList();
             return Ok(result);
         }
 
@@ -120,7 +170,7 @@ namespace DFile.backend.Controllers
                 .FirstOrDefaultAsync(r => r.Id == idStr);
 
             if (record == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
 
             var activeAllocation = await _context.AssetAllocations
                 .Include(aa => aa.Room)
@@ -129,7 +179,7 @@ namespace DFile.backend.Controllers
             var allocDict = new Dictionary<string, AssetAllocation>();
             if (activeAllocation != null) allocDict[record.AssetId] = activeAllocation;
 
-            return Ok(MapToDto(record, allocDict));
+            return Ok(MapToDto(record, allocDict, DateTime.UtcNow));
         }
 
         // ── Status transition rules ──────────────────────────────
@@ -168,6 +218,10 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Cannot create maintenance records for disposed assets." });
             if (asset.IsArchived)
                 return BadRequest(new { message = "Cannot create maintenance records for archived assets." });
+
+            var scheduleErr = MaintenanceSchedulingService.ValidateSchedule(dto.Frequency, dto.StartDate, dto.EndDate);
+            if (scheduleErr != null)
+                return BadRequest(new { message = scheduleErr });
 
             var record = new MaintenanceRecord
             {
@@ -217,7 +271,7 @@ namespace DFile.backend.Controllers
             var allocDict = new Dictionary<string, AssetAllocation>();
             if (activeAllocation != null) allocDict[dto.AssetId] = activeAllocation;
 
-            return CreatedAtAction("GetMaintenanceRecord", new { id = record.Id }, MapToDto(record, allocDict));
+            return CreatedAtAction("GetMaintenanceRecord", new { id = record.Id }, MapToDto(record, allocDict, DateTime.UtcNow));
         }
 
         [HttpPut("{id}")]
@@ -225,10 +279,12 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> PutMaintenanceRecord(string id, UpdateMaintenanceRecordDto dto)
         {
             var tenantId = GetCurrentTenantId();
-            var existing = await _context.MaintenanceRecords.FindAsync(id);
+            var existing = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (existing == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(existing, tenantId)) return NotFound();
 
             // Validate status transition
             if (!IsValidTransition(existing.Status, dto.Status))
@@ -239,6 +295,10 @@ namespace DFile.backend.Controllers
             if (asset == null) return BadRequest(new { message = "Asset not found." });
             if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId)
                 return BadRequest(new { message = "Asset does not belong to your organization." });
+
+            var scheduleErr = MaintenanceSchedulingService.ValidateSchedule(dto.Frequency, dto.StartDate, dto.EndDate);
+            if (scheduleErr != null)
+                return BadRequest(new { message = scheduleErr });
 
             var previousStatus = existing.Status;
 
@@ -276,10 +336,12 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> ArchiveMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (record == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
 
             record.IsArchived = true;
             record.UpdatedAt = DateTime.UtcNow;
@@ -303,10 +365,12 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> RestoreMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (record == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
 
             record.IsArchived = false;
             record.UpdatedAt = DateTime.UtcNow;
@@ -330,10 +394,12 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> DeleteMaintenanceRecord(string id)
         {
             var tenantId = GetCurrentTenantId();
-            var record = await _context.MaintenanceRecords.FindAsync(id);
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (record == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
 
             _auditService.AddEntry(HttpContext,
                 tenantId,
@@ -389,7 +455,7 @@ namespace DFile.backend.Controllers
                 .FirstOrDefaultAsync(r => r.Id == maintenanceId);
 
             if (record == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && record.TenantId != tenantId) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
 
             var asset = record.Asset;
             if (asset == null) return BadRequest(new { message = "Associated asset not found." });
@@ -414,17 +480,7 @@ namespace DFile.backend.Controllers
             record.DiagnosisOutcome = "Not Repairable";
             record.UpdatedAt = DateTime.UtcNow;
 
-            // Create notification for tenant admin
-            _context.Notifications.Add(new Notification
-            {
-                Message = $"Asset '{asset.AssetName}' ({asset.AssetCode}) has been marked as beyond repair and needs replacement.",
-                Type = "Warning",
-                Module = "Maintenance",
-                EntityType = "Asset",
-                EntityId = asset.Id,
-                TargetRole = "Admin",
-                TenantId = tenantId,
-            });
+            await _notificationService.NotifyReplacementNeededAsync(asset, tenantId);
 
             _auditService.AddEntry(HttpContext,
                 tenantId,
@@ -471,7 +527,79 @@ namespace DFile.backend.Controllers
 
         // ── Helpers ───────────────────────────────────────────────
 
-        private static MaintenanceRecordResponseDto MapToDto(MaintenanceRecord r, Dictionary<string, AssetAllocation> activeAllocations)
+        private bool IsMaintenanceVisibleToTenant(MaintenanceRecord r, int? tenantId)
+        {
+            if (IsSuperAdmin()) return true;
+            if (!tenantId.HasValue) return false;
+            if (r.TenantId == tenantId) return true;
+            return r.TenantId == null && r.Asset != null && r.Asset.TenantId == tenantId;
+        }
+
+        private sealed record MaintenanceRecordListRow(
+            string Id,
+            string AssetId,
+            string? AssetName,
+            string? AssetCode,
+            string? TagNumber,
+            string? CategoryName,
+            string Description,
+            string Status,
+            string Priority,
+            string Type,
+            string? Frequency,
+            DateTime? StartDate,
+            DateTime? EndDate,
+            decimal? Cost,
+            string? Attachments,
+            string? DiagnosisOutcome,
+            string? InspectionNotes,
+            string? QuotationNotes,
+            DateTime DateReported,
+            bool IsArchived,
+            DateTime CreatedAt,
+            DateTime UpdatedAt,
+            int? TenantId);
+
+        private static MaintenanceRecordResponseDto MapListRowToDto(
+            MaintenanceRecordListRow r,
+            IReadOnlyDictionary<string, (string? RoomId, string? RoomCode, string? RoomName)> roomByAsset,
+            DateTime utcNow)
+        {
+            roomByAsset.TryGetValue(r.AssetId, out var room);
+            return new MaintenanceRecordResponseDto
+            {
+                Id = r.Id,
+                AssetId = r.AssetId,
+                AssetName = r.AssetName,
+                AssetCode = r.AssetCode,
+                TagNumber = r.TagNumber,
+                CategoryName = r.CategoryName,
+                RoomId = room.RoomId,
+                RoomCode = room.RoomCode,
+                RoomName = room.RoomName,
+                Description = r.Description,
+                Status = r.Status,
+                Priority = r.Priority,
+                Type = r.Type,
+                Frequency = r.Frequency,
+                StartDate = r.StartDate,
+                EndDate = r.EndDate,
+                NextDueDate = MaintenanceSchedulingService.ComputeNextDueDate(
+                    r.IsArchived, r.Status, r.Frequency, r.StartDate, r.EndDate, utcNow),
+                Cost = r.Cost,
+                Attachments = r.Attachments,
+                DiagnosisOutcome = r.DiagnosisOutcome,
+                InspectionNotes = r.InspectionNotes,
+                QuotationNotes = r.QuotationNotes,
+                DateReported = r.DateReported,
+                IsArchived = r.IsArchived,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                TenantId = r.TenantId
+            };
+        }
+
+        private static MaintenanceRecordResponseDto MapToDto(MaintenanceRecord r, Dictionary<string, AssetAllocation> activeAllocations, DateTime utcNow)
         {
             activeAllocations.TryGetValue(r.AssetId, out var alloc);
 
@@ -493,6 +621,7 @@ namespace DFile.backend.Controllers
                 Frequency = r.Frequency,
                 StartDate = r.StartDate,
                 EndDate = r.EndDate,
+                NextDueDate = MaintenanceSchedulingService.ComputeNextDueDate(r, utcNow),
                 Cost = r.Cost,
                 Attachments = r.Attachments,
                 DiagnosisOutcome = r.DiagnosisOutcome,

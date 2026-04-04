@@ -1,6 +1,7 @@
 using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
+using DFile.backend.Mapping;
 using DFile.backend.Models;
 using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -167,7 +168,7 @@ namespace DFile.backend.Controllers
             {
                 categories.TryGetValue(a.CategoryId, out var cat);
                 activeAllocations.TryGetValue(a.Id, out var alloc);
-                return MapToDto(a, cat, userNames, alloc?.Room);
+                return AssetResponseMapper.ToDto(a, cat, userNames, alloc?.Room);
             }).ToList();
         }
 
@@ -246,7 +247,7 @@ namespace DFile.backend.Controllers
             var result = availableAssets.Select(a =>
             {
                 categories.TryGetValue(a.CategoryId, out var cat);
-                return MapToDto(a, cat, userNames, null); // available assets have no active room
+                return AssetResponseMapper.ToDto(a, cat, userNames, null); // available assets have no active room
             }).ToList();
 
             return Ok(result);
@@ -281,7 +282,7 @@ namespace DFile.backend.Controllers
                 .Include(aa => aa.Room)
                 .FirstOrDefaultAsync(aa => aa.AssetId == id && aa.Status == "Active");
 
-            return Ok(MapToDto(asset, cat, userNames, activeAllocation?.Room));
+            return Ok(AssetResponseMapper.ToDto(asset, cat, userNames, activeAllocation?.Room));
         }
 
         [HttpPost]
@@ -347,6 +348,7 @@ namespace DFile.backend.Controllers
                 MonthlyDepreciation = dto.UsefulLifeYears > 0
                     ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
                     : 0,
+                DepreciationMonthsApplied = 0,
                 TenantId = effectiveTenantId.HasValue ? effectiveTenantId.Value : null,
                 WarrantyExpiry = dto.WarrantyExpiry,
                 Notes = dto.Notes,
@@ -381,7 +383,7 @@ namespace DFile.backend.Controllers
                 return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
             }
 
-            return CreatedAtAction("GetAsset", new { id = asset.Id }, MapToDto(asset, category, new Dictionary<int, string>(), null));
+            return CreatedAtAction("GetAsset", new { id = asset.Id }, AssetResponseMapper.ToDto(asset, category, new Dictionary<int, string>(), null));
         }
 
         [HttpPut("{id}")]
@@ -633,51 +635,5 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        private static AssetResponseDto MapToDto(Asset a, AssetCategory? cat, Dictionary<int, string> userNames, Room? activeRoom) => new()
-        {
-            Id = a.Id,
-            AssetCode = a.AssetCode,
-            TagNumber = a.TagNumber,
-            AssetName = a.AssetName,
-            CategoryId = a.CategoryId,
-            CategoryName = cat?.CategoryName,
-            HandlingType = cat?.HandlingType,
-            CategoryDisplayName = cat?.DisplayLabel,
-            LifecycleStatus = a.LifecycleStatus,
-            Status = StatusLabels.GetValueOrDefault(a.LifecycleStatus, "Unknown"),
-            CurrentCondition = a.CurrentCondition,
-            ConditionLabel = ConditionLabels.GetValueOrDefault(a.CurrentCondition, "Unknown"),
-            Room = null, // Deprecated, do not emit stale data
-            RoomId = activeRoom?.Id,
-            RoomCode = activeRoom?.RoomCode,
-            RoomName = activeRoom?.Name,
-            AllocationState = activeRoom != null ? "Allocated" : "Unallocated",
-            Image = a.Image,
-            Manufacturer = a.Manufacturer,
-            Model = a.Model,
-            SerialNumber = a.SerialNumber,
-
-            PurchaseDate = a.PurchaseDate,
-            Vendor = a.Vendor,
-            AcquisitionCost = a.AcquisitionCost,
-            UsefulLifeYears = a.UsefulLifeYears,
-            PurchasePrice = a.PurchasePrice,
-            ResidualValue = a.ResidualValue,
-            SalvagePercentage = a.SalvagePercentage,
-            SalvageValue = a.SalvageValue,
-            IsSalvageOverride = a.IsSalvageOverride,
-            CurrentBookValue = a.CurrentBookValue,
-            MonthlyDepreciation = a.MonthlyDepreciation,
-            TenantId = a.TenantId,
-            WarrantyExpiry = a.WarrantyExpiry,
-            Notes = a.Notes,
-            Documents = a.Documents,
-            IsArchived = a.IsArchived,
-            CreatedAt = a.CreatedAt,
-            UpdatedAt = a.UpdatedAt,
-            CreatedByName = a.CreatedBy.HasValue && userNames.TryGetValue(a.CreatedBy.Value, out var cn) ? cn : null,
-            UpdatedByName = a.UpdatedBy.HasValue && userNames.TryGetValue(a.UpdatedBy.Value, out var un) ? un : null,
-            RowVersion = a.RowVersion
-        };
     }
 }

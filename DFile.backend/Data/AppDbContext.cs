@@ -41,6 +41,11 @@ namespace DFile.backend.Data
         // Asset Condition History
         public DbSet<AssetConditionLog> AssetConditionLogs { get; set; }
 
+        // Per-user settings
+        public DbSet<UserSettings> UserSettings { get; set; }
+
+        public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -107,6 +112,14 @@ namespace DFile.backend.Data
                     .WithMany()
                     .HasForeignKey(a => a.UpdatedBy)
                     .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasOne(a => a.PurchaseOrder)
+                    .WithMany()
+                    .HasForeignKey(a => a.PurchaseOrderId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasIndex(a => a.PurchaseOrderId)
+                    .HasDatabaseName("IX_Assets_PurchaseOrderId");
             });
 
             // ── AssetCategory ──────────────────────────────────────
@@ -157,6 +170,11 @@ namespace DFile.backend.Data
 
                 e.HasIndex(m => m.EndDate)
                     .HasDatabaseName("IX_MaintenanceRecords_EndDate");
+
+                // Speeds tenant dashboard list: WHERE TenantId = @t AND IsArchived = 0 ORDER BY CreatedAt DESC
+                e.HasIndex(m => new { m.TenantId, m.IsArchived, m.CreatedAt })
+                    .IsDescending(false, false, true)
+                    .HasDatabaseName("IX_MaintenanceRecords_Tenant_IsArchived_CreatedAt");
 
                 e.HasOne(m => m.Asset)
                     .WithMany()
@@ -536,6 +554,37 @@ namespace DFile.backend.Data
                     .HasForeignKey(a => a.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+            // ── UserSettings ──────────────────────────────────────
+            modelBuilder.Entity<UserSettings>(e =>
+            {
+                e.HasIndex(s => s.UserId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_UserSettings_UserId");
+
+                e.HasOne(s => s.User)
+                    .WithMany()
+                    .HasForeignKey(s => s.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── PaymentTransaction ─────────────────────────────────
+            modelBuilder.Entity<PaymentTransaction>(e =>
+            {
+                e.Property(p => p.AmountCents);
+                e.Property(p => p.SubscriptionPlanCode).HasMaxLength(32);
+                e.HasIndex(p => p.ReferenceNumber)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PaymentTransactions_ReferenceNumber");
+                e.HasIndex(p => p.CheckoutSessionId)
+                    .HasDatabaseName("IX_PaymentTransactions_CheckoutSessionId");
+                e.HasIndex(p => new { p.TenantId, p.Status })
+                    .HasDatabaseName("IX_PaymentTransactions_Tenant_Status");
+                e.HasOne(p => p.Tenant)
+                    .WithMany()
+                    .HasForeignKey(p => p.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             // ── AssetConditionLog ─────────────────────────────────
             modelBuilder.Entity<AssetConditionLog>(e =>
             {

@@ -69,6 +69,7 @@ namespace DFile.backend.DTOs
         public string? Frequency { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+        public DateTime? NextDueDate { get; set; }
         public decimal? Cost { get; set; }
         public string? Attachments { get; set; }
         public string? DiagnosisOutcome { get; set; }

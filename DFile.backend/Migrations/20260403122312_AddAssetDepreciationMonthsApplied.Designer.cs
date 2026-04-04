@@ -4,6 +4,7 @@ using DFile.backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace dfile.backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403122312_AddAssetDepreciationMonthsApplied")]
+    partial class AddAssetDepreciationMonthsApplied
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,9 +97,6 @@ namespace dfile.backend.Migrations
                     b.Property<DateTime?>("PurchaseDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("PurchaseOrderId")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<decimal>("PurchasePrice")
                         .HasColumnType("decimal(18,2)");
 
@@ -160,9 +160,6 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("LifecycleStatus")
                         .HasDatabaseName("IX_Assets_LifecycleStatus");
-
-                    b.HasIndex("PurchaseOrderId")
-                        .HasDatabaseName("IX_Assets_PurchaseOrderId");
 
                     b.HasIndex("UpdatedBy");
 
@@ -608,10 +605,6 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("EndDate")
                         .HasDatabaseName("IX_MaintenanceRecords_EndDate");
-
-                    b.HasIndex("TenantId", "IsArchived", "CreatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("IX_MaintenanceRecords_Tenant_IsArchived_CreatedAt");
 
                     b.HasIndex("TenantId", "Status", "IsArchived")
                         .HasDatabaseName("IX_MaintenanceRecords_Tenant_Status_Archived");
@@ -1480,11 +1473,6 @@ namespace dfile.backend.Migrations
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("DFile.backend.Models.PurchaseOrder", "PurchaseOrder")
-                        .WithMany()
-                        .HasForeignKey("PurchaseOrderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -1498,8 +1486,6 @@ namespace dfile.backend.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("CreatedByUser");
-
-                    b.Navigation("PurchaseOrder");
 
                     b.Navigation("Tenant");
 

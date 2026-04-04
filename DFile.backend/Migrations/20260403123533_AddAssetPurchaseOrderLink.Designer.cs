@@ -4,6 +4,7 @@ using DFile.backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace dfile.backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403123533_AddAssetPurchaseOrderLink")]
+    partial class AddAssetPurchaseOrderLink
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -608,10 +611,6 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("EndDate")
                         .HasDatabaseName("IX_MaintenanceRecords_EndDate");
-
-                    b.HasIndex("TenantId", "IsArchived", "CreatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("IX_MaintenanceRecords_Tenant_IsArchived_CreatedAt");
 
                     b.HasIndex("TenantId", "Status", "IsArchived")
                         .HasDatabaseName("IX_MaintenanceRecords_Tenant_Status_Archived");

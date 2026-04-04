@@ -44,10 +44,16 @@ namespace DFile.backend.Models
         public bool IsSalvageOverride { get; set; } = false;
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
+        public int DepreciationMonthsApplied { get; set; }
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]
         public Tenant? Tenant { get; set; }
+
+        public string? PurchaseOrderId { get; set; }
+
+        [ForeignKey("PurchaseOrderId")]
+        public PurchaseOrder? PurchaseOrder { get; set; }
 
         public DateTime? WarrantyExpiry { get; set; }
         public string? Notes { get; set; }

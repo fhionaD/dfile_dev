@@ -30,22 +30,37 @@ namespace DFile.backend.Services
             if (_cache.TryGetValue(cacheKey, out List<ModulePermissionDto>? cached) && cached != null)
                 return cached;
 
-            var permissions = await _context.UserRoleAssignments
+            // Two round-trips: avoids correlated subqueries / APPLY patterns EF can generate from
+            // SelectMany(RolePermissions) on the join chain, which was disproportionately slow on login.
+            var templateIds = await _context.UserRoleAssignments
+                .AsNoTracking()
                 .Where(ura => ura.UserId == userId)
                 .Join(
                     _context.TenantRoles.Where(tr => tr.TenantId == tenantId),
                     ura => ura.TenantRoleId,
                     tr => tr.Id,
-                    (ura, tr) => tr.RoleTemplateId
-                )
+                    (ura, tr) => tr.RoleTemplateId)
                 .Join(
                     _context.RoleTemplates.Where(rt => !rt.IsArchived),
                     rtId => rtId,
                     rt => rt.Id,
-                    (rtId, rt) => rt.Id
-                )
-                .SelectMany(rtId => _context.RolePermissions
-                    .Where(rp => rp.RoleTemplateId == rtId))
+                    (rtId, rt) => rt.Id)
+                .Distinct()
+                .ToListAsync();
+
+            if (templateIds.Count == 0)
+            {
+                var empty = new List<ModulePermissionDto>();
+                _cache.Set(cacheKey, empty, CacheDuration);
+                return empty;
+            }
+
+            var rows = await _context.RolePermissions
+                .AsNoTracking()
+                .Where(rp => templateIds.Contains(rp.RoleTemplateId))
+                .ToListAsync();
+
+            var permissions = rows
                 .GroupBy(rp => rp.ModuleName)
                 .Select(g => new ModulePermissionDto
                 {
@@ -56,7 +71,7 @@ namespace DFile.backend.Services
                     CanApprove = g.Any(p => p.CanApprove),
                     CanArchive = g.Any(p => p.CanArchive),
                 })
-                .ToListAsync();
+                .ToList();
 
             _cache.Set(cacheKey, permissions, CacheDuration);
             return permissions;

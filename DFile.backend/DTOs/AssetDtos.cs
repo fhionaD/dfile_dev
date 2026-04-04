@@ -175,5 +175,6 @@ namespace DFile.backend.DTOs
         public string? CreatedByName { get; set; }
         public string? UpdatedByName { get; set; }
         public byte[]? RowVersion { get; set; }
+        public string? PurchaseOrderId { get; set; }
     }
 }

@@ -45,6 +45,31 @@ namespace DFile.backend.Controllers
             return false;
         }
 
+        /// <summary>
+        /// Rooms that count as "using" this category for display and archive rules.
+        /// Tenant-scoped categories only count same-tenant rooms so stray cross-tenant FK rows do not block archive.
+        /// </summary>
+        private static IQueryable<Room> ActiveRoomsForCategory(AppDbContext ctx, RoomCategory category, int? viewerTenantId, bool superAdmin)
+        {
+            var q = ctx.Rooms.Where(r => r.CategoryId == category.Id && !r.IsArchived);
+            if (category.TenantId.HasValue)
+                return q.Where(r => r.TenantId == category.TenantId.Value);
+            if (!superAdmin && viewerTenantId.HasValue)
+                return q.Where(r => r.TenantId == viewerTenantId.Value);
+            return q;
+        }
+
+        private static IQueryable<RoomSubCategory> ActiveSubCategoriesForCategory(
+            AppDbContext ctx, RoomCategory category, int? viewerTenantId, bool superAdmin)
+        {
+            var q = ctx.RoomSubCategories.Where(s => s.RoomCategoryId == category.Id && !s.IsArchived);
+            if (category.TenantId.HasValue)
+                return q.Where(s => s.TenantId == category.TenantId.Value);
+            if (!superAdmin && viewerTenantId.HasValue)
+                return q.Where(s => s.TenantId == viewerTenantId.Value);
+            return q;
+        }
+
         [HttpGet]
         [RequirePermission("RoomCategories", "CanView")]
         public async Task<ActionResult<IEnumerable<RoomCategoryResponseDto>>> GetRoomCategories(
@@ -73,30 +98,32 @@ namespace DFile.backend.Controllers
 
             var categories = await query.ToListAsync();
 
-            // Get room counts per category
-            var roomCountsQuery = _context.Rooms.Where(r => !r.IsArchived).AsQueryable();
-            if (!IsSuperAdmin() && tenantId.HasValue)
+            var categoryIds = categories.Select(c => c.Id).ToList();
+            var roomCounts = new Dictionary<string, int>();
+            var subCatCounts = new Dictionary<string, int>();
+
+            if (categoryIds.Count > 0)
             {
-                roomCountsQuery = roomCountsQuery.Where(r => r.TenantId == tenantId);
+                var roomRows = await _context.Rooms
+                    .Where(r => !r.IsArchived && r.CategoryId != null && categoryIds.Contains(r.CategoryId))
+                    .Select(r => new { r.CategoryId, r.TenantId })
+                    .ToListAsync();
+
+                var subRows = await _context.RoomSubCategories
+                    .Where(s => !s.IsArchived && categoryIds.Contains(s.RoomCategoryId))
+                    .Select(s => new { s.RoomCategoryId, s.TenantId })
+                    .ToListAsync();
+
+                foreach (var c in categories)
+                {
+                    roomCounts[c.Id] = roomRows.Count(r =>
+                        r.CategoryId == c.Id &&
+                        (!c.TenantId.HasValue || r.TenantId == c.TenantId));
+                    subCatCounts[c.Id] = subRows.Count(s =>
+                        s.RoomCategoryId == c.Id &&
+                        (!c.TenantId.HasValue || s.TenantId == c.TenantId));
+                }
             }
-
-            var roomCounts = await roomCountsQuery
-                .Where(r => r.CategoryId != null)
-                .GroupBy(r => r.CategoryId!)
-                .Select(g => new { CategoryId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
-
-            // Get subcategory counts per category
-            var subCatCountsQuery = _context.RoomSubCategories.Where(s => !s.IsArchived).AsQueryable();
-            if (!IsSuperAdmin() && tenantId.HasValue)
-            {
-                subCatCountsQuery = subCatCountsQuery.Where(s => s.TenantId == tenantId);
-            }
-
-            var subCatCounts = await subCatCountsQuery
-                .GroupBy(s => s.RoomCategoryId)
-                .Select(g => new { CategoryId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
 
             var result = categories.Select(c => new RoomCategoryResponseDto
             {
@@ -106,8 +133,8 @@ namespace DFile.backend.Controllers
                 Description = c.Description,
                 IsArchived = c.IsArchived,
                 TenantId = c.TenantId,
-                RoomCount = roomCounts.TryGetValue(c.Id, out var count) ? count : 0,
-                SubCategoryCount = subCatCounts.TryGetValue(c.Id, out var subCount) ? subCount : 0,
+                RoomCount = roomCounts.GetValueOrDefault(c.Id),
+                SubCategoryCount = subCatCounts.GetValueOrDefault(c.Id),
                 CreatedByName = c.CreatedByUser != null ? c.CreatedByUser.FirstName + " " + c.CreatedByUser.LastName : null,
                 UpdatedByName = c.UpdatedByUser != null ? c.UpdatedByUser.FirstName + " " + c.UpdatedByUser.LastName : null,
                 CreatedAt = c.CreatedAt,
@@ -146,13 +173,9 @@ namespace DFile.backend.Controllers
             if (category == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && category.TenantId != tenantId) return NotFound();
 
-            var roomCount = await _context.Rooms
-                .Where(r => r.CategoryId == id && !r.IsArchived)
-                .Where(r => IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId)
-                .CountAsync();
+            var roomCount = await ActiveRoomsForCategory(_context, category, tenantId, IsSuperAdmin()).CountAsync();
 
-            var subCategoryCount = await _context.RoomSubCategories
-                .Where(s => s.RoomCategoryId == id && !s.IsArchived)
+            var subCategoryCount = await ActiveSubCategoriesForCategory(_context, category, tenantId, IsSuperAdmin())
                 .CountAsync();
 
             return Ok(new RoomCategoryResponseDto
@@ -349,11 +372,8 @@ namespace DFile.backend.Controllers
                     });
                 }
 
-                var activeRoomsExist = await _context.Rooms
-                    .AnyAsync(r =>
-                        r.CategoryId == id &&
-                        !r.IsArchived &&
-                        (IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId));
+                var activeRoomsExist = await ActiveRoomsForCategory(_context, category, tenantId, IsSuperAdmin())
+                    .AnyAsync();
 
                 if (activeRoomsExist)
                 {
@@ -364,14 +384,14 @@ namespace DFile.backend.Controllers
                     });
                 }
 
+                // Use EXISTS-style correlation so EF/SQL Server always translates (some Join shapes throw at runtime).
+                var categoryId = category.Id;
                 var hasActiveAllocations = await _context.AssetAllocations
                     .AsNoTracking()
+                    .Where(a => a.Status == "Active")
                     .AnyAsync(a =>
-                        a.Status == "Active" &&
-                        _context.Rooms.Any(r =>
-                            r.Id == a.RoomId &&
-                            r.CategoryId == id &&
-                            (IsSuperAdmin() || !tenantId.HasValue || r.TenantId == tenantId)));
+                        _context.Rooms.AsNoTracking().Any(r =>
+                            r.Id == a.RoomId && r.CategoryId == categoryId));
 
                 if (hasActiveAllocations)
                 {
@@ -385,9 +405,7 @@ namespace DFile.backend.Controllers
 
                 try
                 {
-                    var activeSubs = await _context.RoomSubCategories
-                        .Where(s => s.RoomCategoryId == id && !s.IsArchived)
-                        .Where(s => IsSuperAdmin() || !tenantId.HasValue || s.TenantId == tenantId)
+                    var activeSubs = await ActiveSubCategoriesForCategory(_context, category, tenantId, IsSuperAdmin())
                         .ToListAsync();
 
                     foreach (var sub in activeSubs)

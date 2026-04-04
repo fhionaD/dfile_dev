@@ -4,6 +4,7 @@ using DFile.backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace dfile.backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403090218_AddUserSettings")]
+    partial class AddUserSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -56,9 +59,6 @@ namespace dfile.backend.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
-                    b.Property<int>("DepreciationMonthsApplied")
-                        .HasColumnType("int");
-
                     b.Property<string>("Documents")
                         .HasColumnType("nvarchar(max)");
 
@@ -93,9 +93,6 @@ namespace dfile.backend.Migrations
 
                     b.Property<DateTime?>("PurchaseDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("PurchaseOrderId")
-                        .HasColumnType("nvarchar(450)");
 
                     b.Property<decimal>("PurchasePrice")
                         .HasColumnType("decimal(18,2)");
@@ -160,9 +157,6 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("LifecycleStatus")
                         .HasDatabaseName("IX_Assets_LifecycleStatus");
-
-                    b.HasIndex("PurchaseOrderId")
-                        .HasDatabaseName("IX_Assets_PurchaseOrderId");
 
                     b.HasIndex("UpdatedBy");
 
@@ -609,10 +603,6 @@ namespace dfile.backend.Migrations
                     b.HasIndex("EndDate")
                         .HasDatabaseName("IX_MaintenanceRecords_EndDate");
 
-                    b.HasIndex("TenantId", "IsArchived", "CreatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("IX_MaintenanceRecords_Tenant_IsArchived_CreatedAt");
-
                     b.HasIndex("TenantId", "Status", "IsArchived")
                         .HasDatabaseName("IX_MaintenanceRecords_Tenant_Status_Archived");
 
@@ -676,84 +666,6 @@ namespace dfile.backend.Migrations
                         .HasDatabaseName("IX_Notifications_Tenant_Read_Created");
 
                     b.ToTable("Notifications");
-                });
-
-            modelBuilder.Entity("DFile.backend.Models.PaymentTransaction", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("AmountCents")
-                        .HasColumnType("int");
-
-                    b.Property<string>("CheckoutSessionId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("nvarchar(8)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("LastEventType")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("PaymentIntentId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("ReferenceNumber")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("SubscriptionPlanCode")
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CheckoutSessionId")
-                        .HasDatabaseName("IX_PaymentTransactions_CheckoutSessionId");
-
-                    b.HasIndex("ReferenceNumber")
-                        .IsUnique()
-                        .HasDatabaseName("IX_PaymentTransactions_ReferenceNumber");
-
-                    b.HasIndex("TenantId", "Status")
-                        .HasDatabaseName("IX_PaymentTransactions_Tenant_Status");
-
-                    b.ToTable("PaymentTransactions");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.PurchaseOrder", b =>
@@ -1480,11 +1392,6 @@ namespace dfile.backend.Migrations
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("DFile.backend.Models.PurchaseOrder", "PurchaseOrder")
-                        .WithMany()
-                        .HasForeignKey("PurchaseOrderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("DFile.backend.Models.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -1498,8 +1405,6 @@ namespace dfile.backend.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("CreatedByUser");
-
-                    b.Navigation("PurchaseOrder");
 
                     b.Navigation("Tenant");
 
@@ -1671,17 +1576,6 @@ namespace dfile.backend.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DFile.backend.Models.PaymentTransaction", b =>
-                {
-                    b.HasOne("DFile.backend.Models.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("DFile.backend.Models.PurchaseOrder", b =>

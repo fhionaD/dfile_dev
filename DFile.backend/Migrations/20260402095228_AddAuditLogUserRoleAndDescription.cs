@@ -10,24 +10,19 @@ namespace dfile.backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Description",
-                table: "AuditLogs",
-                type: "nvarchar(2000)",
-                maxLength: 2000,
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "UserRole",
-                table: "AuditLogs",
-                type: "nvarchar(128)",
-                maxLength: 128,
-                nullable: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AuditLogs_Tenant_UserRole",
-                table: "AuditLogs",
-                columns: new[] { "TenantId", "UserRole" });
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.AuditLogs', 'Description') IS NULL
+    ALTER TABLE [AuditLogs] ADD [Description] nvarchar(2000) NULL;
+");
+            migrationBuilder.Sql(@"
+IF COL_LENGTH('dbo.AuditLogs', 'UserRole') IS NULL
+    ALTER TABLE [AuditLogs] ADD [UserRole] nvarchar(128) NULL;
+");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.AuditLogs', N'U') IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AuditLogs_Tenant_UserRole' AND object_id = OBJECT_ID(N'dbo.AuditLogs'))
+    CREATE NONCLUSTERED INDEX [IX_AuditLogs_Tenant_UserRole] ON [dbo].[AuditLogs] ([TenantId], [UserRole]);
+");
         }
 
         /// <inheritdoc />

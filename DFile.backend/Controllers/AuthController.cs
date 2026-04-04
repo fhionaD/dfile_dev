@@ -1,3 +1,4 @@
+using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -19,58 +20,90 @@ namespace DFile.backend.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly PermissionService _permissionService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(AppDbContext context, IConfiguration configuration, PermissionService permissionService)
+        public AuthController(AppDbContext context, IConfiguration configuration, PermissionService permissionService, ILogger<AuthController> logger)
         {
             _context = context;
             _configuration = configuration;
             _permissionService = permissionService;
+            _logger = logger;
         }
 
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDto? dto)
         {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
-            {
-                return BadRequest(new { message = "Email and password are required." });
-            }
-
-            var emailNormalized = dto.Email.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
-
-            if (user == null)
-            {
-                return Unauthorized(new { message = "Invalid credentials" });
-            }
-
-            if (user.TenantId.HasValue)
-            {
-                var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
-                if (tenant != null && tenant.Status != "Active")
-                {
-                     return Unauthorized(new { message = "Your organization's account is inactive. Please contact support." });
-                }
-            }
-
-            bool passwordMatches;
             try
             {
-                passwordMatches = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-            }
-            catch
-            {
-                passwordMatches = false;
-            }
+                // Input validation
+                if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
+                {
+                    return BadRequest(new { message = "Email and password are required." });
+                }
 
-            if (!passwordMatches)
-            {
-                return Unauthorized(new { message = "Invalid credentials" });
-            }
+                var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+                _logger.LogInformation("Login attempt for email: {Email}", emailNormalized);
 
-            var token = GenerateJwtToken(user);
-            var userResponse = await MapToResponseWithPermissions(user);
-            return Ok(new { token, user = userResponse });
+                // Safe user lookup with case-insensitive email
+                // Note: .ToLower() is used in LINQ (EF Core compatible), emailNormalized for comparison
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+                if (user == null)
+                {
+                    _logger.LogWarning("Login failed: User not found for email: {Email}", emailNormalized);
+                    return Unauthorized(new { message = "Invalid credentials" });
+                }
+
+                // Validate user account exists and basic data is present
+                if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                {
+                    _logger.LogError("Login failed: User {UserId} has no password hash", user.Id);
+                    return Unauthorized(new { message = "Invalid credentials" });
+                }
+
+                _logger.LogInformation("User found: {UserId}, Status: {Status}, TenantId: {TenantId}", user.Id, user.Status, user.TenantId);
+
+                // Check tenant status if user belongs to a tenant
+                if (user.TenantId.HasValue)
+                {
+                    var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
+                    if (tenant != null && tenant.Status != "Active")
+                    {
+                        _logger.LogWarning("Login failed: Tenant inactive for user {UserId}, tenant status: {Status}", user.Id, tenant.Status);
+                        return Unauthorized(new { message = "Your organization's account is inactive. Please contact support." });
+                    }
+                }
+
+                // Verify password
+                bool passwordMatches;
+                try
+                {
+                    passwordMatches = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error verifying password for user {UserId}", user.Id);
+                    passwordMatches = false;
+                }
+
+                if (!passwordMatches)
+                {
+                    _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
+                    return Unauthorized(new { message = "Invalid credentials" });
+                }
+
+                // Generate token and user response
+                _logger.LogInformation("Login successful for user {UserId}: {Email}", user.Id, user.Email);
+                var token = GenerateJwtToken(user);
+                var userResponse = await MapToResponseWithPermissions(user);
+                return Ok(new { token, user = userResponse });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during login");
+                return StatusCode(500, new { message = "Internal server error. Please try again later." });
+            }
         }
 
         [HttpGet("me")]
@@ -100,6 +133,9 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Invalid role template." });
             if (roleTemplate.IsArchived)
                 return BadRequest(new { message = "Cannot assign an archived role template." });
+
+            if (roleTemplate.IsSystem && !UserRoleConstants.IsKnownName(roleTemplate.Name))
+                return BadRequest(new { message = "Invalid system role template name." });
 
             var callerRole = User.FindFirst(ClaimTypes.Role)?.Value;
             var callerTenantClaim = User.FindFirst("TenantId")?.Value;
@@ -167,7 +203,7 @@ namespace DFile.backend.Controllers
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, UserRoleConstants.ToAuthorizationRole(user.Role))
             };
 
             if (user.TenantId.HasValue)

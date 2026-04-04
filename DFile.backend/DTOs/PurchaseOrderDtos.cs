@@ -76,4 +76,12 @@ namespace DFile.backend.DTOs
         public int? TenantId { get; set; }
         public List<PurchaseOrderItemDto>? Items { get; set; }
     }
+
+    public class ReceivePurchaseOrderDto
+    {
+        [Required]
+        public DateTime DeliveryDate { get; set; }
+
+        public string? CategoryId { get; set; }
+    }
 }
