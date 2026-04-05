@@ -598,6 +598,10 @@ namespace dfile.backend.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("ScheduleSeriesId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("RequestId")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -638,6 +642,10 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("TenantId", "Status", "IsArchived")
                         .HasDatabaseName("IX_MaintenanceRecords_Tenant_Status_Archived");
+
+                    b.HasIndex("TenantId", "ScheduleSeriesId")
+                        .HasDatabaseName("IX_MaintenanceRecords_Tenant_ScheduleSeriesId")
+                        .HasFilter("[ScheduleSeriesId] IS NOT NULL");
 
                     b.ToTable("MaintenanceRecords");
                 });

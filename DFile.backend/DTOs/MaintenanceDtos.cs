@@ -20,6 +20,9 @@ namespace DFile.backend.DTOs
         public string? DiagnosisOutcome { get; set; }
         public string? InspectionNotes { get; set; }
         public string? QuotationNotes { get; set; }
+
+        /// <summary>Optional UUID from client; prevents duplicate rows if the same batch is submitted twice.</summary>
+        public string? ScheduleSeriesId { get; set; }
     }
 
     public class UpdateMaintenanceRecordDto
@@ -60,6 +63,7 @@ namespace DFile.backend.DTOs
         public string? RoomId { get; set; }
         public string? RoomCode { get; set; }
         public string? RoomName { get; set; }
+        public string? RoomFloor { get; set; }
 
         // Maintenance record fields
         public string Description { get; set; } = string.Empty;
@@ -85,6 +89,8 @@ namespace DFile.backend.DTOs
         public string? FinanceWorkflowStatus { get; set; }
         public string? LinkedPurchaseOrderId { get; set; }
         public string? ReplacementRegisteredAssetId { get; set; }
+
+        public string? ScheduleSeriesId { get; set; }
     }
 
     public class InspectionWorkflowSubmitDto

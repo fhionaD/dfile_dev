@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { StatusText } from "@/components/ui/status-text";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, Wrench, RefreshCw } from "lucide-react";
+import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, RefreshCw } from "lucide-react";
 import { useAllocatedAssetsForMaintenance, useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useSubmitInspectionWorkflow } from "@/hooks/use-maintenance";
 import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
@@ -66,9 +66,16 @@ const MAX_OCCURRENCES: Record<string, number> = {
 
 function generateOccurrences(record: MaintenanceRecord): ScheduleOccurrence[] {
     const advance = record.frequency ? ADVANCE_PER_FREQUENCY[record.frequency] : undefined;
-    const hasRange = !!record.startDate && !!record.endDate;
+    /** Server now persists one row per date with scheduleSeriesId and null endDate; expand only legacy range rows. */
+    const legacyRangeExpand =
+        !record.scheduleSeriesId &&
+        !!record.startDate &&
+        !!record.endDate &&
+        !!advance &&
+        record.frequency &&
+        record.frequency !== "One-time";
 
-    if (!advance || !hasRange) {
+    if (!legacyRangeExpand) {
         return [
             {
                 ...record,
@@ -200,11 +207,11 @@ export default function SchedulesPage() {
 
     const scheduledOccurrences = useMemo(() => activeParents.flatMap((r) => generateOccurrences(r)), [activeParents]);
 
-    const getAssetDisplay = (assetId: string) => {
+    const getAssetDisplay = useCallback((assetId: string) => {
         const alloc = allocatedAssets.find((a) => a.assetId === assetId);
         if (alloc) return { name: alloc.assetName || assetId, code: alloc.assetCode || alloc.tagNumber || "" };
         return { name: assetId, code: "" };
-    };
+    }, [allocatedAssets]);
 
     const filtered = useMemo(() => {
         return scheduledRecords.filter((record) => {
@@ -231,7 +238,7 @@ export default function SchedulesPage() {
             }
             return true;
         });
-    }, [scheduledRecords, searchQuery, frequencyFilter, statusFilter, kpiPriority, kpiDiagnosis, allocatedAssets]);
+    }, [scheduledRecords, searchQuery, frequencyFilter, statusFilter, kpiPriority, kpiDiagnosis, getAssetDisplay]);
 
     /** KPI counts match the current tab so filter buttons align with visible rows. */
     const kpiScopeRecords = useMemo(() => {
@@ -553,7 +560,6 @@ export default function SchedulesPage() {
                                     <TableHead className="font-bold text-foreground">Priority</TableHead>
                                     <TableHead className="font-bold text-foreground">Status</TableHead>
                                     <TableHead className="font-bold text-foreground">Date</TableHead>
-                                    <TableHead className="font-bold text-foreground">End Date</TableHead>
                                     <TableHead className="text-right font-bold text-foreground">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -604,9 +610,6 @@ export default function SchedulesPage() {
                                             </TableCell>
                                             <TableCell className="text-sm tabular-nums font-medium text-foreground py-3 px-4">
                                                 {record.startDate ? new Date(record.startDate).toLocaleDateString() : "—"}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-foreground tabular-nums py-3 px-4">
-                                                {record.endDate ? new Date(record.endDate).toLocaleDateString() : "—"}
                                             </TableCell>
                                             <TableCell className="text-right py-3 px-4" onClick={(e) => e.stopPropagation()}>
                                                 {(() => {
@@ -707,6 +710,8 @@ export default function SchedulesPage() {
                 onOpenChange={(open) => {
                     if (!open) setInspectionTarget(null);
                 }}
+                assetId={inspectionTarget?.assetId}
+                maintenanceRecord={inspectionTarget}
                 assetName={inspectionTarget?.assetName || inspectionTarget?.assetId}
                 isLoading={submitInspectionMutation.isPending}
                 enableGlassmorphism={enableGlassmorphism}

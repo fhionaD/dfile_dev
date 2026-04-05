@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Wrench, AlertTriangle, FileText, Calendar, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ export function CreateMaintenanceModal({
     const addRecordMutation = useAddMaintenanceRecord();
     const updateRecordMutation = useUpdateMaintenanceRecord();
     const [validationError, setValidationError] = useState<string | null>(null);
+    /** Stable per modal open for recurring creates — avoids duplicate batches on double submit. */
+    const recurringSeriesIdRef = useRef<string | null>(null);
 
     const [formData, setFormData] = useState<Partial<MaintenanceRecord>>({
         assetId: "",
@@ -47,9 +49,12 @@ export function CreateMaintenanceModal({
 
     const selectedAsset: Asset | undefined = assets.find((a) => a.id === formData.assetId);
 
+    /* Dialog open / defaults: intentional state sync (not external subscription). */
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (open) {
             setValidationError(null);
+            recurringSeriesIdRef.current = null;
             if (initialData) {
                 setFormData({
                     assetId: initialData.assetId || "",
@@ -113,6 +118,7 @@ export function CreateMaintenanceModal({
             endDate: endDate.toISOString().split("T")[0],
         }));
     }, [formData.startDate, formData.frequency]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -160,15 +166,25 @@ export function CreateMaintenanceModal({
                     },
                 });
             } else if (formData.assetId) {
+                const freq = (formData.frequency as string) || "One-time";
+                if (freq !== "One-time") {
+                    if (!recurringSeriesIdRef.current) {
+                        recurringSeriesIdRef.current =
+                            typeof crypto !== "undefined" && crypto.randomUUID
+                                ? crypto.randomUUID()
+                                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                    }
+                }
                 await addRecordMutation.mutateAsync({
                     assetId: formData.assetId,
                     description: formData.description || "No description provided",
                     priority: (formData.priority as string) || "Medium",
                     status: "Pending",
                     type: (formData.type as string) || "Corrective",
-                    frequency: (formData.frequency as string) || "One-time",
+                    frequency: freq,
                     startDate: formData.startDate || new Date().toISOString().split("T")[0],
-                    endDate: formData.frequency === "One-time" ? undefined : formData.endDate,
+                    endDate: freq === "One-time" ? undefined : formData.endDate,
+                    scheduleSeriesId: freq !== "One-time" ? recurringSeriesIdRef.current ?? undefined : undefined,
                 });
             } else {
                 setValidationError("Please select an asset.");

@@ -60,5 +60,21 @@ namespace DFile.backend.Services
             });
             return Task.CompletedTask;
         }
+
+        public Task NotifyMaintenancePartsReadyAsync(MaintenanceRecord record, CancellationToken cancellationToken = default)
+        {
+            var label = !string.IsNullOrEmpty(record.RequestId) ? record.RequestId : record.Id;
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"Parts are ready for repair request {label}. You can proceed with the work order.",
+                Type = "Info",
+                Module = "Maintenance",
+                EntityType = "MaintenanceRecord",
+                EntityId = record.Id,
+                TargetRole = "Maintenance",
+                TenantId = record.TenantId,
+            });
+            return Task.CompletedTask;
+        }
     }
 }

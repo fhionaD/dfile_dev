@@ -14,11 +14,18 @@ interface CreateMaintenancePayload {
     frequency?: string;
     startDate?: string;
     endDate?: string;
+    /** Client-generated id for recurring batches; resubmitting the same id yields 409 after first success. */
+    scheduleSeriesId?: string;
     cost?: number;
     attachments?: string;
     diagnosisOutcome?: string;
     inspectionNotes?: string;
     quotationNotes?: string;
+}
+
+export interface CreateMaintenanceBatchResponse {
+    items: MaintenanceRecord[];
+    count: number;
 }
 
 interface UpdateMaintenancePayload extends CreateMaintenancePayload {
@@ -66,9 +73,21 @@ export function useMaintenanceRecords(
     });
 }
 
-function mapActiveAllocationsToMaintenance(rows: any[]): AllocatedAssetForMaintenance[] {
+interface RawActiveAllocationRow {
+    assetId?: string;
+    assetCode?: string;
+    assetName?: string;
+    tagNumber?: string;
+    roomId?: string;
+    roomCode?: string;
+    roomName?: string;
+    allocatedAt?: string;
+    tenantId?: number;
+}
+
+function mapActiveAllocationsToMaintenance(rows: RawActiveAllocationRow[]): AllocatedAssetForMaintenance[] {
     return rows.map((a) => ({
-        assetId: a.assetId,
+        assetId: a.assetId ?? '',
         assetCode: a.assetCode,
         assetName: a.assetName,
         tagNumber: a.tagNumber,
@@ -99,13 +118,13 @@ export function useAllocatedAssetsForMaintenance() {
                 const status = (error as AxiosError).response?.status;
                 if (status === 401 || status === 403 || status === 404) {
                     const { data } = await api.get<unknown>('/api/allocations/active');
-                    return mapActiveAllocationsToMaintenance(asArray(data));
+                    return mapActiveAllocationsToMaintenance(asArray<RawActiveAllocationRow>(data));
                 }
                 throw error;
             }
             // Primary returned [] — use same tenant-scoped list as tenant allocation (parity with GetActiveAllocations).
             const { data: active } = await api.get<unknown>('/api/allocations/active');
-            return mapActiveAllocationsToMaintenance(asArray(active));
+            return mapActiveAllocationsToMaintenance(asArray<RawActiveAllocationRow>(active));
         },
     });
 }
@@ -126,12 +145,16 @@ export function useAddMaintenanceRecord() {
 
     return useMutation({
         mutationFn: async (payload: CreateMaintenancePayload) => {
-            const { data } = await api.post<MaintenanceRecord>('/api/maintenance', payload);
-            return data;
+            const { data } = await api.post<MaintenanceRecord | CreateMaintenanceBatchResponse>('/api/maintenance', payload);
+            if (data && typeof data === 'object' && 'items' in data && Array.isArray((data as CreateMaintenanceBatchResponse).items)) {
+                return data as CreateMaintenanceBatchResponse;
+            }
+            return { items: [data as MaintenanceRecord], count: 1 };
         },
-        onSuccess: () => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
-            toast.success('Maintenance request submitted');
+            const n = result.count ?? result.items?.length ?? 1;
+            toast.success(n > 1 ? `Created ${n} schedule entries` : 'Maintenance request submitted');
         },
         onError: (error: unknown) => {
             toast.error(maintenanceErrorMessage(error, 'Failed to create maintenance request'));
@@ -195,6 +218,17 @@ export function useFinanceMaintenanceRequests() {
     });
 }
 
+export function useFinanceRepairsAwaitingParts() {
+    return useQuery({
+        queryKey: ['finance-maintenance-awaiting-parts'],
+        queryFn: async () => {
+            const { data } = await api.get<MaintenanceRecord[]>('/api/finance/maintenance-requests/awaiting-parts');
+            return data;
+        },
+        staleTime: 60 * 1000,
+    });
+}
+
 export function useFinanceApproveRepair() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -203,6 +237,7 @@ export function useFinanceApproveRepair() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-awaiting-parts'] });
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             toast.success('Repair approved');
@@ -221,11 +256,30 @@ export function useFinanceRejectMaintenance() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-awaiting-parts'] });
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             toast.success('Request rejected');
         },
         onError: (error: unknown) => {
             toast.error(maintenanceErrorMessage(error, 'Failed to reject request'));
+        },
+    });
+}
+
+export function useFinanceMarkPartsReady() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.patch(`/api/finance/maintenance-requests/${id}/mark-parts-ready`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-awaiting-parts'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            toast.success('Maintenance team notified — parts are ready');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to mark parts ready'));
         },
     });
 }

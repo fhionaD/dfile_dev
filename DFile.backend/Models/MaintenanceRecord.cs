@@ -31,6 +31,9 @@ namespace DFile.backend.Models
         /// <summary>Human-readable ID for maintenance requests (e.g. RQ-1234).</summary>
         public string? RequestId { get; set; }
 
+        /// <summary>Client-generated idempotency key; all rows from one recurring create share this value.</summary>
+        public string? ScheduleSeriesId { get; set; }
+
         /// <summary>Repair | Replacement — set when submitted to Finance.</summary>
         public string? FinanceRequestType { get; set; }
 

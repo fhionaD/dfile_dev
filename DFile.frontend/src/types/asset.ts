@@ -141,6 +141,7 @@ export interface MaintenanceRecord {
     roomId?: string;
     roomCode?: string;
     roomName?: string;
+    roomFloor?: string | null;
     description: string;
     status:
         | "Open"
@@ -172,6 +173,7 @@ export interface MaintenanceRecord {
     financeWorkflowStatus?: string | null;
     linkedPurchaseOrderId?: string | null;
     replacementRegisteredAssetId?: string | null;
+    scheduleSeriesId?: string | null;
 }
 
 export interface PurchaseOrder {

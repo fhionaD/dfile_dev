@@ -82,13 +82,14 @@ namespace DFile.backend.Controllers
                     r.FinanceRequestType,
                     r.FinanceWorkflowStatus,
                     r.LinkedPurchaseOrderId,
-                    r.ReplacementRegisteredAssetId))
+                    r.ReplacementRegisteredAssetId,
+                    r.ScheduleSeriesId))
                 .ToListAsync();
 
             var assetIds = rows.Select(r => r.AssetId).Distinct().ToList();
             // Chunk IN lists: very large tenant lists can hit SQL Server parameter limits and degrade plans.
             const int allocChunkSize = 900;
-            var roomByAsset = new Dictionary<string, (string? RoomId, string? RoomCode, string? RoomName)>(StringComparer.Ordinal);
+            var roomByAsset = new Dictionary<string, (string? RoomId, string? RoomCode, string? RoomName, string? RoomFloor)>(StringComparer.Ordinal);
             for (var off = 0; off < assetIds.Count; off += allocChunkSize)
             {
                 var chunk = assetIds.Skip(off).Take(allocChunkSize).ToList();
@@ -100,14 +101,15 @@ namespace DFile.backend.Controllers
                         aa.AssetId,
                         aa.RoomId,
                         RoomCode = aa.Room != null ? aa.Room.RoomCode : null,
-                        RoomName = aa.Room != null ? aa.Room.Name : null
+                        RoomName = aa.Room != null ? aa.Room.Name : null,
+                        RoomFloor = aa.Room != null && !string.IsNullOrWhiteSpace(aa.Room.Floor) ? aa.Room.Floor.Trim() : null
                     })
                     .ToListAsync();
 
                 foreach (var a in allocationRows)
                 {
                     if (roomByAsset.ContainsKey(a.AssetId)) continue;
-                    roomByAsset[a.AssetId] = (a.RoomId, a.RoomCode, a.RoomName);
+                    roomByAsset[a.AssetId] = (a.RoomId, a.RoomCode, a.RoomName, a.RoomFloor);
                 }
             }
 
@@ -210,7 +212,7 @@ namespace DFile.backend.Controllers
 
         [HttpPost]
         [RequirePermission("Maintenance", "CanCreate")]
-        public async Task<ActionResult<MaintenanceRecordResponseDto>> PostMaintenanceRecord(CreateMaintenanceRecordDto dto)
+        public async Task<IActionResult> PostMaintenanceRecord(CreateMaintenanceRecordDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -226,10 +228,11 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Description is required." });
             if (string.IsNullOrWhiteSpace(dto.AssetId))
                 return BadRequest(new { message = "AssetId is required." });
+            if (!dto.StartDate.HasValue)
+                return BadRequest(new { message = "Start date is required." });
 
             var tenantId = GetCurrentTenantId();
 
-            // Validate AssetId exists and belongs to same tenant
             var asset = await _context.Assets
                 .Include(a => a.Category)
                 .FirstOrDefaultAsync(a => a.Id == dto.AssetId);
@@ -245,35 +248,64 @@ namespace DFile.backend.Controllers
             if (scheduleErr != null)
                 return BadRequest(new { message = scheduleErr });
 
-            var requestId = await RecordCodeGenerator.GenerateMaintenanceRequestIdAsync(_context);
+            var seriesKey = string.IsNullOrWhiteSpace(dto.ScheduleSeriesId) ? null : dto.ScheduleSeriesId.Trim();
+            if (seriesKey != null && await _context.MaintenanceRecords.AsNoTracking().AnyAsync(m => m.ScheduleSeriesId == seriesKey))
+                return Conflict(new { message = "This schedule batch was already created." });
 
-            var record = new MaintenanceRecord
+            var rangeEnd = dto.EndDate ?? dto.StartDate.Value;
+            var occurrenceDates = MaintenanceSchedulingService.GenerateInclusiveOccurrenceDatesUtc(
+                dto.StartDate.Value,
+                rangeEnd,
+                dto.Frequency);
+
+            if (occurrenceDates.Count == 0)
+                return BadRequest(new { message = "No schedule dates could be generated for the given range." });
+
+            const int maxBatch = 400;
+            if (occurrenceDates.Count > maxBatch)
+                return BadRequest(new { message = $"Too many occurrences ({occurrenceDates.Count}). Maximum is {maxBatch}." });
+
+            var seriesId = MaintenanceSchedulingService.IsRecurring(dto.Frequency)
+                ? (seriesKey ?? Guid.NewGuid().ToString("N"))
+                : null;
+
+            var created = new List<MaintenanceRecord>();
+            var now = DateTime.UtcNow;
+            foreach (var occ in occurrenceDates)
             {
-                Id = Guid.NewGuid().ToString(),
-                RequestId = requestId,
-                AssetId = dto.AssetId,
-                Description = dto.Description,
-                Status = dto.Status,
-                Priority = dto.Priority,
-                Type = dto.Type,
-                Frequency = dto.Frequency,
-                StartDate = dto.StartDate,
-                EndDate = dto.EndDate,
-                Cost = null,
-                Attachments = dto.Attachments,
-                DiagnosisOutcome = dto.DiagnosisOutcome,
-                InspectionNotes = dto.InspectionNotes,
-                QuotationNotes = dto.QuotationNotes,
-                DateReported = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                TenantId = IsSuperAdmin() ? null : tenantId,
-                IsArchived = false
-            };
+                var requestId = await RecordCodeGenerator.GenerateMaintenanceRequestIdAsync(_context);
+                var record = new MaintenanceRecord
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    RequestId = requestId,
+                    ScheduleSeriesId = seriesId,
+                    AssetId = dto.AssetId,
+                    Description = dto.Description,
+                    Status = dto.Status,
+                    Priority = dto.Priority,
+                    Type = dto.Type,
+                    Frequency = dto.Frequency,
+                    StartDate = occ,
+                    EndDate = null,
+                    Cost = null,
+                    Attachments = dto.Attachments,
+                    DiagnosisOutcome = dto.DiagnosisOutcome,
+                    InspectionNotes = dto.InspectionNotes,
+                    QuotationNotes = dto.QuotationNotes,
+                    DateReported = now,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    TenantId = IsSuperAdmin() ? null : tenantId,
+                    IsArchived = false
+                };
+                _context.MaintenanceRecords.Add(record);
+                created.Add(record);
+            }
 
-            _context.MaintenanceRecords.Add(record);
+            await _context.SaveChangesAsync();
 
             var userId = GetCurrentUserId();
+            var firstId = created[0].Id;
             _auditService.AddEntry(HttpContext,
                 IsSuperAdmin() ? null : tenantId,
                 userId,
@@ -281,13 +313,8 @@ namespace DFile.backend.Controllers
                 "Maintenance",
                 "Create",
                 "MaintenanceRecord",
-                record.Id,
-                $"Maintenance record created ({record.Type}, status {record.Status}) for asset {asset.AssetCode ?? dto.AssetId}.");
-
-            await _context.SaveChangesAsync();
-
-            // Re-attach Asset for DTO mapping
-            record.Asset = asset;
+                firstId,
+                $"Maintenance schedule batch: {created.Count} occurrence(s) ({dto.Type}, status {dto.Status}) for asset {asset.AssetCode ?? dto.AssetId}.");
 
             var activeAllocation = await _context.AssetAllocations
                 .Include(aa => aa.Room)
@@ -296,7 +323,14 @@ namespace DFile.backend.Controllers
             var allocDict = new Dictionary<string, AssetAllocation>();
             if (activeAllocation != null) allocDict[dto.AssetId] = activeAllocation;
 
-            return CreatedAtAction("GetMaintenanceRecord", new { id = record.Id }, MapToDto(record, allocDict, DateTime.UtcNow));
+            var dtos = new List<MaintenanceRecordResponseDto>();
+            foreach (var r in created)
+            {
+                r.Asset = asset;
+                dtos.Add(MapToDto(r, allocDict, DateTime.UtcNow));
+            }
+
+            return StatusCode(StatusCodes.Status201Created, new { items = dtos, count = dtos.Count });
         }
 
         [HttpPut("{id}")]
@@ -722,11 +756,12 @@ namespace DFile.backend.Controllers
             string? FinanceRequestType,
             string? FinanceWorkflowStatus,
             string? LinkedPurchaseOrderId,
-            string? ReplacementRegisteredAssetId);
+            string? ReplacementRegisteredAssetId,
+            string? ScheduleSeriesId);
 
         private static MaintenanceRecordResponseDto MapListRowToDto(
             MaintenanceRecordListRow r,
-            IReadOnlyDictionary<string, (string? RoomId, string? RoomCode, string? RoomName)> roomByAsset,
+            IReadOnlyDictionary<string, (string? RoomId, string? RoomCode, string? RoomName, string? RoomFloor)> roomByAsset,
             DateTime utcNow)
         {
             roomByAsset.TryGetValue(r.AssetId, out var room);
@@ -742,6 +777,7 @@ namespace DFile.backend.Controllers
                 RoomId = room.RoomId,
                 RoomCode = room.RoomCode,
                 RoomName = room.RoomName,
+                RoomFloor = room.RoomFloor,
                 Description = r.Description,
                 Status = r.Status,
                 Priority = r.Priority,
@@ -765,6 +801,7 @@ namespace DFile.backend.Controllers
                 FinanceWorkflowStatus = r.FinanceWorkflowStatus,
                 LinkedPurchaseOrderId = r.LinkedPurchaseOrderId,
                 ReplacementRegisteredAssetId = r.ReplacementRegisteredAssetId,
+                ScheduleSeriesId = r.ScheduleSeriesId,
             };
         }
 
@@ -784,6 +821,7 @@ namespace DFile.backend.Controllers
                 RoomId = alloc?.Room?.Id,
                 RoomCode = alloc?.Room?.RoomCode,
                 RoomName = alloc?.Room?.Name,
+                RoomFloor = alloc?.Room != null && !string.IsNullOrWhiteSpace(alloc.Room.Floor) ? alloc.Room.Floor.Trim() : null,
                 Description = r.Description,
                 Status = r.Status,
                 Priority = r.Priority,
@@ -806,6 +844,7 @@ namespace DFile.backend.Controllers
                 FinanceWorkflowStatus = r.FinanceWorkflowStatus,
                 LinkedPurchaseOrderId = r.LinkedPurchaseOrderId,
                 ReplacementRegisteredAssetId = r.ReplacementRegisteredAssetId,
+                ScheduleSeriesId = r.ScheduleSeriesId,
             };
         }
     }

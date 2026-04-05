@@ -27,12 +27,42 @@ namespace DFile.backend.Services
             {
                 if (!startDate.HasValue)
                     return "Start date is required when a recurring frequency (Daily, Weekly, Monthly, or Yearly) is selected.";
+                if (!endDate.HasValue)
+                    return "End date is required for recurring schedules so occurrences can be generated.";
             }
 
             if (startDate.HasValue && endDate.HasValue && endDate.Value.Date < startDate.Value.Date)
                 return "End date cannot be before start date.";
 
             return null;
+        }
+
+        /// <summary>
+        /// Inclusive occurrence dates from start through end (date-only, UTC kind). One-time returns a single start date.
+        /// </summary>
+        public static IReadOnlyList<DateTime> GenerateInclusiveOccurrenceDatesUtc(DateTime startDate, DateTime endDate, string? frequency)
+        {
+            var f = frequency?.Trim() ?? "";
+            var end = endDate.Date;
+            var list = new List<DateTime>();
+            if (!IsRecurring(f))
+            {
+                list.Add(DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc));
+                return list;
+            }
+
+            var current = startDate.Date;
+            const int max = 400;
+            while (current <= end && list.Count < max)
+            {
+                list.Add(DateTime.SpecifyKind(current, DateTimeKind.Utc));
+                var next = StepForward(DateTime.SpecifyKind(current, DateTimeKind.Utc), f).Date;
+                if (next <= current)
+                    break;
+                current = next;
+            }
+
+            return list;
         }
 
         public static DateTime StepForward(DateTime dateUtc, string? frequency)

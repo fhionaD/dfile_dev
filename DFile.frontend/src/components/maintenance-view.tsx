@@ -408,6 +408,8 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
             <InspectionDiagnosisModal
                 open={inspectionTarget !== null}
                 onOpenChange={(open) => { if (!open) setInspectionTarget(null); }}
+                assetId={inspectionTarget?.assetId}
+                maintenanceRecord={inspectionTarget ?? undefined}
                 assetName={inspectionTarget?.assetName || inspectionTarget?.assetId}
                 isLoading={submitInspectionMutation.isPending}
                 enableGlassmorphism={enableGlassmorphism}

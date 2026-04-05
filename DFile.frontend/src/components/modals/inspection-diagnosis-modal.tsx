@@ -8,13 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ClipboardCheck, ShieldAlert, ShieldCheck, CheckCircle, Upload, FileText, X, PhilippinePeso } from "lucide-react";
 import { useUploadAttachment, type InspectionWorkflowPayload } from "@/hooks/use-maintenance";
+import { useAsset } from "@/hooks/use-assets";
+import type { MaintenanceRecord } from "@/types/asset";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface InspectionDiagnosisModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit: (data: InspectionWorkflowPayload) => void | Promise<void>;
     isLoading?: boolean;
+    /** Resolved name when asset detail is not loaded */
     assetName?: string;
+    assetId?: string | null;
+    maintenanceRecord?: MaintenanceRecord | null;
     enableGlassmorphism?: boolean;
 }
 
@@ -39,15 +45,25 @@ const NO_FIX_SHORTCUTS = [
     "Performance OK",
 ];
 
+function formatMoneyPhp(n: number | undefined): string {
+    if (n == null || Number.isNaN(n)) return "—";
+    return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(n);
+}
+
 export function InspectionDiagnosisModal({
     open,
     onOpenChange,
     onSubmit,
     isLoading,
     assetName,
+    assetId,
+    maintenanceRecord,
     enableGlassmorphism = false,
 }: InspectionDiagnosisModalProps) {
     const uploadMutation = useUploadAttachment();
+    const { data: asset, isLoading: assetLoading } = useAsset(assetId ?? "", {
+        enabled: open && !!assetId,
+    });
     const [outcome, setOutcome] = useState<"" | "Repairable" | "Not Repairable" | "No Fix Needed">("");
     const [detailNotes, setDetailNotes] = useState("");
     const [estimatedRepairCost, setEstimatedRepairCost] = useState<string>("");
@@ -113,6 +129,16 @@ export function InspectionDiagnosisModal({
         reset();
     };
 
+    const displayAssetName = maintenanceRecord?.assetName || asset?.desc || assetName || "—";
+    const displayRoom = maintenanceRecord?.roomName || asset?.room || "—";
+    const displayFloor = maintenanceRecord?.roomFloor?.trim() || "—";
+    const displayManufacturer = asset?.manufacturer?.trim() || "—";
+    const displayModel = asset?.model?.trim() || "—";
+    const displayTaskDescription = maintenanceRecord?.description?.trim() || "—";
+    const replacementCost = asset?.purchasePrice ?? asset?.value;
+
+    const showAssetPanel = outcome === "Repairable" || outcome === "Not Repairable";
+
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent
@@ -128,7 +154,7 @@ export function InspectionDiagnosisModal({
                         Inspection
                     </DialogTitle>
                     <DialogDescription>
-                        {assetName ? `Asset: ${assetName}` : "Select a result — the form adapts to your choice."}
+                        Choose exactly one outcome. The form shows asset context for repair and replacement paths.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -183,6 +209,48 @@ export function InspectionDiagnosisModal({
                             </button>
                         </div>
                     </div>
+
+                    {showAssetPanel && (
+                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset details</p>
+                            {assetLoading && !!assetId ? (
+                                <Skeleton className="h-24 w-full" />
+                            ) : (
+                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                    <div>
+                                        <dt className="text-xs text-muted-foreground">Asset name</dt>
+                                        <dd className="font-medium">{displayAssetName}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs text-muted-foreground">Manufacturer</dt>
+                                        <dd>{displayManufacturer}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs text-muted-foreground">Model number</dt>
+                                        <dd className="font-mono text-xs">{displayModel}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs text-muted-foreground">Room</dt>
+                                        <dd>{displayRoom}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-xs text-muted-foreground">Floor</dt>
+                                        <dd>{displayFloor}</dd>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <dt className="text-xs text-muted-foreground">Schedule / task description</dt>
+                                        <dd className="text-foreground/90">{displayTaskDescription}</dd>
+                                    </div>
+                                    {outcome === "Not Repairable" && (
+                                        <div className="sm:col-span-2">
+                                            <dt className="text-xs text-muted-foreground">Cost (reference)</dt>
+                                            <dd className="font-mono">{formatMoneyPhp(replacementCost)}</dd>
+                                        </div>
+                                    )}
+                                </dl>
+                            )}
+                        </div>
+                    )}
 
                     {outcome === "Repairable" && (
                         <div className="space-y-4 border-t pt-4">
@@ -253,6 +321,9 @@ export function InspectionDiagnosisModal({
 
                     {outcome === "Not Repairable" && (
                         <div className="space-y-4 border-t pt-4">
+                            <p className="text-xs text-muted-foreground">
+                                Create a replacement purchase order in Procurement, then link it here. The request is sent to Finance for approval.
+                            </p>
                             <div className="space-y-2">
                                 <Label>Why not repairable?</Label>
                                 <Textarea

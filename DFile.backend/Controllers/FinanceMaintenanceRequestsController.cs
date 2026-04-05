@@ -19,11 +19,16 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly INotificationService _notificationService;
 
-        public FinanceMaintenanceRequestsController(AppDbContext context, IAuditService auditService)
+        public FinanceMaintenanceRequestsController(
+            AppDbContext context,
+            IAuditService auditService,
+            INotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
+            _notificationService = notificationService;
         }
 
         private int? GetCurrentUserId()
@@ -94,6 +99,49 @@ namespace DFile.backend.Controllers
             return Ok(result);
         }
 
+        /// <summary>Repairs approved by Finance but waiting for parts — Finance can mark parts ready from here.</summary>
+        [HttpGet("awaiting-parts")]
+        [RequirePermission("Assets", "CanView")]
+        public async Task<ActionResult<IEnumerable<MaintenanceRecordResponseDto>>> GetRepairsAwaitingParts()
+        {
+            var tenantId = GetCurrentTenantId();
+            var query = _context.MaintenanceRecords
+                .AsNoTracking()
+                .Include(r => r.Asset)
+                    .ThenInclude(a => a!.Category)
+                // Use direct equality — EF Core cannot translate string.Equals(..., StringComparison) to SQL.
+                .Where(r =>
+                    r.Status == "In Progress" &&
+                    r.FinanceRequestType == "Repair" &&
+                    r.FinanceWorkflowStatus == "Approved");
+
+            if (!IsSuperAdmin() && tenantId.HasValue)
+            {
+                query = query.Where(r =>
+                    r.TenantId == tenantId ||
+                    (r.TenantId == null && r.Asset != null && r.Asset.TenantId == tenantId));
+            }
+
+            var rows = await query.OrderByDescending(r => r.UpdatedAt).ToListAsync();
+            var utcNow = DateTime.UtcNow;
+            var result = new List<MaintenanceRecordResponseDto>();
+
+            foreach (var r in rows)
+            {
+                if (!IsMaintenanceVisibleToTenant(r, tenantId)) continue;
+
+                var activeAllocation = await _context.AssetAllocations
+                    .Include(aa => aa.Room)
+                    .FirstOrDefaultAsync(aa => aa.AssetId == r.AssetId && aa.Status == "Active");
+                var allocDict = new Dictionary<string, AssetAllocation>();
+                if (activeAllocation != null) allocDict[r.AssetId] = activeAllocation;
+
+                result.Add(MaintenanceControllerMapHelper.MapToDto(r, allocDict, utcNow));
+            }
+
+            return Ok(result);
+        }
+
         [HttpPatch("{id}/approve-repair")]
         [RequirePermissionOrRoles("Assets", "CanApprove", "Finance")]
         public async Task<IActionResult> ApproveRepair(string id)
@@ -111,12 +159,38 @@ namespace DFile.backend.Controllers
             if (!string.Equals(record.FinanceWorkflowStatus, "Pending Approval", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new { message = $"Invalid finance workflow state: {record.FinanceWorkflowStatus ?? "(none)"}." });
 
-            record.Status = "Completed";
+            record.Status = "In Progress";
             record.FinanceWorkflowStatus = "Approved";
             record.UpdatedAt = DateTime.UtcNow;
 
             _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Approve", "MaintenanceRecord", id,
-                $"Finance approved repair request {record.RequestId ?? id}.");
+                $"Finance approved repair request {record.RequestId ?? id}; maintenance may proceed after parts are available.");
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPatch("{id}/mark-parts-ready")]
+        [RequirePermissionOrRoles("Assets", "CanApprove", "Finance")]
+        public async Task<IActionResult> MarkPartsReady(string id)
+        {
+            var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+            var record = await _context.MaintenanceRecords.Include(r => r.Asset).FirstOrDefaultAsync(r => r.Id == id);
+            if (record == null) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
+
+            if (!string.Equals(record.Status, "In Progress", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(record.FinanceRequestType, "Repair", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(record.FinanceWorkflowStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Parts can only be marked ready for an approved repair that is in progress." });
+
+            record.FinanceWorkflowStatus = "Parts Ready";
+            record.UpdatedAt = DateTime.UtcNow;
+
+            await _notificationService.NotifyMaintenancePartsReadyAsync(record);
+            _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Update", "MaintenanceRecord", id,
+                $"Finance marked parts ready for {record.RequestId ?? id}.");
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -323,6 +397,7 @@ namespace DFile.backend.Controllers
                 RoomId = alloc?.Room?.Id,
                 RoomCode = alloc?.Room?.RoomCode,
                 RoomName = alloc?.Room?.Name,
+                RoomFloor = alloc?.Room != null && !string.IsNullOrWhiteSpace(alloc.Room.Floor) ? alloc.Room.Floor.Trim() : null,
                 Description = r.Description,
                 Status = r.Status,
                 Priority = r.Priority,
@@ -345,6 +420,7 @@ namespace DFile.backend.Controllers
                 FinanceWorkflowStatus = r.FinanceWorkflowStatus,
                 LinkedPurchaseOrderId = r.LinkedPurchaseOrderId,
                 ReplacementRegisteredAssetId = r.ReplacementRegisteredAssetId,
+                ScheduleSeriesId = r.ScheduleSeriesId,
             };
         }
     }

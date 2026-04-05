@@ -13,10 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Wrench, CheckCircle2, XCircle, Package, Loader2 } from "lucide-react";
 import {
     useFinanceMaintenanceRequests,
+    useFinanceRepairsAwaitingParts,
     useFinanceApproveRepair,
     useFinanceRejectMaintenance,
     useFinanceApproveReplacement,
     useFinanceCompleteReplacement,
+    useFinanceMarkPartsReady,
     type CompleteReplacementPayload,
 } from "@/hooks/use-maintenance";
 import { useCategories } from "@/hooks/use-categories";
@@ -36,6 +38,7 @@ function rowType(r: MaintenanceRecord): string {
 
 export default function FinanceMaintenanceRequestsPage() {
     const { data: rows = [], isLoading } = useFinanceMaintenanceRequests();
+    const { data: awaitingParts = [], isLoading: awaitingLoading } = useFinanceRepairsAwaitingParts();
     const { data: categoriesRaw = [] } = useCategories(false);
     const categories = useMemo(() => categoriesRaw.filter((c) => c.status !== "Archived"), [categoriesRaw]);
 
@@ -43,6 +46,7 @@ export default function FinanceMaintenanceRequestsPage() {
     const rejectReq = useFinanceRejectMaintenance();
     const approveReplacement = useFinanceApproveReplacement();
     const completeReplacement = useFinanceCompleteReplacement();
+    const markPartsReady = useFinanceMarkPartsReady();
 
     const [completeOpen, setCompleteOpen] = useState(false);
     const [completeId, setCompleteId] = useState<string | null>(null);
@@ -69,7 +73,11 @@ export default function FinanceMaintenanceRequestsPage() {
     };
 
     const busy =
-        approveRepair.isPending || rejectReq.isPending || approveReplacement.isPending || completeReplacement.isPending;
+        approveRepair.isPending ||
+        rejectReq.isPending ||
+        approveReplacement.isPending ||
+        completeReplacement.isPending ||
+        markPartsReady.isPending;
 
     return (
         <div className="space-y-6">
@@ -189,6 +197,65 @@ export default function FinanceMaintenanceRequestsPage() {
                                         </TableRow>
                                     );
                                 })}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </Card>
+
+            <Card className="overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-medium">Repairs awaiting parts</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            After approving a repair, mark parts ready here to notify Maintenance.
+                        </p>
+                    </div>
+                    {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                </div>
+                {awaitingLoading ? (
+                    <div className="p-6 space-y-2">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                ) : awaitingParts.length === 0 ? (
+                    <p className="p-8 text-sm text-muted-foreground text-center">No approved repairs waiting for parts.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Request</TableHead>
+                                    <TableHead>Asset</TableHead>
+                                    <TableHead>Est. cost</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {awaitingParts.map((r) => (
+                                    <TableRow key={r.id}>
+                                        <TableCell className="font-mono text-xs">{r.requestId ?? r.id}</TableCell>
+                                        <TableCell>
+                                            <div className="text-sm font-medium">{r.assetName ?? r.assetId}</div>
+                                            {r.assetCode && (
+                                                <div className="text-xs text-muted-foreground font-mono">{r.assetCode}</div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="tabular-nums text-sm">
+                                            {r.cost != null ? `₱${Number(r.cost).toFixed(2)}` : "—"}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                size="sm"
+                                                className="gap-1"
+                                                onClick={() => markPartsReady.mutate(r.id)}
+                                                disabled={busy}
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5" /> Parts ready
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
                     </div>
