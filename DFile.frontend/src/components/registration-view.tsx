@@ -95,7 +95,10 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                 {activeTab === "inventory" ? (
                     <div className="space-y-8">
                         <AssetStats />
-                        <AssetTable onAssetClick={handleInventoryAssetClick} onRegisterAsset={openRegisterAsset} />
+                        <AssetTable
+                            onAssetClick={handleInventoryAssetClick}
+                            onRegisterAsset={openRegisterAsset}
+                        />
                     </div>
                 ) : (
                     <AssetCategoriesSection />

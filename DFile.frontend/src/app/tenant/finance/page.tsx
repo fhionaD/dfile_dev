@@ -1,17 +1,17 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-const FinanceDashboard = dynamic(() => import("@/components/finance-dashboard").then(m => ({ default: m.FinanceDashboard })), {
-    loading: () => <Card className="p-6"><Skeleton className="h-72 w-full" /></Card>,
-});
-
-export default function TenantFinancePage() {
+/** Legacy URL: older nav sent Admins here (summary-only). Full finance UI is under /finance/*. Static export–safe redirect. */
+export default function TenantFinanceLegacyRedirect() {
+    const router = useRouter();
+    useEffect(() => {
+        router.replace("/finance/dashboard");
+    }, [router]);
     return (
-        <div className="space-y-8">
-            <FinanceDashboard />
+        <div className="p-6 text-sm text-muted-foreground" role="status">
+            Opening finance dashboard…
         </div>
     );
 }

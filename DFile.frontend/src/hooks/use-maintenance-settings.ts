@@ -33,6 +33,8 @@ const STORAGE_KEY = 'maintenance-settings';
 export function useMaintenanceSettings() {
   const [settings, setSettings] = useState<MaintenanceSettings>(DEFAULT_SETTINGS);
   const [isInitialized, setIsInitialized] = useState(false);
+  /** Defer server sync until after first paint so maintenance dashboard data isn't competing on the wire. */
+  const [allowBackendSync, setAllowBackendSync] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -50,6 +52,21 @@ export function useMaintenanceSettings() {
     setIsInitialized(true);
   }, []);
 
+  useEffect(() => {
+    if (!isInitialized || typeof window === 'undefined') return;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if ('requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(() => setAllowBackendSync(true), { timeout: 500 });
+    } else {
+      timeoutId = setTimeout(() => setAllowBackendSync(true), 0);
+    }
+    return () => {
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [isInitialized]);
+
   // Fetch settings from backend
   const { data: backendSettings, isLoading: isLoadingBackend } = useQuery({
     queryKey: ['maintenanceSettings'],
@@ -63,7 +80,7 @@ export function useMaintenanceSettings() {
         return null;
       }
     },
-    enabled: isInitialized,
+    enabled: isInitialized && allowBackendSync,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

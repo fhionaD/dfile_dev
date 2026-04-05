@@ -132,6 +132,7 @@ export interface Room {
 
 export interface MaintenanceRecord {
     id: string;
+    requestId?: string;
     assetId: string;
     assetName?: string;
     assetCode?: string;
@@ -141,15 +142,25 @@ export interface MaintenanceRecord {
     roomCode?: string;
     roomName?: string;
     description: string;
-    status: "Open" | "Inspection" | "Quoted" | "In Progress" | "Completed" | "Scheduled" | "Pending";
+    status:
+        | "Open"
+        | "Inspection"
+        | "Quoted"
+        | "In Progress"
+        | "Completed"
+        | "Scheduled"
+        | "Pending"
+        | "Finance Review"
+        | "Waiting for Replacement";
     priority: "Low" | "Medium" | "High";
     type: "Preventive" | "Corrective" | "Upgrade" | "Inspection";
-    frequency?: "One-time" | "Daily" | "Weekly" | "Monthly" | "Yearly";
+    frequency?: "One-time" | "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly";
     startDate?: string;
     endDate?: string;
+    nextDueDate?: string;
     cost?: number;
     attachments?: string;
-    diagnosisOutcome?: "Repairable" | "Not Repairable" | null;
+    diagnosisOutcome?: "Repairable" | "Not Repairable" | "No Fix Needed" | null;
     inspectionNotes?: string;
     quotationNotes?: string;
     dateReported: string;
@@ -157,6 +168,10 @@ export interface MaintenanceRecord {
     isArchived?: boolean;
     createdAt?: string;
     updatedAt?: string;
+    financeRequestType?: "Repair" | "Replacement" | string | null;
+    financeWorkflowStatus?: string | null;
+    linkedPurchaseOrderId?: string | null;
+    replacementRegisteredAssetId?: string | null;
 }
 
 export interface PurchaseOrder {
@@ -174,6 +189,7 @@ export interface PurchaseOrder {
     requestedBy: string;
     createdAt: string;
     assetId?: string;
+    maintenanceRecordId?: string;
     archived?: boolean;
 }
 

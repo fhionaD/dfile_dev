@@ -16,6 +16,7 @@ namespace DFile.backend.DTOs
         public DateTime? PurchaseDate { get; set; }
         public int UsefulLifeYears { get; set; }
         public string? RequestedBy { get; set; }
+        public string? MaintenanceRecordId { get; set; }
         public List<PurchaseOrderItemDto>? Items { get; set; }
     }
 
@@ -74,6 +75,7 @@ namespace DFile.backend.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public int? TenantId { get; set; }
+        public string? MaintenanceRecordId { get; set; }
         public List<PurchaseOrderItemDto>? Items { get; set; }
     }
 

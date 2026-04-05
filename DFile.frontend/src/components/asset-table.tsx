@@ -34,7 +34,6 @@ import { useCategories } from "@/hooks/use-categories";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
 const statusVariant: Record<string, "success" | "info" | "warning" | "danger"> = {
     "In Use": "success",
     "Available": "info",
@@ -93,7 +92,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     const { data: categories = [] } = useCategories(false);
     const { data: assetArchiveCounts } = useAssetArchiveCounts();
     const uniqueCategories = useMemo(
-        () => categories.map((c) => c.categoryName).filter(Boolean).sort(),
+        () => [...new Set(categories.map((c) => c.categoryName).filter(Boolean))].sort(),
         [categories],
     );
 
@@ -102,6 +101,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
         q: debouncedSearch || undefined,
         status: statusFilter,
         category: categoryFilter,
+        includeDisposed: statusFilter === "Disposed" ? true : undefined,
     });
     const assets = paged?.data ?? [];
     const totalCount = paged?.totalCount ?? 0;
@@ -222,7 +222,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
         categoryName: "w-[18%]",
         room: "w-[14%]",
         value: "w-[14%]",
-        actions: "w-[120px]",
+        actions: "w-[100px]",
     };
 
     /* eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table useReactTable is intentionally excluded from React Compiler memoization */

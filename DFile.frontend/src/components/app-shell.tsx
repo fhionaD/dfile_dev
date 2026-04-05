@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MaintenanceSettingsModal } from "@/components/modals/maintenance-settings-modal";
+import { MaintenanceSettingsProvider } from "@/contexts/maintenance-context";
 import { useAuth } from "@/contexts/auth-context";
 import { UserRole } from "@/types/asset";
 import { getDashboardPath } from "@/lib/role-routing";
@@ -314,6 +315,7 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
     if (!requiredRoles.includes(user.role)) return null;
 
     return (
+        <MaintenanceSettingsProvider>
         <TooltipProvider delayDuration={100}>
             <div className="min-h-screen bg-background flex">
 
@@ -485,5 +487,6 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
                 onOpenChange={setIsSettingsModalOpen} 
             />
         </TooltipProvider>
+        </MaintenanceSettingsProvider>
     );
 }

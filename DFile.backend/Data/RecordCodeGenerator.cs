@@ -96,5 +96,10 @@ namespace DFile.backend.Data
         public static Task<string> GenerateAllocationIdAsync(AppDbContext context) =>
             GenerateUniqueCodeAsync(context, "AL",
                 async (ctx, code) => await ctx.AssetAllocations.AnyAsync(a => a.Id == code));
+
+        /// <summary>Unique maintenance request id (RQ-####).</summary>
+        public static Task<string> GenerateMaintenanceRequestIdAsync(AppDbContext context) =>
+            GenerateUniqueCodeAsync(context, "RQ",
+                async (ctx, code) => await ctx.MaintenanceRecords.AnyAsync(m => m.RequestId == code));
     }
 }

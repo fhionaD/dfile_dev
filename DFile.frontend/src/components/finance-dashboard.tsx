@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
 import {
-    TrendingDown, TrendingUp, AlertTriangle, Building2, PhilippinePeso,
-    Wrench, BarChart3, DollarSign, ArrowUpRight, ArrowDownRight, Package
+    TrendingDown, AlertTriangle, PhilippinePeso,
+    Wrench, BarChart3, Package
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { StatusText } from "@/components/ui/status-text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAssets } from "@/hooks/use-assets";
 import { usePurchaseOrders } from "@/hooks/use-procurement";
@@ -14,12 +13,15 @@ import { useMaintenanceRecords } from "@/hooks/use-maintenance";
 
 interface FinanceDashboardProps {
     cardClassName?: string;
+    /** Full finance module analytics vs. tenant overview (KPIs + alerts only). */
+    variant?: "full" | "summary";
 }
 
-export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) {
+export function FinanceDashboard({ cardClassName = "", variant = "full" }: FinanceDashboardProps) {
+    const isFull = variant === "full";
     const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
-    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords();
-    const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders();
+    const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(false, { enabled: isFull });
+    const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders(false, { enabled: isFull });
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(amount);
@@ -89,33 +91,6 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
         return { totalMaintenanceCost, completedCost, pendingCost, costByPriority, costByStatus, sortedMonths, maxMonthlyCost };
     }, [records]);
 
-    // ── Room Costs ──
-    const roomStats = useMemo(() => {
-        const data: Record<string, { assetValue: number; maintenanceCost: number; assetCount: number }> = {};
-
-        assets.forEach(a => {
-            if (a.status === "Archived" || a.status === "Disposed") return;
-            const room = a.room || "Unassigned";
-            if (!data[room]) data[room] = { assetValue: 0, maintenanceCost: 0, assetCount: 0 };
-            data[room].assetValue += a.currentBookValue ?? a.value ?? 0;
-            data[room].assetCount++;
-        });
-
-        records.forEach(r => {
-            if (r.cost && r.status === "Completed") {
-                const asset = assets.find(a => a.id === r.assetId);
-                const room = asset?.room || "Unassigned";
-                if (!data[room]) data[room] = { assetValue: 0, maintenanceCost: 0, assetCount: 0 };
-                data[room].maintenanceCost += r.cost;
-            }
-        });
-
-        return Object.entries(data)
-            .map(([room, d]) => ({ room, ...d }))
-            .sort((a, b) => b.assetValue - a.assetValue)
-            .slice(0, 6);
-    }, [assets, records]);
-
     // ── Vendor Spend ──
     const vendorStats = useMemo(() => {
         const map: Record<string, number> = {};
@@ -141,17 +116,20 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
         return { eol, warranty };
     }, [assets]);
 
-    const isLoading = isLoadingAssets || isLoadingRecords || isLoadingOrders;
+    const isLoading = isLoadingAssets || (isFull && (isLoadingRecords || isLoadingOrders));
 
     if (isLoading) {
+        const skeletonKpis = isFull ? 4 : 2;
         return (
             <div className="space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[...Array(4)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-20 w-full" /></div></Card>)}
+                <div className={`grid gap-4 ${isFull ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 max-w-3xl"}`}>
+                    {[...Array(skeletonKpis)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-20 w-full" /></div></Card>)}
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {[...Array(4)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-56 w-full" /></div></Card>)}
-                </div>
+                {isFull ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {[...Array(4)].map((_, i) => <Card key={i} className={cardClassName}><div className="p-6"><Skeleton className="h-56 w-full" /></div></Card>)}
+                    </div>
+                ) : null}
             </div>
         );
     }
@@ -172,12 +150,16 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
                 </div>
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">Financial Analytics</h1>
-                    <p className="text-sm text-muted-foreground">Asset portfolio, maintenance costs & procurement insights</p>
+                    <p className="text-sm text-muted-foreground">
+                        {variant === "summary"
+                            ? "High-level portfolio and depreciation snapshot for your organization."
+                            : "Asset portfolio, maintenance costs & procurement insights"}
+                    </p>
                 </div>
             </div>
 
             {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`grid gap-4 ${isFull ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 max-w-3xl"}`}>
                 {/* Portfolio Value */}
                 <Card className={`relative overflow-hidden ${cardClassName}`}>
                     <div className="p-5 space-y-3">
@@ -207,31 +189,35 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-amber-300" />
                 </Card>
 
-                {/* Maintenance Spend */}
-                <Card className={`relative overflow-hidden ${cardClassName}`}>
-                    <div className="p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Maintenance Spend</p>
-                            <Wrench className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <p className="text-2xl font-bold tracking-tight">{formatShort(maintenanceStats.totalMaintenanceCost)}</p>
-                        <p className="text-xs text-muted-foreground">{records.length} total records</p>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-300" />
-                </Card>
+                {isFull ? (
+                    <>
+                        {/* Maintenance Spend */}
+                        <Card className={`relative overflow-hidden ${cardClassName}`}>
+                            <div className="p-5 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Maintenance Spend</p>
+                                    <Wrench className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <p className="text-2xl font-bold tracking-tight">{formatShort(maintenanceStats.totalMaintenanceCost)}</p>
+                                <p className="text-xs text-muted-foreground">{records.length} total records</p>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-300" />
+                        </Card>
 
-                {/* Procurement Spend */}
-                <Card className={`relative overflow-hidden ${cardClassName}`}>
-                    <div className="p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement</p>
-                            <Package className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <p className="text-2xl font-bold tracking-tight">{formatShort(vendorStats.total)}</p>
-                        <p className="text-xs text-muted-foreground">{orders.length} purchase orders</p>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-300" />
-                </Card>
+                        {/* Procurement Spend */}
+                        <Card className={`relative overflow-hidden ${cardClassName}`}>
+                            <div className="p-5 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement</p>
+                                    <Package className="h-4 w-4 text-purple-600" />
+                                </div>
+                                <p className="text-2xl font-bold tracking-tight">{formatShort(vendorStats.total)}</p>
+                                <p className="text-xs text-muted-foreground">{orders.length} purchase orders</p>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-300" />
+                        </Card>
+                    </>
+                ) : null}
             </div>
 
             {/* Alerts Banner */}
@@ -252,7 +238,7 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
                 </div>
             )}
 
-            {/* Analytics Grid */}
+            {isFull ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                 {/* Monthly Cost Trend - Bar Chart */}
@@ -397,45 +383,7 @@ export function FinanceDashboard({ cardClassName = "" }: FinanceDashboardProps) 
                     </CardContent>
                 </Card>
             </div>
-
-            {/* Cost by Room */}
-            <Card className={cardClassName}>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Cost Distribution by Room</CardTitle>
-                        <Badge variant="outline" className="text-xs font-mono">Top {roomStats.length} rooms</Badge>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {roomStats.length === 0 ? (
-                        <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">No room data</div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {roomStats.map(r => (
-                                <div key={r.room} className="rounded-xl border p-4 space-y-3 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm font-semibold truncate">{r.room}</span>
-                                        </div>
-                                        <Badge variant="secondary" className="text-[10px] font-mono">{r.assetCount} assets</Badge>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-0.5">
-                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Asset Value</p>
-                                            <p className="text-sm font-bold">{formatShort(r.assetValue)}</p>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Maintenance</p>
-                                            <p className="text-sm font-bold">{formatShort(r.maintenanceCost)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            ) : null}
         </div>
     );
 }

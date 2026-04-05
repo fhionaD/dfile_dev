@@ -30,6 +30,8 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    // Without a timeout, a stalled API (e.g. DB retries) leaves login stuck on "Signing in…" forever.
+    timeout: 60_000,
 });
 
 // Request Interceptor: base URL + token

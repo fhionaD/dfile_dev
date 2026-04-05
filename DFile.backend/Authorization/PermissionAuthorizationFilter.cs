@@ -1,13 +1,14 @@
 using DFile.backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using System.Linq;
 using System.Security.Claims;
 
 namespace DFile.backend.Authorization
 {
     /// <summary>
-    /// Global authorization filter that enforces module-level permissions via RequirePermissionAttribute.
-    /// Runs before model binding so permission checks happen before validation.
+    /// Global authorization filter for <see cref="RequirePermissionAttribute"/> and
+    /// <see cref="RequirePermissionOrRolesAttribute"/>. Runs before model binding.
     /// Super Admin bypasses all permission checks.
     /// </summary>
     public class PermissionAuthorizationFilter : IAsyncAuthorizationFilter
@@ -21,33 +22,31 @@ namespace DFile.backend.Authorization
 
         public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
-            // Find RequirePermission attributes on action first, then controller
             var attributes = context.ActionDescriptor.EndpointMetadata
                 .OfType<RequirePermissionAttribute>()
                 .ToList();
+            var orRoleAttributes = context.ActionDescriptor.EndpointMetadata
+                .OfType<RequirePermissionOrRolesAttribute>()
+                .ToList();
 
-            // No permission attribute = no restriction (falls through to standard [Authorize])
-            if (attributes.Count == 0)
+            if (attributes.Count == 0 && orRoleAttributes.Count == 0)
             {
                 return;
             }
 
             var user = context.HttpContext.User;
 
-            // Must be authenticated
             if (user.Identity == null || !user.Identity.IsAuthenticated)
             {
                 context.Result = new UnauthorizedResult();
                 return;
             }
 
-            // Super Admin bypasses all permission checks
             if (user.IsInRole("Super Admin"))
             {
                 return;
             }
 
-            // Extract user ID and tenant ID from claims
             var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var tenantIdStr = user.FindFirst("TenantId")?.Value;
 
@@ -58,7 +57,20 @@ namespace DFile.backend.Authorization
                 return;
             }
 
-            // Check ALL required permissions (all must pass)
+            foreach (var attr in orRoleAttributes)
+            {
+                var hasPerm = await _permissionService.HasPermission(userId, tenantId, attr.ModuleName, attr.Action);
+                var hasRole = attr.AlternateRoles.Length > 0 && attr.AlternateRoles.Any(user.IsInRole);
+                if (!hasPerm && !hasRole)
+                {
+                    context.Result = new ObjectResult(new { message = $"You do not have permission to {attr.Action.Replace("Can", "").ToLower()} {attr.ModuleName}." })
+                    {
+                        StatusCode = 403
+                    };
+                    return;
+                }
+            }
+
             foreach (var attr in attributes)
             {
                 var allowed = await _permissionService.HasPermission(userId, tenantId, attr.ModuleName, attr.Action);

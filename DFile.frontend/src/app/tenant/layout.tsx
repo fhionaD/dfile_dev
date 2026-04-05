@@ -1,7 +1,24 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { LayoutDashboard, Building2, Package, ArrowLeftRight, MapPin, ShoppingCart, Wrench, PieChart, ClipboardList } from "lucide-react";
+import {
+    LayoutDashboard,
+    Building2,
+    Package,
+    ArrowLeftRight,
+    MapPin,
+    ShoppingCart,
+    Wrench,
+    PieChart,
+    ClipboardList,
+    CheckCircle2,
+    CreditCard,
+    Users,
+    Shield,
+    Tag,
+    Briefcase,
+    ListChecks,
+} from "lucide-react";
 import { UserRole } from "@/types/asset";
 
 const REQUIRED_ROLES: UserRole[] = ["Admin"];
@@ -12,6 +29,10 @@ const navSections: NavSection[] = [
         items: [
             { href: "/tenant/dashboard",          label: "Dashboard",              icon: LayoutDashboard },
             { href: "/tenant/organization",       label: "Organization Structure", icon: Building2 },
+            { href: "/tenant/departments",       label: "Departments",            icon: Briefcase },
+            { href: "/tenant/users",             label: "Users",                  icon: Users },
+            { href: "/tenant/roles",             label: "Roles",                  icon: Shield },
+            { href: "/tenant/billing",           label: "Billing",                icon: CreditCard },
             { href: "/tenant/audit-logs",         label: "Audit Logs",             icon: ClipboardList },
         ],
     },
@@ -26,6 +47,7 @@ const navSections: NavSection[] = [
         label: "Configuration",
         items: [
             { href: "/tenant/locations",          label: "Locations",              icon: MapPin },
+            { href: "/tenant/asset-categories",   label: "Asset Categories",       icon: Tag },
         ],
     },
     {
@@ -37,8 +59,10 @@ const navSections: NavSection[] = [
     {
         label: "Cross-Module",
         items: [
+            { href: "/tenant/tasks",              label: "Tasks",                  icon: CheckCircle2 },
             { href: "/tenant/maintenance",        label: "Maintenance",            icon: Wrench },
-            { href: "/tenant/finance",            label: "Finance Overview",       icon: PieChart },
+            { href: "/finance/dashboard",         label: "Finance Dashboard",      icon: PieChart },
+            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ListChecks },
         ],
     },
 ];

@@ -16,6 +16,7 @@ interface CreatePurchaseOrderPayload {
     purchaseDate?: string;
     usefulLifeYears?: number;
     requestedBy?: string;
+    maintenanceRecordId?: string;
 }
 
 interface UpdatePurchaseOrderPayload extends CreatePurchaseOrderPayload {
@@ -23,7 +24,10 @@ interface UpdatePurchaseOrderPayload extends CreatePurchaseOrderPayload {
     assetId?: string;
 }
 
-export function usePurchaseOrders(showArchived: boolean = false) {
+export function usePurchaseOrders(
+    showArchived: boolean = false,
+    options?: { enabled?: boolean },
+) {
     return useQuery({
         queryKey: ['purchaseOrders', showArchived],
         queryFn: async () => {
@@ -32,6 +36,7 @@ export function usePurchaseOrders(showArchived: boolean = false) {
             });
             return data;
         },
+        enabled: options?.enabled !== false,
     });
 }
 
@@ -105,6 +110,30 @@ export function useRestoreOrder() {
         },
         onError: () => {
             toast.error('Failed to restore order');
+        },
+    });
+}
+
+export function useReceiveOrder() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, deliveryDate, categoryId }: { id: string; deliveryDate: string; categoryId?: string }) => {
+            const { data } = await api.put<Record<string, unknown>>(`/api/PurchaseOrders/${id}/receive`, {
+                deliveryDate,
+                categoryId: categoryId || undefined,
+            });
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            toast.success('Purchase order received. Asset created.');
+        },
+        onError: (error: Error) => {
+            const axiosErr = error as AxiosError<{ message?: string }>;
+            const msg = axiosErr.response?.data?.message || 'Failed to receive order';
+            toast.error(msg);
         },
     });
 }

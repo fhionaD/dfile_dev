@@ -1,8 +1,8 @@
 import {
     LayoutDashboard, Building2, MapPin, Tag, ShoppingCart, Package, ArrowRightLeft,
-    PieChart, TrendingDown, Trash2, FileBarChart,
+    PieChart, TrendingDown, Trash2, FileBarChart, CreditCard,
     Wrench, CalendarClock, HeartPulse,
-    ShieldCheck, AlertTriangle, BarChart3, KeyRound, ShieldAlert,
+    ShieldCheck, AlertTriangle, BarChart3, KeyRound, ShieldAlert, CheckCircle2, ClipboardList,
 } from "lucide-react";
 
 export interface PermNavItem {
@@ -23,6 +23,11 @@ const TENANT_NAV: PermNavSection[] = [
         items: [
             { href: "/tenant/dashboard", label: "Dashboard", icon: LayoutDashboard },
             { href: "/tenant/organization", label: "Organization Structure", icon: Building2, requiredModules: ["Departments", "Employees"] },
+            { href: "/tenant/departments", label: "Departments", icon: Building2, requiredModules: ["Departments"] },
+            { href: "/tenant/users", label: "Users", icon: Building2, requiredModules: ["Employees"] },
+            { href: "/tenant/roles", label: "Roles", icon: KeyRound, requiredModules: ["Employees"] },
+            { href: "/tenant/billing", label: "Billing", icon: CreditCard },
+            { href: "/tenant/audit-logs", label: "Audit Logs", icon: ClipboardList, requiredModules: ["Reports"] },
         ],
     },
     {
@@ -46,20 +51,27 @@ const TENANT_NAV: PermNavSection[] = [
         ],
     },
     {
+        label: "Operations",
+        items: [
+            { href: "/tenant/tasks", label: "Tasks", icon: CheckCircle2, requiredModules: ["Tasks"] },
+        ],
+    },
+    {
         label: "Finance",
         items: [
             { href: "/finance/dashboard", label: "Finance Dashboard", icon: PieChart, requiredModules: ["Assets"] },
+            { href: "/finance/assets", label: "Assets", icon: Package, requiredModules: ["Assets"] },
             { href: "/finance/depreciation", label: "Depreciation", icon: TrendingDown, requiredModules: ["Assets"] },
             { href: "/finance/disposals", label: "Disposals", icon: Trash2, requiredModules: ["Assets"] },
             { href: "/finance/reports", label: "Reports", icon: FileBarChart, requiredModules: ["Reports"] },
             { href: "/finance/procurement-approvals", label: "Procurement Approvals", icon: ShoppingCart, requiredModules: ["PurchaseOrders"] },
+            { href: "/finance/maintenance-requests", label: "Maintenance Requests", icon: Wrench, requiredModules: ["Assets"] },
         ],
     },
     {
         label: "Maintenance",
         items: [
             { href: "/maintenance/dashboard", label: "Maintenance Dashboard", icon: Wrench, requiredModules: ["Maintenance"] },
-            { href: "/maintenance/work-orders", label: "Work Orders", icon: CalendarClock, requiredModules: ["Maintenance"] },
             { href: "/maintenance/schedules", label: "Schedules", icon: CalendarClock, requiredModules: ["Maintenance"] },
             { href: "/maintenance/asset-condition", label: "Asset Condition", icon: HeartPulse, requiredModules: ["Maintenance"] },
         ],

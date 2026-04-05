@@ -568,6 +568,12 @@ namespace dfile.backend.Migrations
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FinanceRequestType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FinanceWorkflowStatus")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Frequency")
                         .HasColumnType("nvarchar(max)");
 
@@ -577,12 +583,24 @@ namespace dfile.backend.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
 
+                    b.Property<string>("LinkedPurchaseOrderId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("QuotationNotes")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReplacementRegisteredAssetId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
@@ -608,6 +626,11 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("EndDate")
                         .HasDatabaseName("IX_MaintenanceRecords_EndDate");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_MaintenanceRecords_RequestId")
+                        .HasFilter("[RequestId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "IsArchived", "CreatedAt")
                         .IsDescending(false, false, true)
@@ -783,6 +806,10 @@ namespace dfile.backend.Migrations
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
+
+                    b.Property<string>("MaintenanceRecordId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Manufacturer")
                         .HasColumnType("nvarchar(max)");

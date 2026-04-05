@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -27,6 +28,23 @@ export default function RootLayout({
       <body
         className={`${inter.variable} antialiased`}
       >
+        {/* Remove redundant chunk CSS preloads (inlineCss + flight hints) before Chrome warns. */}
+        <Script id="dfile-strip-css-preload" strategy="beforeInteractive">
+          {`(function(){
+function strip(){
+  var h=document.head;
+  if(!h)return;
+  h.querySelectorAll('link[rel="preload"][as="style"]').forEach(function(el){
+    var u=el.getAttribute("href")||"";
+    if(u.indexOf("/_next/static/chunks/")!==-1 && /\.css($|\\?)/.test(u)) el.remove();
+  });
+}
+strip();
+if(typeof MutationObserver!=="undefined"&&document.documentElement){
+  new MutationObserver(strip).observe(document.documentElement,{childList:true,subtree:true});
+}
+})();`}
+        </Script>
         <AuthProvider>
           <QueryProvider>
             <ThemeProvider

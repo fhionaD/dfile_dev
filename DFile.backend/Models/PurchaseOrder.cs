@@ -30,6 +30,9 @@ namespace DFile.backend.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public string? AssetId { get; set; }
 
+        /// <summary>Optional link from a maintenance replacement workflow.</summary>
+        public string? MaintenanceRecordId { get; set; }
+
         public int? ApprovedBy { get; set; }
         public DateTime? ApprovedAt { get; set; }
 

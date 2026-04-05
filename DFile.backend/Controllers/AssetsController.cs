@@ -64,6 +64,7 @@ namespace DFile.backend.Controllers
         [HttpGet]
         public async Task<ActionResult> GetAssets(
             [FromQuery] bool showArchived = false,
+            [FromQuery] bool includeDisposed = false,
             [FromQuery] int? page = null,
             [FromQuery] int pageSize = 25,
             [FromQuery] string? q = null,
@@ -89,6 +90,9 @@ namespace DFile.backend.Controllers
             }
 
             query = query.Where(a => a.IsArchived == showArchived);
+
+            if (!showArchived && !includeDisposed)
+                query = query.Where(a => a.LifecycleStatus != LifecycleStatus.Disposed);
 
             if (page.HasValue)
             {

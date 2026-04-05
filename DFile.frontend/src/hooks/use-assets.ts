@@ -21,10 +21,10 @@ export function useAssetsPaged(
     showArchived: boolean,
     page: number,
     pageSize: number,
-    filters: { q?: string; status?: string; category?: string },
+    filters: { q?: string; status?: string; category?: string; includeDisposed?: boolean },
 ) {
     return useQuery({
-        queryKey: ["assets", "paged", showArchived, page, pageSize, filters.q, filters.status, filters.category],
+        queryKey: ["assets", "paged", showArchived, page, pageSize, filters.q, filters.status, filters.category, filters.includeDisposed],
         queryFn: async () => {
             const { data } = await api.get<{
                 totalCount: number;
@@ -35,6 +35,7 @@ export function useAssetsPaged(
             }>("/api/assets", {
                 params: {
                     showArchived,
+                    includeDisposed: filters.includeDisposed === true ? true : undefined,
                     page,
                     pageSize,
                     q: filters.q?.trim() || undefined,
@@ -53,12 +54,13 @@ export function useAssetsPaged(
     });
 }
 
-export function useAssets(showArchived: boolean = false) {
+export function useAssets(showArchived: boolean = false, options?: { includeDisposed?: boolean }) {
+    const includeDisposed = options?.includeDisposed === true;
     return useQuery({
-        queryKey: ['assets', showArchived],
+        queryKey: ['assets', showArchived, includeDisposed],
         queryFn: async () => {
             const { data } = await api.get<Record<string, unknown>[]>('/api/assets', {
-                params: { showArchived }
+                params: { showArchived, includeDisposed: includeDisposed ? true : undefined },
             });
             return data.map((a) => mapAssetFromApi(a)) as Asset[];
         },

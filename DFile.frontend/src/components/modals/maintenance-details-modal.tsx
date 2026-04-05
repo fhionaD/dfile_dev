@@ -47,6 +47,8 @@ const statusVariant: Record<string, "warning" | "info" | "success" | "muted" | "
     Completed: "success",
     Scheduled: "info",
     Pending: "warning",
+    "Finance Review": "warning",
+    "Waiting for Replacement": "warning",
 };
 
 const priorityVariant: Record<string, "success" | "warning" | "danger"> = {
@@ -62,7 +64,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
     const beyondRepairMutation = useMarkBeyondRepair();
 
     const [inspectionNotes, setInspectionNotes] = useState("");
-    const [diagnosisOutcome, setDiagnosisOutcome] = useState<"Repairable" | "Not Repairable" | "">("");
+    const [diagnosisOutcome, setDiagnosisOutcome] = useState<"Repairable" | "Not Repairable" | "No Fix Needed" | "">("");
     const [quotationNotes, setQuotationNotes] = useState("");
     const [quotationCost, setQuotationCost] = useState<number>(0);
     const [isAdvancing, setIsAdvancing] = useState(false);
@@ -89,6 +91,8 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
     const isInspectionPhase = record.status === "Inspection";
     const isQuotedPhase = record.status === "Quoted";
     const isNotRepairable = record.diagnosisOutcome === "Not Repairable" || diagnosisOutcome === "Not Repairable";
+    const financeReplacementFlow =
+        record.status === "Finance Review" || record.status === "Waiting for Replacement";
 
     const buildPayload = (overrideStatus?: string) => ({
         assetId: record.assetId,
@@ -123,17 +127,6 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
         setIsAdvancing(true);
         try {
             await updateMutation.mutateAsync({ id: record.id, payload: buildPayload(nextStatus) });
-            onOpenChange(false);
-        } finally {
-            setIsAdvancing(false);
-        }
-    };
-
-    const handleSaveInspection = async () => {
-        if (!record || !diagnosisOutcome) return;
-        setIsAdvancing(true);
-        try {
-            await updateMutation.mutateAsync({ id: record.id, payload: buildPayload() });
             onOpenChange(false);
         } finally {
             setIsAdvancing(false);
@@ -187,9 +180,9 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                             <Wrench size={24} />
                         </div>
                         <div>
-                            <DialogTitle className="text-lg font-semibold text-foreground">Maintenance Ticket</DialogTitle>
+                            <DialogTitle className="text-lg font-semibold text-foreground">Maintenance</DialogTitle>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                <Badge variant="secondary" className="font-mono text-xs">{record.id}</Badge>
+                                <Badge variant="secondary" className="font-mono text-xs">{record.requestId ?? record.id}</Badge>
                                 <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
                                 <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority} Priority</StatusText>
                             </div>
@@ -202,7 +195,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                     {/* Status Stepper */}
                     <div>
                         <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                            <ChevronRight size={16} className="text-primary" /> Ticket Progress
+                            <ChevronRight size={16} className="text-primary" /> Progress
                         </h4>
                         <div className="flex items-center gap-1 bg-muted/30 p-3 rounded-lg border border-border/50">
                             {STATUS_FLOW.map((step, i) => {
@@ -313,14 +306,127 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                         </div>
                     </div>
 
-                    {/* Inspection Panel */}
-                    {/* REMOVED - Use InspectionDiagnosisModal instead */}
+                    {/* Quotation Panel — enter cost, notes, attachments while status is Quoted */}
+                    {(isQuotedPhase || record.quotationNotes || (record.status !== "Open" && record.status !== "Inspection" && record.cost)) && (
+                        <>
+                            <Separator />
+                            <div>
+                                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                    <PhilippinePeso size={16} className="text-primary" /> Quotation Details
+                                </h4>
+                                <div className="bg-muted/10 p-4 border border-border/50 rounded-lg space-y-4">
+                                    {isQuotedPhase ? (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-medium text-muted-foreground">Repair Cost Estimate (₱)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={quotationCost || ""}
+                                                        onChange={(e) => setQuotationCost(Number(e.target.value))}
+                                                        placeholder="0.00"
+                                                        className="h-9 bg-background text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-medium text-muted-foreground">Quotation Notes</Label>
+                                                <Textarea
+                                                    value={quotationNotes}
+                                                    onChange={(e) => setQuotationNotes(e.target.value)}
+                                                    placeholder="Describe repair scope, parts needed, labor estimate..."
+                                                    className="min-h-[60px] bg-background text-sm resize-none"
+                                                />
+                                            </div>
 
-                    {/* Quotation Panel */}
-                    {/* REMOVED - Use MaintenanceDetailsModal in quotation phase instead */}
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-medium text-muted-foreground">Attachments (Optional)</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        ref={fileInputRef}
+                                                        type="file"
+                                                        className="hidden"
+                                                        onChange={handleFileUpload}
+                                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        disabled={uploadMutation.isPending}
+                                                    >
+                                                        <Upload size={14} className="mr-1.5" />
+                                                        {uploadMutation.isPending ? "Uploading..." : "Upload File"}
+                                                    </Button>
+                                                    <span className="text-xs text-muted-foreground">Max 10MB</span>
+                                                </div>
+                                                {uploadedFiles.length > 0 && (
+                                                    <div className="mt-2 space-y-1">
+                                                        {uploadedFiles.map((url) => (
+                                                            <div key={url} className="flex items-center gap-2 text-xs bg-muted/50 p-2 rounded-md">
+                                                                <FileText size={12} className="text-muted-foreground shrink-0" />
+                                                                <span className="truncate flex-1 text-foreground">{url.split("/").pop()}</span>
+                                                                <Button type="button" size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => handleRemoveFile(url)}>
+                                                                    <X size={10} />
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                    {/* Beyond Repair Warning */}
-                    {isNotRepairable && (
+                                            <Button
+                                                size="sm"
+                                                onClick={handleSaveQuotation}
+                                                disabled={isAdvancing}
+                                                className="w-full bg-primary text-primary-foreground"
+                                            >
+                                                <ClipboardCheck size={14} className="mr-2" /> Save Quotation
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {record.cost !== undefined && record.cost !== null && (
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground mb-1">Cost Estimate</p>
+                                                    <p className="text-lg font-semibold">₱{record.cost.toLocaleString()}</p>
+                                                </div>
+                                            )}
+                                            {record.quotationNotes && (
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                                                    <p className="text-sm">{record.quotationNotes}</p>
+                                                </div>
+                                            )}
+                                            {record.attachments && (
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground mb-1">Attachments</p>
+                                                    <div className="space-y-1">
+                                                        {record.attachments.split(",").filter(Boolean).map((url) => (
+                                                            <a
+                                                                key={url}
+                                                                href={url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 text-xs text-primary hover:underline"
+                                                            >
+                                                                <FileText size={12} /> {url.split("/").pop()}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Beyond Repair Warning — hidden once Finance owns replacement (avoid duplicate vs inspection workflow) */}
+                    {isNotRepairable && !financeReplacementFlow && (
                         <>
                             <Separator />
                             <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">

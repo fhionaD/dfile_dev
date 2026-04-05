@@ -15,15 +15,14 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (isLoading || hasRedirectedRef.current) return;
-        if (isLoggedIn && user) {
-            const dest = getDashboardPath(user.role);
-            if (dest && dest !== "/login") {
-                hasRedirectedRef.current = true;
-                router.push(dest);
-            }
+        if (!isLoggedIn || !user) return;
+
+        const dest = getDashboardPath(user.role);
+        if (dest && dest !== "/login") {
+            hasRedirectedRef.current = true;
+            router.push(dest);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoggedIn, isLoading]);
+    }, [isLoading, isLoggedIn, user, router]);
 
     if (isLoading) return <LoadingScreen message="Checking your session…" />;
 

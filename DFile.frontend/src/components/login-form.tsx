@@ -30,6 +30,9 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
       } catch (err: unknown) {
         const error = err as { message?: string } | undefined;
         setError(error?.message ?? "An unexpected error occurred. Please try again.");
+      } finally {
+        // Always clear loading — success path relies on navigation away; if redirect fails or the
+        // request times out, the button must recover (prevents endless "Signing in…").
         setIsLoading(false);
       }
     } else {

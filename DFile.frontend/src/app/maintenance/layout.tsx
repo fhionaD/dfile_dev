@@ -1,7 +1,6 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { MaintenanceSettingsProvider } from "@/contexts/maintenance-context";
 import { LayoutDashboard, CalendarClock, HeartPulse, PieChart } from "lucide-react";
 import { UserRole } from "@/types/asset";
 
@@ -26,14 +25,12 @@ const navSections: NavSection[] = [
 
 export default function MaintenanceLayout({ children }: { children: React.ReactNode }) {
     return (
-        <MaintenanceSettingsProvider>
-            <AppShell
-                navSections={navSections}
-                requiredRoles={REQUIRED_ROLES}
-                homePath="/maintenance/dashboard"
-            >
-                {children}
-            </AppShell>
-        </MaintenanceSettingsProvider>
+        <AppShell
+            navSections={navSections}
+            requiredRoles={REQUIRED_ROLES}
+            homePath="/maintenance/dashboard"
+        >
+            {children}
+        </AppShell>
     );
 }

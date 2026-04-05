@@ -185,6 +185,12 @@ namespace DFile.backend.Data
                     .WithMany()
                     .HasForeignKey(m => m.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
+
+                e.Property(m => m.RequestId).HasMaxLength(32);
+                e.HasIndex(m => m.RequestId)
+                    .IsUnique()
+                    .HasFilter("[RequestId] IS NOT NULL")
+                    .HasDatabaseName("IX_MaintenanceRecords_RequestId");
             });
 
             // ── Room ───────────────────────────────────────────────

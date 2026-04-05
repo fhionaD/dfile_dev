@@ -108,6 +108,7 @@ namespace DFile.backend.Controllers
                 UsefulLifeYears = dto.UsefulLifeYears,
                 Status = "Pending",
                 RequestedBy = dto.RequestedBy,
+                MaintenanceRecordId = string.IsNullOrWhiteSpace(dto.MaintenanceRecordId) ? null : dto.MaintenanceRecordId.Trim(),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 TenantId = IsSuperAdmin() ? null : tenantId,
@@ -452,6 +453,7 @@ namespace DFile.backend.Controllers
             CreatedAt = o.CreatedAt,
             UpdatedAt = o.UpdatedAt,
             TenantId = o.TenantId,
+            MaintenanceRecordId = o.MaintenanceRecordId,
             Items = o.Items.Select(i => new PurchaseOrderItemDto
             {
                 Id = i.Id,

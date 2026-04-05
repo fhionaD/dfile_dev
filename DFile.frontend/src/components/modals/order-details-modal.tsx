@@ -1,17 +1,25 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusText } from "@/components/ui/status-text";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ShoppingCart, PhilippinePeso, Calendar, Building2, User, Package, TrendingDown } from "lucide-react";
 import { PurchaseOrder } from "@/types/asset";
+import { useReceiveOrder } from "@/hooks/use-procurement";
 
 interface OrderDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     order: PurchaseOrder | null;
+}
+
+function toDateInputValue(d: Date) {
+    return d.toISOString().slice(0, 10);
 }
 
 const statusVariant: Record<string, "warning" | "info" | "success" | "danger"> = {
@@ -22,6 +30,15 @@ const statusVariant: Record<string, "warning" | "info" | "success" | "danger"> =
 };
 
 export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsModalProps) {
+    const receiveOrder = useReceiveOrder();
+    const [deliveryDate, setDeliveryDate] = useState(() => toDateInputValue(new Date()));
+
+    useEffect(() => {
+        if (open && order) {
+            setDeliveryDate(toDateInputValue(new Date()));
+        }
+    }, [open, order?.id]);
+
     if (!order) return null;
 
     const monthlyDep = order.usefulLifeYears > 0
@@ -126,6 +143,46 @@ export function OrderDetailsModal({ open, onOpenChange, order }: OrderDetailsMod
                         </div>
                     </div>
                 </div>
+
+                {order.status === "Approved" && !order.assetId && (
+                    <div className="px-6 pb-2 space-y-3 border-t border-border pt-4">
+                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            <Package size={16} className="text-primary" /> Receive &amp; create asset
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                            Confirms delivery and registers an asset linked to this PO. Ensure line items include a category or the PO category matches an asset category name.
+                        </p>
+                        <div className="space-y-1.5 max-w-xs">
+                            <Label htmlFor="po-delivery-date">Delivery date</Label>
+                            <Input
+                                id="po-delivery-date"
+                                type="date"
+                                value={deliveryDate}
+                                max={toDateInputValue(new Date())}
+                                onChange={(e) => setDeliveryDate(e.target.value)}
+                            />
+                        </div>
+                        <Button
+                            type="button"
+                            disabled={receiveOrder.isPending}
+                            onClick={() => {
+                                void (async () => {
+                                    try {
+                                        await receiveOrder.mutateAsync({
+                                            id: order.id,
+                                            deliveryDate: new Date(deliveryDate + "T12:00:00.000Z").toISOString(),
+                                        });
+                                        onOpenChange(false);
+                                    } catch {
+                                        /* toast handled in hook */
+                                    }
+                                })();
+                            }}
+                        >
+                            {receiveOrder.isPending ? "Receiving…" : "Receive order"}
+                        </Button>
+                    </div>
+                )}
 
                 <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end gap-3">
                     <Button onClick={() => onOpenChange(false)} className=" bg-primary text-primary-foreground shadow-lg hover:bg-primary/90">

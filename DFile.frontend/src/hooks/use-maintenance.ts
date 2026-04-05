@@ -25,7 +25,8 @@ interface UpdateMaintenancePayload extends CreateMaintenancePayload {
     dateReported?: string;
 }
 
-const MAINTENANCE_API_ENDPOINTS = [
+/** Primary route; fallbacks only for legacy deployments that still 404 the first path. */
+const MAINTENANCE_RECORDS_ENDPOINTS = [
     "/api/maintenance",
     "/api/maintenance-records",
     "/api/maintenance-manager",
@@ -34,7 +35,7 @@ const MAINTENANCE_API_ENDPOINTS = [
 async function getMaintenanceRecordsWithFallback(showArchived: boolean) {
     let lastError: unknown;
 
-    for (const endpoint of MAINTENANCE_API_ENDPOINTS) {
+    for (const endpoint of MAINTENANCE_RECORDS_ENDPOINTS) {
         try {
             const { data } = await api.get<MaintenanceRecord[]>(endpoint, {
                 params: { showArchived },
@@ -52,10 +53,16 @@ async function getMaintenanceRecordsWithFallback(showArchived: boolean) {
     throw lastError ?? new Error("Maintenance endpoint not found.");
 }
 
-export function useMaintenanceRecords(showArchived: boolean = false) {
+export function useMaintenanceRecords(
+    showArchived: boolean = false,
+    options?: { enabled?: boolean },
+) {
     return useQuery({
         queryKey: ['maintenance', showArchived],
         queryFn: async () => getMaintenanceRecordsWithFallback(showArchived),
+        // List payloads are large; avoid refetch on every remount within the same session window.
+        staleTime: 2 * 60 * 1000,
+        enabled: options?.enabled !== false,
     });
 }
 
@@ -103,6 +110,17 @@ export function useAllocatedAssetsForMaintenance() {
     });
 }
 
+function maintenanceErrorMessage(error: unknown, fallback: string): string {
+    const ax = error as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+    const data = ax.response?.data;
+    if (data?.message) return data.message;
+    if (data?.errors && typeof data.errors === "object") {
+        const first = Object.values(data.errors).flat()[0];
+        if (first) return first;
+    }
+    return fallback;
+}
+
 export function useAddMaintenanceRecord() {
     const queryClient = useQueryClient();
 
@@ -115,8 +133,8 @@ export function useAddMaintenanceRecord() {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             toast.success('Maintenance request submitted');
         },
-        onError: () => {
-            toast.error('Failed to create maintenance request');
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to create maintenance request'));
         },
     });
 }
@@ -133,8 +151,137 @@ export function useUpdateMaintenanceRecord() {
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             toast.success('Maintenance record updated');
         },
-        onError: () => {
-            toast.error('Failed to update maintenance record');
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to update maintenance record'));
+        },
+    });
+}
+
+export interface InspectionWorkflowPayload {
+    outcome: "Repairable" | "Not Repairable" | "No Fix Needed";
+    detailNotes?: string;
+    estimatedRepairCost?: number;
+    attachments?: string;
+    linkedPurchaseOrderId?: string;
+}
+
+export function useSubmitInspectionWorkflow() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, payload }: { id: string; payload: InspectionWorkflowPayload }) => {
+            const { data } = await api.post<MaintenanceRecord>(`/api/maintenance/${id}/inspection-workflow`, payload);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            toast.success('Inspection submitted');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to submit inspection'));
+        },
+    });
+}
+
+export function useFinanceMaintenanceRequests() {
+    return useQuery({
+        queryKey: ['finance-maintenance-requests'],
+        queryFn: async () => {
+            const { data } = await api.get<MaintenanceRecord[]>('/api/finance/maintenance-requests');
+            return data;
+        },
+        staleTime: 60 * 1000,
+    });
+}
+
+export function useFinanceApproveRepair() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.patch(`/api/finance/maintenance-requests/${id}/approve-repair`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            toast.success('Repair approved');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to approve repair'));
+        },
+    });
+}
+
+export function useFinanceRejectMaintenance() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+            await api.patch(`/api/finance/maintenance-requests/${id}/reject`, { reason });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            toast.success('Request rejected');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to reject request'));
+        },
+    });
+}
+
+export function useFinanceApproveReplacement() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            await api.patch(`/api/finance/maintenance-requests/${id}/approve-replacement`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            toast.success('Replacement approved; original asset disposed');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to approve replacement'));
+        },
+    });
+}
+
+export interface CompleteReplacementPayload {
+    assetName: string;
+    categoryId: string;
+    serialNumber?: string;
+    cost: number;
+    dateOfAcquisition?: string;
+    documentation?: string;
+}
+
+export function useFinanceCompleteReplacement() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, payload }: { id: string; payload: CompleteReplacementPayload }) => {
+            const { data } = await api.post<{ assetId: string; assetCode: string }>(
+                `/api/finance/maintenance-requests/${id}/complete-replacement`,
+                {
+                    assetName: payload.assetName,
+                    categoryId: payload.categoryId,
+                    serialNumber: payload.serialNumber,
+                    cost: payload.cost,
+                    dateOfAcquisition: payload.dateOfAcquisition,
+                    documentation: payload.documentation,
+                },
+            );
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            toast.success('Replacement asset registered');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to complete replacement'));
         },
     });
 }
@@ -221,7 +368,10 @@ export function useUploadAttachment() {
             const { data } = await api.post<{ url: string; fileName: string; size: number }>(
                 '/api/maintenance/upload',
                 formData,
-                { headers: { 'Content-Type': 'multipart/form-data' } }
+                {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 300_000,
+                }
             );
             return data;
         },

@@ -1,13 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
+import { MaintenanceView } from "@/components/maintenance-view";
 
-const MaintenanceView = dynamic(() => import("@/components/maintenance-view").then(m => ({ default: m.MaintenanceView })), {
-    loading: () => <Card className="p-6"><Skeleton className="h-72 w-full" /></Card>,
-});
-
+/**
+ * Static import (not next/dynamic): a dynamic chunk deferred the whole view and delayed
+ * the first GET /api/maintenance until after an extra network round-trip for the JS bundle.
+ */
 export default function MaintenanceDashboardPage() {
     return (
         <div className="space-y-8">

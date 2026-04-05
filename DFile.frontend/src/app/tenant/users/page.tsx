@@ -10,13 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Users, Plus, Search, Archive, RotateCcw, MoreHorizontal, Eye, Pencil } from "lucide-react";
+import { Users, Plus, Search, Archive, RotateCcw, MoreHorizontal, Eye, Pencil, Shield } from "lucide-react";
 import { useEmployees, useRoles, useDepartments, useAddEmployee, useUpdateEmployee, useArchiveEmployee, useRestoreEmployee } from "@/hooks/use-organization";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Employee } from "@/types/asset";
 
 const AddEmployeeModal = dynamic(() => import("@/components/modals/add-employee-modal").then(m => ({ default: m.AddEmployeeModal })));
 const EmployeeDetailsModal = dynamic(() => import("@/components/modals/employee-details-modal").then(m => ({ default: m.EmployeeDetailsModal })));
+const ChangeRoleModal = dynamic(() => import("@/components/modals/change-role-modal").then(m => ({ default: m.ChangeRoleModal })));
 
 export default function UsersPage() {
     const [showArchived, setShowArchived] = useState(false);
@@ -34,6 +35,7 @@ export default function UsersPage() {
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+    const [roleChangeTarget, setRoleChangeTarget] = useState<Employee | null>(null);
 
     const filtered = employees.filter(e => {
         if (searchQuery) {
@@ -159,6 +161,9 @@ export default function UsersPage() {
                                                 <DropdownMenuItem onClick={() => handleEdit(emp)} className="gap-2 cursor-pointer">
                                                     <Pencil className="h-4 w-4" /> Edit
                                                 </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setRoleChangeTarget(emp)} className="gap-2 cursor-pointer">
+                                                    <Shield className="h-4 w-4" /> Change Role
+                                                </DropdownMenuItem>
                                                 {emp.status !== "Archived" ? (
                                                     <DropdownMenuItem onClick={() => setArchiveTarget(emp.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                                                         <Archive className="h-4 w-4" /> Archive
@@ -192,6 +197,33 @@ export default function UsersPage() {
                 onOpenChange={setIsDetailsOpen}
                 employee={selectedEmployee}
                 onEdit={handleEdit}
+            />
+
+            <ChangeRoleModal
+                open={roleChangeTarget !== null}
+                onOpenChange={(open) => { if (!open) setRoleChangeTarget(null); }}
+                employee={roleChangeTarget}
+                roles={roles}
+                onSave={async (employeeId, newRole) => {
+                    const emp = employees.find(e => e.id === employeeId);
+                    if (!emp) return;
+                    await updateMutation.mutateAsync({
+                        id: employeeId,
+                        payload: {
+                            firstName: emp.firstName,
+                            middleName: emp.middleName,
+                            lastName: emp.lastName,
+                            email: emp.email,
+                            contactNumber: emp.contactNumber,
+                            department: emp.department,
+                            role: newRole,
+                            hireDate: emp.hireDate,
+                            status: emp.status,
+                        },
+                    });
+                    setRoleChangeTarget(null);
+                }}
+                isPending={updateMutation.isPending}
             />
 
             <ConfirmDialog

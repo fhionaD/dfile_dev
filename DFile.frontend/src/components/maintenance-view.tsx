@@ -12,13 +12,13 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMaintenanceRecords, useArchiveMaintenanceRecord } from "@/hooks/use-maintenance";
+import { useMaintenanceRecords, useArchiveMaintenanceRecord, useSubmitInspectionWorkflow } from "@/hooks/use-maintenance";
 import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/stat-card";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
-
+import { InspectionDiagnosisModal } from "@/components/modals/inspection-diagnosis-modal";
 interface MaintenanceViewProps {
     onScheduleMaintenance?: (assetId: string) => void;
     onRequestReplacement?: (assetId: string) => void;
@@ -31,10 +31,12 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(showArchived);
 
     const archiveRecordMutation = useArchiveMaintenanceRecord();
+    const submitInspectionMutation = useSubmitInspectionWorkflow();
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [inspectionTarget, setInspectionTarget] = useState<MaintenanceRecord | null>(null);
 
     // Request Filters
     const [searchQuery, setSearchQuery] = useState("");
@@ -97,7 +99,7 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     }).sort((a, b) => new Date(b.createdAt || b.dateReported).getTime() - new Date(a.createdAt || a.dateReported).getTime());
 
     // KPI Calculations
-    const openRequests = records.filter(r => !r.isArchived && (r.status === "Open" || r.status === "Inspection" || r.status === "Quoted" || r.status === "Pending" || r.status === "In Progress")).length;
+    const openRequests = records.filter(r => !r.isArchived && (r.status === "Open" || r.status === "Inspection" || r.status === "Quoted" || r.status === "Pending" || r.status === "In Progress" || r.status === "Finance Review" || r.status === "Waiting for Replacement")).length;
     
     const overdueRequests = records.filter(r => {
         if (r.isArchived || r.status === "Completed") return false;
@@ -142,6 +144,8 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         "In Progress": "info",
         Completed: "success",
         Scheduled: "info",
+        "Finance Review": "warning",
+        "Waiting for Replacement": "warning",
     };
 
     const priorityVariant: Record<string, "danger" | "warning" | "success" | "muted"> = {
@@ -378,19 +382,39 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                 </Table>
             </div>
 
-            {/* Create Maintenance Modal */}
-            <CreateMaintenanceModal
-                open={isCreateModalOpen}
-                onOpenChange={setIsCreateModalOpen}
-            />
+            {/* Mount only when open: CreateMaintenanceModal and MaintenanceDetailsModal each call
+                useAssets() (GET /api/assets full list) and the create modal also calls useMaintenanceRecords.
+                Keeping them mounted while closed duplicated heavy requests on every dashboard load. */}
+            {isCreateModalOpen && (
+                <CreateMaintenanceModal
+                    open={isCreateModalOpen}
+                    onOpenChange={setIsCreateModalOpen}
+                />
+            )}
 
-            {/* Maintenance Details Modal */}
-            <MaintenanceDetailsModal
-                open={isDetailsModalOpen}
-                onOpenChange={setIsDetailsModalOpen}
-                record={selectedRecord}
-                onEdit={() => {
-                    setIsDetailsModalOpen(false);
+            {isDetailsModalOpen && selectedRecord && (
+                <MaintenanceDetailsModal
+                    open={isDetailsModalOpen}
+                    onOpenChange={setIsDetailsModalOpen}
+                    record={selectedRecord}
+                    enableGlassmorphism={enableGlassmorphism}
+                    onOpenInspectionModal={(record) => setInspectionTarget(record)}
+                    onEdit={() => {
+                        setIsDetailsModalOpen(false);
+                    }}
+                />
+            )}
+
+            <InspectionDiagnosisModal
+                open={inspectionTarget !== null}
+                onOpenChange={(open) => { if (!open) setInspectionTarget(null); }}
+                assetName={inspectionTarget?.assetName || inspectionTarget?.assetId}
+                isLoading={submitInspectionMutation.isPending}
+                enableGlassmorphism={enableGlassmorphism}
+                onSubmit={async (payload) => {
+                    if (!inspectionTarget) return;
+                    await submitInspectionMutation.mutateAsync({ id: inspectionTarget.id, payload });
+                    setInspectionTarget(null);
                 }}
             />
         </div>

@@ -1,10 +1,11 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { PieChart, Package, TrendingDown, Trash2, FileBarChart, ShoppingCart, Wrench } from "lucide-react";
+import { PieChart, Package, Trash2, FileBarChart, ShoppingCart, Wrench, TrendingDown, ClipboardList } from "lucide-react";
 import { UserRole } from "@/types/asset";
 
-const REQUIRED_ROLES: UserRole[] = ["Finance"];
+/** Tenant Admins use the same finance module URLs as Finance users (full dashboard + subpages). */
+const REQUIRED_ROLES: UserRole[] = ["Finance", "Admin"];
 
 const navSections: NavSection[] = [
     {
@@ -12,7 +13,6 @@ const navSections: NavSection[] = [
         items: [
             { href: "/finance/dashboard", label: "Dashboard", icon: PieChart },
             { href: "/finance/assets", label: "Assets", icon: Package },
-            { href: "/finance/depreciation", label: "Depreciation", icon: TrendingDown },
             { href: "/finance/disposals", label: "Disposals", icon: Trash2 },
         ],
     },
@@ -20,13 +20,15 @@ const navSections: NavSection[] = [
         label: "Reporting & Procurement",
         items: [
             { href: "/finance/reports", label: "Reports", icon: FileBarChart },
+            { href: "/finance/depreciation", label: "Depreciation", icon: TrendingDown },
             { href: "/finance/procurement-approvals", label: "Procurement Approvals", icon: ShoppingCart },
         ],
     },
     {
         label: "Cross-Module",
         items: [
-            { href: "/finance/maintenance", label: "Maintenance", icon: Wrench },
+            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ClipboardList },
+            { href: "/finance/maintenance", label: "Maintenance overview", icon: Wrench },
         ],
     },
 ];

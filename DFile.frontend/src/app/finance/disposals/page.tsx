@@ -11,7 +11,7 @@ import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
 
 export default function DisposalsPage() {
-    const { data: assets = [], isLoading } = useAssets();
+    const { data: assets = [], isLoading } = useAssets(false, { includeDisposed: true });
     const [searchQuery, setSearchQuery] = useState("");
 
     const disposedAssets = useMemo(() => {

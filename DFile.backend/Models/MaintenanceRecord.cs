@@ -28,6 +28,19 @@ namespace DFile.backend.Models
         public string? InspectionNotes { get; set; }
         public string? QuotationNotes { get; set; }
 
+        /// <summary>Human-readable ID for maintenance requests (e.g. RQ-1234).</summary>
+        public string? RequestId { get; set; }
+
+        /// <summary>Repair | Replacement — set when submitted to Finance.</summary>
+        public string? FinanceRequestType { get; set; }
+
+        /// <summary>Pending Approval | Approved | Rejected | Waiting for Replacement | Replacement Completed</summary>
+        public string? FinanceWorkflowStatus { get; set; }
+
+        public string? LinkedPurchaseOrderId { get; set; }
+
+        public string? ReplacementRegisteredAssetId { get; set; }
+
         public bool IsArchived { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
