@@ -233,7 +233,9 @@ export default function SchedulesPage() {
                     (record.assetName || "").toLowerCase().includes(q) ||
                     (record.assetCode || "").toLowerCase().includes(q) ||
                     (record.requestId || "").toLowerCase().includes(q) ||
-                    (record.startDate || "").includes(q)
+                    (record.startDate || "").includes(q) ||
+                    (record.roomCode || "").toLowerCase().includes(q) ||
+                    (record.roomName || "").toLowerCase().includes(q)
                 );
             }
             return true;
@@ -555,6 +557,7 @@ export default function SchedulesPage() {
                                 <TableRow className="hover:bg-muted/80 transition-colors">
                                     <TableHead className="font-bold text-foreground">Request</TableHead>
                                     <TableHead className="font-bold text-foreground">Asset</TableHead>
+                                    <TableHead className="font-bold text-foreground">Room Unit</TableHead>
                                     <TableHead className="font-bold text-foreground">Description</TableHead>
                                     <TableHead className="font-bold text-foreground">Frequency</TableHead>
                                     <TableHead className="font-bold text-foreground">Priority</TableHead>
@@ -592,6 +595,18 @@ export default function SchedulesPage() {
                                                         </span>
                                                     )}
                                                 </div>
+                                            </TableCell>
+                                            <TableCell className="py-3 px-4 max-w-[160px]">
+                                                {record.roomCode || record.roomName ? (
+                                                    <div className="space-y-0.5">
+                                                        <span className="text-sm font-medium block truncate">{record.roomCode ?? record.roomName}</span>
+                                                        {record.roomName && record.roomCode && (
+                                                            <span className="text-xs text-muted-foreground block truncate">{record.roomName}</span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="font-semibold text-foreground max-w-[200px] truncate py-3 px-4">
                                                 {record.description}

@@ -1,3 +1,4 @@
+using DFile.backend.Authorization;
 using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
@@ -137,7 +138,7 @@ namespace DFile.backend.Controllers
             if (roleTemplate.IsSystem && !UserRoleConstants.IsKnownName(roleTemplate.Name))
                 return BadRequest(new { message = "Invalid system role template name." });
 
-            var callerRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            var callerRole = User.GetJwtRole();
             var callerTenantClaim = User.FindFirst("TenantId")?.Value;
             int? callerTenantId = string.IsNullOrEmpty(callerTenantClaim) ? null : int.Parse(callerTenantClaim);
 

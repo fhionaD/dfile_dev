@@ -69,7 +69,7 @@ function normalizeTagNumberFromApi(
     obj: Record<string, unknown>,
     id: string | undefined,
 ): string | undefined {
-    let tag = pickStringField(obj, ["tagNumber", "TagNumber", "tag_number"]);
+    const tag = pickStringField(obj, ["tagNumber", "TagNumber", "tag_number"]);
     if (!tag) return undefined;
     if (looksLikeUuid(tag)) return undefined;
     if (id && tag === id.trim()) return undefined;
@@ -107,6 +107,13 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
     if (!allocationState && roomIdFromApi)
         allocationState = "Allocated";
 
+    const roomCategoryName =
+        pickStringField(a, ["roomCategoryName", "RoomCategoryName"]) ??
+        (typeof base.roomCategoryName === "string" ? base.roomCategoryName : undefined);
+    const roomSubCategoryName =
+        pickStringField(a, ["roomSubCategoryName", "RoomSubCategoryName"]) ??
+        (typeof base.roomSubCategoryName === "string" ? base.roomSubCategoryName : undefined);
+
     return {
         ...base,
         id,
@@ -114,6 +121,9 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
         assetCode,
         purchaseDate,
         allocationState,
+        roomId: roomIdFromApi ?? (typeof base.roomId === "string" ? base.roomId : undefined),
+        roomCategoryName,
+        roomSubCategoryName,
         desc:
             pickStringField(a, ["assetName", "AssetName", "desc", "Desc"]) ??
             (typeof base.desc === "string" ? base.desc : undefined) ??
@@ -130,6 +140,9 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
             pickStringField(a, ["roomName", "RoomName", "room", "Room"]) ??
             (typeof base.room === "string" ? base.room : undefined) ??
             "—",
+        categoryName:
+            pickStringField(a, ["categoryName", "CategoryName"]) ??
+            (typeof base.categoryName === "string" ? base.categoryName : undefined),
     };
 }
 

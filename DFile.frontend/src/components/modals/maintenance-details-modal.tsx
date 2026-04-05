@@ -96,6 +96,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
 
     const buildPayload = (overrideStatus?: string) => ({
         assetId: record.assetId,
+        roomId: record.roomId,
         description: record.description,
         status: overrideStatus || record.status,
         priority: record.priority,
@@ -260,6 +261,15 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
                                 <p className="text-xs text-muted-foreground">Asset Name</p>
                                 <p className="font-medium">{assetName || "—"}</p>
                             </div>
+                            {(record.roomCode || record.roomName) && (
+                                <div className="col-span-2">
+                                    <p className="text-xs text-muted-foreground">Room unit</p>
+                                    <p className="font-medium">
+                                        {record.roomCode && <span className="font-mono mr-2">{record.roomCode}</span>}
+                                        {record.roomName}
+                                    </p>
+                                </div>
+                            )}
                             <div>
                                 <p className="text-xs text-muted-foreground">Type</p>
                                 <p className="font-medium">{record.type}</p>

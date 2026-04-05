@@ -365,6 +365,8 @@ namespace DFile.backend.Controllers
             _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Create", "Asset", newAsset.Id,
                 $"Registered replacement asset for maintenance {record.RequestId ?? id}.");
 
+            await _notificationService.NotifyAdminReplacementAssetRegisteredAsync(record, newAsset);
+
             try
             {
                 await _context.SaveChangesAsync();

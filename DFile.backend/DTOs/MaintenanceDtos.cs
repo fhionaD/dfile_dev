@@ -7,6 +7,9 @@ namespace DFile.backend.DTOs
         [Required]
         public string AssetId { get; set; } = string.Empty;
 
+        /// <summary>Optional; when set must match the asset's active allocation room (disambiguation + validation).</summary>
+        public string? RoomId { get; set; }
+
         [Required]
         public string Description { get; set; } = string.Empty;
 
@@ -29,6 +32,9 @@ namespace DFile.backend.DTOs
     {
         [Required]
         public string AssetId { get; set; } = string.Empty;
+
+        /// <summary>Optional; when set must match the asset's active allocation room.</summary>
+        public string? RoomId { get; set; }
 
         [Required]
         public string Description { get; set; } = string.Empty;
@@ -107,7 +113,7 @@ namespace DFile.backend.DTOs
 
         public string? Attachments { get; set; }
 
-        /// <summary>Required when Outcome is Not Repairable — replacement PO already created.</summary>
+        /// <summary>Optional for Not Repairable — link when a replacement PO already exists; otherwise Finance reviews first.</summary>
         public string? LinkedPurchaseOrderId { get; set; }
     }
 

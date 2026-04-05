@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 
 interface CreateMaintenancePayload {
     assetId: string;
+    /** Must match active allocation when provided; server requires an active allocation. */
+    roomId?: string;
     description: string;
     status?: string;
     priority?: string;
@@ -353,6 +355,7 @@ export function useUpdateMaintenanceStatus() {
 
             const payload: UpdateMaintenancePayload = {
                 assetId: record.assetId,
+                roomId: record.roomId,
                 description: record.description,
                 status,
                 priority: record.priority,

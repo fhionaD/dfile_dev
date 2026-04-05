@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -207,18 +207,21 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                                             Category <span className="text-destructive">*</span>
                                         </Label>
                                         <input type="hidden" name="category" value={selectedCategoryId} readOnly />
-                                        <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                                            <SelectTrigger className="h-10 w-full">
-                                                <SelectValue placeholder="Select Category..." />
-                                            </SelectTrigger>
-                                            <SelectContent position="popper" className="max-h-[200px] w-[var(--radix-select-trigger-width)]">
-                                                {categories.map(c => (
-                                                    <SelectItem key={c.id} value={c.id}>
-                                                        {c.categoryName} - {getHandlingTypeLabel(c.handlingType)}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <SearchableSelect
+                                            value={selectedCategoryId}
+                                            onValueChange={setSelectedCategoryId}
+                                            options={categories.map((c) => ({
+                                                value: c.id,
+                                                label: `${c.categoryName} – ${getHandlingTypeLabel(c.handlingType)}`,
+                                                keywords: `${c.categoryName} ${c.description ?? ""}`,
+                                            }))}
+                                            placeholder="Search category…"
+                                            searchPlaceholder="Filter categories…"
+                                            emptyMessage="No categories match."
+                                            aria-label="Asset category"
+                                            aria-required
+                                            className="bg-background"
+                                        />
                                     </div>
 
                                     {/* Serial Number */}

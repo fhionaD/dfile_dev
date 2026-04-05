@@ -10,6 +10,10 @@ export interface Asset {
     roomId?: string;
     roomCode?: string;
     roomName?: string;
+    /** Room unit category from active allocation (when API provides it). */
+    roomCategoryName?: string;
+    /** Room unit sub-category from active allocation (when API provides it). */
+    roomSubCategoryName?: string;
     allocationState?: string;
     lifecycleStatus?: number;
     currentCondition?: number;

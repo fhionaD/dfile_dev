@@ -68,6 +68,8 @@ export function InspectionDiagnosisModal({
     const [detailNotes, setDetailNotes] = useState("");
     const [estimatedRepairCost, setEstimatedRepairCost] = useState<string>("");
     const [linkedPurchaseOrderId, setLinkedPurchaseOrderId] = useState("");
+    /** When true, replacement PO id is required before submit. */
+    const [linkReplacementPoNow, setLinkReplacementPoNow] = useState(false);
     const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
 
     const reset = () => {
@@ -75,6 +77,7 @@ export function InspectionDiagnosisModal({
         setDetailNotes("");
         setEstimatedRepairCost("");
         setLinkedPurchaseOrderId("");
+        setLinkReplacementPoNow(false);
         setUploadedUrls([]);
     };
 
@@ -109,7 +112,8 @@ export function InspectionDiagnosisModal({
             : outcome === "Repairable"
               ? detailNotes.trim().length > 0 && parseFloat(estimatedRepairCost) > 0
               : outcome === "Not Repairable"
-                ? detailNotes.trim().length > 0 && linkedPurchaseOrderId.trim().length > 0
+                ? detailNotes.trim().length > 0 &&
+                  (!linkReplacementPoNow || linkedPurchaseOrderId.trim().length > 0)
                 : false;
 
     const handleSubmit = async () => {
@@ -123,26 +127,39 @@ export function InspectionDiagnosisModal({
             if (uploadedUrls.length) payload.attachments = uploadedUrls.join(",");
         } else {
             payload.detailNotes = detailNotes.trim();
-            payload.linkedPurchaseOrderId = linkedPurchaseOrderId.trim();
+            if (linkReplacementPoNow && linkedPurchaseOrderId.trim())
+                payload.linkedPurchaseOrderId = linkedPurchaseOrderId.trim();
         }
         await onSubmit(payload);
         reset();
     };
 
     const displayAssetName = maintenanceRecord?.assetName || asset?.desc || assetName || "—";
-    const displayRoom = maintenanceRecord?.roomName || asset?.room || "—";
+    const displayRoom =
+        [maintenanceRecord?.roomCode, maintenanceRecord?.roomName].filter(Boolean).join(" · ") ||
+        asset?.room ||
+        "—";
     const displayFloor = maintenanceRecord?.roomFloor?.trim() || "—";
     const displayManufacturer = asset?.manufacturer?.trim() || "—";
     const displayModel = asset?.model?.trim() || "—";
     const displayTaskDescription = maintenanceRecord?.description?.trim() || "—";
     const replacementCost = asset?.purchasePrice ?? asset?.value;
+    const displayCategory = asset?.categoryName || maintenanceRecord?.categoryName || "—";
+    const displaySubCategory = asset?.roomSubCategoryName?.trim() || "—";
+    const displayUsefulLife = asset?.usefulLifeYears != null ? `${asset.usefulLifeYears} yr` : "—";
+    const displaySalvage =
+        asset?.salvageValue != null
+            ? formatMoneyPhp(asset.salvageValue)
+            : asset?.salvagePercentage != null
+              ? `${asset.salvagePercentage}%`
+              : "—";
 
     const showAssetPanel = outcome === "Repairable" || outcome === "Not Repairable";
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent
-                className={`sm:max-w-lg max-h-[90vh] overflow-y-auto ${
+                className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${
                     enableGlassmorphism
                         ? "border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-2xl ring-1 ring-white/10"
                         : ""
@@ -216,38 +233,73 @@ export function InspectionDiagnosisModal({
                             {assetLoading && !!assetId ? (
                                 <Skeleton className="h-24 w-full" />
                             ) : (
-                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <div>
-                                        <dt className="text-xs text-muted-foreground">Asset name</dt>
-                                        <dd className="font-medium">{displayAssetName}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-xs text-muted-foreground">Manufacturer</dt>
-                                        <dd>{displayManufacturer}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-xs text-muted-foreground">Model number</dt>
-                                        <dd className="font-mono text-xs">{displayModel}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-xs text-muted-foreground">Room</dt>
-                                        <dd>{displayRoom}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-xs text-muted-foreground">Floor</dt>
-                                        <dd>{displayFloor}</dd>
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <dt className="text-xs text-muted-foreground">Schedule / task description</dt>
-                                        <dd className="text-foreground/90">{displayTaskDescription}</dd>
-                                    </div>
-                                    {outcome === "Not Repairable" && (
-                                        <div className="sm:col-span-2">
-                                            <dt className="text-xs text-muted-foreground">Cost (reference)</dt>
-                                            <dd className="font-mono">{formatMoneyPhp(replacementCost)}</dd>
+                                <>
+                                    {outcome === "Not Repairable" && asset?.image && (
+                                        <div className="flex justify-center sm:justify-start">
+                                            <img
+                                                src={asset.image}
+                                                alt=""
+                                                className="max-h-36 max-w-full rounded-md border object-contain bg-background"
+                                            />
                                         </div>
                                     )}
-                                </dl>
+                                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                        <div>
+                                            <dt className="text-xs text-muted-foreground">Asset name</dt>
+                                            <dd className="font-medium">{displayAssetName}</dd>
+                                        </div>
+                                        {outcome === "Not Repairable" && (
+                                            <>
+                                                <div>
+                                                    <dt className="text-xs text-muted-foreground">Category</dt>
+                                                    <dd>{displayCategory}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-xs text-muted-foreground">Room sub-category</dt>
+                                                    <dd>{displaySubCategory}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-xs text-muted-foreground">Cost</dt>
+                                                    <dd className="font-mono">{formatMoneyPhp(replacementCost)}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-xs text-muted-foreground">Useful life</dt>
+                                                    <dd>{displayUsefulLife}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-xs text-muted-foreground">Salvage value</dt>
+                                                    <dd className="font-mono">{displaySalvage}</dd>
+                                                </div>
+                                            </>
+                                        )}
+                                        <div>
+                                            <dt className="text-xs text-muted-foreground">Manufacturer</dt>
+                                            <dd>{displayManufacturer}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs text-muted-foreground">Model number</dt>
+                                            <dd className="font-mono text-xs">{displayModel}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs text-muted-foreground">Assigned room</dt>
+                                            <dd>{displayRoom}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-xs text-muted-foreground">Floor</dt>
+                                            <dd>{displayFloor}</dd>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <dt className="text-xs text-muted-foreground">Schedule / task description</dt>
+                                            <dd className="text-foreground/90">{displayTaskDescription}</dd>
+                                        </div>
+                                        {outcome === "Repairable" && (
+                                            <div className="sm:col-span-2">
+                                                <dt className="text-xs text-muted-foreground">Cost (reference)</dt>
+                                                <dd className="font-mono">{formatMoneyPhp(replacementCost)}</dd>
+                                            </div>
+                                        )}
+                                    </dl>
+                                </>
                             )}
                         </div>
                     )}
@@ -322,7 +374,8 @@ export function InspectionDiagnosisModal({
                     {outcome === "Not Repairable" && (
                         <div className="space-y-4 border-t pt-4">
                             <p className="text-xs text-muted-foreground">
-                                Create a replacement purchase order in Procurement, then link it here. The request is sent to Finance for approval.
+                                This sends the case to <strong>Finance</strong> for approval. After approval, Procurement can fulfill a PO if needed, or Finance can register a
+                                replacement if you already have one.
                             </p>
                             <div className="space-y-2">
                                 <Label>Why not repairable?</Label>
@@ -333,14 +386,47 @@ export function InspectionDiagnosisModal({
                                     placeholder="Explain why replacement is required..."
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label>Replacement purchase order ID</Label>
-                                <Input
-                                    value={linkedPurchaseOrderId}
-                                    onChange={(e) => setLinkedPurchaseOrderId(e.target.value)}
-                                    placeholder="Create a PO in Procurement, then paste its ID"
-                                />
-                                <p className="text-xs text-muted-foreground">The PO must belong to your organization and will be sent to Finance with this request.</p>
+                            <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                                <p className="text-xs font-medium text-foreground">Replacement purchase order</p>
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setLinkReplacementPoNow(false);
+                                            setLinkedPurchaseOrderId("");
+                                        }}
+                                        className={`text-left rounded-md border px-3 py-2 text-sm transition-colors ${
+                                            !linkReplacementPoNow
+                                                ? "border-primary bg-primary/10 ring-1 ring-primary"
+                                                : "border-border hover:bg-muted/50"
+                                        }`}
+                                    >
+                                        No PO yet — Finance reviews first
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setLinkReplacementPoNow(true)}
+                                        className={`text-left rounded-md border px-3 py-2 text-sm transition-colors ${
+                                            linkReplacementPoNow
+                                                ? "border-primary bg-primary/10 ring-1 ring-primary"
+                                                : "border-border hover:bg-muted/50"
+                                        }`}
+                                    >
+                                        Link an existing replacement PO
+                                    </button>
+                                </div>
+                                {linkReplacementPoNow && (
+                                    <div className="space-y-2 pt-1">
+                                        <Label htmlFor="nr-po-id">Purchase order ID</Label>
+                                        <Input
+                                            id="nr-po-id"
+                                            value={linkedPurchaseOrderId}
+                                            onChange={(e) => setLinkedPurchaseOrderId(e.target.value)}
+                                            placeholder="Paste PO id from Procurement"
+                                        />
+                                        <p className="text-xs text-muted-foreground">The PO must belong to your organization.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

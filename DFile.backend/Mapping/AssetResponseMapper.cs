@@ -52,6 +52,8 @@ namespace DFile.backend.Mapping
                 RoomId = activeRoom?.Id,
                 RoomCode = activeRoom?.RoomCode,
                 RoomName = activeRoom?.Name,
+                RoomCategoryName = activeRoom?.RoomCategory?.Name,
+                RoomSubCategoryName = activeRoom?.RoomSubCategory?.Name,
                 AllocationState = activeRoom != null ? "Allocated" : "Unallocated",
                 Image = a.Image,
                 Manufacturer = a.Manufacturer,

@@ -1,3 +1,4 @@
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.Models;
 using System.Security.Claims;
@@ -17,7 +18,7 @@ namespace DFile.backend.Services
         {
             entry.IpAddress ??= httpContext.Connection.RemoteIpAddress?.ToString();
             entry.UserAgent ??= httpContext.Request.Headers.UserAgent.ToString();
-            entry.UserRole ??= httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
+            entry.UserRole ??= httpContext.User.GetJwtRole();
             _context.AuditLogs.Add(entry);
         }
 

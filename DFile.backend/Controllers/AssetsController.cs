@@ -283,7 +283,10 @@ namespace DFile.backend.Controllers
             var userNames = await _context.Users.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName);
 
             var activeAllocation = await _context.AssetAllocations
-                .Include(aa => aa.Room)
+                .Include(aa => aa.Room!)
+                    .ThenInclude(r => r!.RoomCategory)
+                .Include(aa => aa.Room!)
+                    .ThenInclude(r => r!.RoomSubCategory)
                 .FirstOrDefaultAsync(aa => aa.AssetId == id && aa.Status == "Active");
 
             return Ok(AssetResponseMapper.ToDto(asset, cat, userNames, activeAllocation?.Room));

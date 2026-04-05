@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DFile.backend.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace DFile.backend.Services
@@ -36,7 +37,6 @@ namespace DFile.backend.Services
         public bool IsSuperAdmin =>
             User?.IsInRole("Super Admin") == true;
 
-        public string? Role => User?.FindFirst(ClaimTypes.Role)?.Value
-            ?? User?.FindFirst("Role")?.Value;
+        public string? Role => User?.GetJwtRole();
     }
 }

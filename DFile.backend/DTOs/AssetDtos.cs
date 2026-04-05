@@ -148,6 +148,10 @@ namespace DFile.backend.DTOs
         public string? RoomId { get; set; }
         public string? RoomCode { get; set; }
         public string? RoomName { get; set; }
+        /// <summary>Room unit category (from active allocation), when loaded.</summary>
+        public string? RoomCategoryName { get; set; }
+        /// <summary>Room unit sub-category (from active allocation), when loaded.</summary>
+        public string? RoomSubCategoryName { get; set; }
         public string AllocationState { get; set; } = "Unassigned";
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }

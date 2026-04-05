@@ -1,3 +1,4 @@
+using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -22,7 +23,7 @@ namespace DFile.backend.Services
                 Module = "PurchaseOrders",
                 EntityType = "PurchaseOrder",
                 EntityId = order.Id,
-                TargetRole = "Procurement",
+                TargetRole = UserRoleConstants.Procurement,
                 TenantId = order.TenantId,
             });
             return Task.CompletedTask;
@@ -37,7 +38,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "Asset",
                 EntityId = asset.Id,
-                TargetRole = "Admin",
+                TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });
             return Task.CompletedTask;
@@ -55,7 +56,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = notice.RecordId,
-                TargetRole = "Maintenance",
+                TargetRole = UserRoleConstants.Maintenance,
                 TenantId = notice.RecordTenantId ?? notice.AssetTenantId,
             });
             return Task.CompletedTask;
@@ -71,7 +72,56 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
-                TargetRole = "Maintenance",
+                TargetRole = UserRoleConstants.Maintenance,
+                TenantId = record.TenantId,
+            });
+            return Task.CompletedTask;
+        }
+
+        public Task NotifyFinanceMaintenanceApprovalNeededAsync(MaintenanceRecord record, CancellationToken cancellationToken = default)
+        {
+            var label = !string.IsNullOrEmpty(record.RequestId) ? record.RequestId : record.Id;
+            var kind = string.IsNullOrWhiteSpace(record.FinanceRequestType) ? "request" : record.FinanceRequestType;
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"Maintenance request {label} requires finance approval ({kind}).",
+                Type = "Info",
+                Module = "Finance",
+                EntityType = "MaintenanceRecord",
+                EntityId = record.Id,
+                TargetRole = UserRoleConstants.Finance,
+                TenantId = record.TenantId,
+            });
+            return Task.CompletedTask;
+        }
+
+        public Task NotifyAdminReplacementAssetRegisteredAsync(MaintenanceRecord maintenanceRecord, Asset newAsset, CancellationToken cancellationToken = default)
+        {
+            var req = !string.IsNullOrEmpty(maintenanceRecord.RequestId) ? maintenanceRecord.RequestId : maintenanceRecord.Id;
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"Finance registered replacement asset {newAsset.AssetCode} ({newAsset.AssetName}) for maintenance {req}. Review allocation and tagging.",
+                Type = "Success",
+                Module = "Assets",
+                EntityType = "Asset",
+                EntityId = newAsset.Id,
+                TargetRole = UserRoleConstants.Admin,
+                TenantId = maintenanceRecord.TenantId ?? newAsset.TenantId,
+            });
+            return Task.CompletedTask;
+        }
+
+        public Task NotifyMaintenanceNewTicketFromAdminAsync(MaintenanceRecord record, CancellationToken cancellationToken = default)
+        {
+            var label = !string.IsNullOrEmpty(record.RequestId) ? record.RequestId : record.Id;
+            _context.Notifications.Add(new Notification
+            {
+                Message = $"New maintenance ticket {label} from Admin: {record.Description}",
+                Type = "Info",
+                Module = "Maintenance",
+                EntityType = "MaintenanceRecord",
+                EntityId = record.Id,
+                TargetRole = UserRoleConstants.Maintenance,
                 TenantId = record.TenantId,
             });
             return Task.CompletedTask;

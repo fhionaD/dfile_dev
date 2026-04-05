@@ -1,4 +1,4 @@
-using DFile.backend.Controllers;
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -25,7 +25,7 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var role = User.GetJwtRole() ?? "";
             var tenantId = GetCurrentTenantId();
 
             var query = _context.Notifications.AsQueryable();
@@ -71,7 +71,7 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> GetUnreadCount()
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var role = User.GetJwtRole() ?? "";
             var tenantId = GetCurrentTenantId();
 
             var query = _context.Notifications.Where(n => !n.IsRead);
@@ -112,7 +112,7 @@ namespace DFile.backend.Controllers
         public async Task<IActionResult> MarkAllAsRead()
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+            var role = User.GetJwtRole() ?? "";
             var tenantId = GetCurrentTenantId();
 
             var query = _context.Notifications.Where(n => !n.IsRead);

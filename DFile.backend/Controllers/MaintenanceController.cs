@@ -1,4 +1,5 @@
 using DFile.backend.Authorization;
+using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -32,6 +33,18 @@ namespace DFile.backend.Controllers
         {
             var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        /// <summary>
+        /// JWT may surface the role as short claim "role" or as ClaimTypes.Role depending on handler settings.
+        /// </summary>
+        private static bool IsAdminOrSuperAdminCreator(ClaimsPrincipal user)
+        {
+            if (user.IsInRole(UserRoleConstants.Admin) || user.IsInRole(UserRoleConstants.SuperAdmin))
+                return true;
+            var r = user.GetJwtRole();
+            return string.Equals(r, UserRoleConstants.Admin, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(r, UserRoleConstants.SuperAdmin, StringComparison.OrdinalIgnoreCase);
         }
 
         [HttpGet]
@@ -244,6 +257,11 @@ namespace DFile.backend.Controllers
             if (asset.IsArchived)
                 return BadRequest(new { message = "Cannot create maintenance records for archived assets." });
 
+            var activeAlloc = await _context.AssetAllocations.AsNoTracking()
+                .FirstOrDefaultAsync(aa => aa.AssetId == dto.AssetId && aa.Status == "Active");
+            var allocErr = ValidateActiveAllocationAndOptionalRoom(dto.RoomId, activeAlloc);
+            if (allocErr != null) return allocErr;
+
             var scheduleErr = MaintenanceSchedulingService.ValidateSchedule(dto.Frequency, dto.StartDate, dto.EndDate);
             if (scheduleErr != null)
                 return BadRequest(new { message = scheduleErr });
@@ -265,9 +283,11 @@ namespace DFile.backend.Controllers
             if (occurrenceDates.Count > maxBatch)
                 return BadRequest(new { message = $"Too many occurrences ({occurrenceDates.Count}). Maximum is {maxBatch}." });
 
-            var seriesId = MaintenanceSchedulingService.IsRecurring(dto.Frequency)
+            // Recurring: series id groups occurrences. One-off: still persist client scheduleSeriesId when supplied
+            // so duplicate-batch detection (conflict above) matches stored rows.
+            string? persistedSeriesId = MaintenanceSchedulingService.IsRecurring(dto.Frequency)
                 ? (seriesKey ?? Guid.NewGuid().ToString("N"))
-                : null;
+                : seriesKey;
 
             var created = new List<MaintenanceRecord>();
             var now = DateTime.UtcNow;
@@ -278,7 +298,7 @@ namespace DFile.backend.Controllers
                 {
                     Id = Guid.NewGuid().ToString(),
                     RequestId = requestId,
-                    ScheduleSeriesId = seriesId,
+                    ScheduleSeriesId = persistedSeriesId,
                     AssetId = dto.AssetId,
                     Description = dto.Description,
                     Status = dto.Status,
@@ -302,6 +322,9 @@ namespace DFile.backend.Controllers
                 created.Add(record);
             }
 
+            if (IsAdminOrSuperAdminCreator(User))
+                await _notificationService.NotifyMaintenanceNewTicketFromAdminAsync(created[0]);
+
             await _context.SaveChangesAsync();
 
             var userId = GetCurrentUserId();
@@ -315,6 +338,8 @@ namespace DFile.backend.Controllers
                 "MaintenanceRecord",
                 firstId,
                 $"Maintenance schedule batch: {created.Count} occurrence(s) ({dto.Type}, status {dto.Status}) for asset {asset.AssetCode ?? dto.AssetId}.");
+
+            await _context.SaveChangesAsync();
 
             var activeAllocation = await _context.AssetAllocations
                 .Include(aa => aa.Room)
@@ -374,6 +399,11 @@ namespace DFile.backend.Controllers
             if (asset == null) return BadRequest(new { message = "Asset not found." });
             if (!IsSuperAdmin() && tenantId.HasValue && asset.TenantId != tenantId)
                 return BadRequest(new { message = "Asset does not belong to your organization." });
+
+            var activeAllocPut = await _context.AssetAllocations.AsNoTracking()
+                .FirstOrDefaultAsync(aa => aa.AssetId == dto.AssetId && aa.Status == "Active");
+            var allocPutErr = ValidateActiveAllocationAndOptionalRoom(dto.RoomId, activeAllocPut);
+            if (allocPutErr != null) return allocPutErr;
 
             var scheduleErr = MaintenanceSchedulingService.ValidateSchedule(dto.Frequency, dto.StartDate, dto.EndDate);
             if (scheduleErr != null)
@@ -537,23 +567,28 @@ namespace DFile.backend.Controllers
                     return BadRequest(new { message = "Description explaining why the asset is not repairable is required." });
 
                 var poId = (dto.LinkedPurchaseOrderId ?? "").Trim();
-                if (string.IsNullOrWhiteSpace(poId))
-                    return BadRequest(new { message = "A replacement purchase order id is required." });
+                if (!string.IsNullOrWhiteSpace(poId))
+                {
+                    var po = await _context.PurchaseOrders.FirstOrDefaultAsync(p => p.Id == poId);
+                    if (po == null) return BadRequest(new { message = "Purchase order not found." });
+                    if (!IsSuperAdmin() && tenantId.HasValue && po.TenantId != tenantId)
+                        return BadRequest(new { message = "Purchase order does not belong to your organization." });
 
-                var po = await _context.PurchaseOrders.FirstOrDefaultAsync(p => p.Id == poId);
-                if (po == null) return BadRequest(new { message = "Purchase order not found." });
-                if (!IsSuperAdmin() && tenantId.HasValue && po.TenantId != tenantId)
-                    return BadRequest(new { message = "Purchase order does not belong to your organization." });
+                    record.LinkedPurchaseOrderId = poId;
+                    if (string.IsNullOrWhiteSpace(po.MaintenanceRecordId))
+                        po.MaintenanceRecordId = record.Id;
+                    po.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    record.LinkedPurchaseOrderId = null;
+                }
 
                 record.DiagnosisOutcome = "Not Repairable";
                 record.QuotationNotes = notes;
-                record.LinkedPurchaseOrderId = poId;
                 record.Status = "Finance Review";
                 record.FinanceRequestType = "Replacement";
                 record.FinanceWorkflowStatus = "Pending Approval";
-                if (string.IsNullOrWhiteSpace(po.MaintenanceRecordId))
-                    po.MaintenanceRecordId = record.Id;
-                po.UpdatedAt = DateTime.UtcNow;
             }
             else
                 return BadRequest(new { message = "Outcome must be Repairable, Not Repairable, or No Fix Needed." });
@@ -569,6 +604,9 @@ namespace DFile.backend.Controllers
                 "MaintenanceRecord",
                 record.Id,
                 $"Inspection workflow submitted ({outcome}) for request {record.RequestId ?? record.Id}.");
+
+            if (string.Equals(record.Status, "Finance Review", StringComparison.OrdinalIgnoreCase))
+                await _notificationService.NotifyFinanceMaintenanceApprovalNeededAsync(record);
 
             await _context.SaveChangesAsync();
 
@@ -719,6 +757,16 @@ namespace DFile.backend.Controllers
         }
 
         // ── Helpers ───────────────────────────────────────────────
+
+        private IActionResult? ValidateActiveAllocationAndOptionalRoom(string? requestedRoomId, AssetAllocation? alloc)
+        {
+            if (alloc == null)
+                return BadRequest(new { message = "This asset has no active room allocation. Assign the asset to a room before scheduling maintenance." });
+            if (!string.IsNullOrWhiteSpace(requestedRoomId)
+                && !string.Equals(requestedRoomId.Trim(), alloc.RoomId, StringComparison.Ordinal))
+                return BadRequest(new { message = "Room selection does not match this asset's active allocation." });
+            return null;
+        }
 
         private bool IsMaintenanceVisibleToTenant(MaintenanceRecord r, int? tenantId)
         {
