@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
     ColumnDef,
     SortingState,
@@ -81,13 +81,27 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+        const t = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+            setPageIndex(0);
+        }, 300);
         return () => clearTimeout(t);
     }, [searchQuery]);
 
-    useEffect(() => {
+    const handleStatusFilterChange = useCallback((v: string) => {
         setPageIndex(0);
-    }, [showArchived, debouncedSearch, statusFilter, categoryFilter]);
+        setStatusFilter(v);
+    }, []);
+
+    const handleCategoryFilterChange = useCallback((v: string) => {
+        setPageIndex(0);
+        setCategoryFilter(v);
+    }, []);
+
+    const toggleShowArchived = useCallback(() => {
+        setPageIndex(0);
+        setShowArchived((prev) => !prev);
+    }, []);
 
     const { data: categories = [] } = useCategories(false);
     const { data: assetArchiveCounts } = useAssetArchiveCounts();
@@ -97,7 +111,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
     );
 
     const page = pageIndex + 1;
-    const { data: paged, isLoading } = useAssetsPaged(showArchived, page, pageSize, {
+    const { data: paged, isPending } = useAssetsPaged(showArchived, page, pageSize, {
         q: debouncedSearch || undefined,
         status: statusFilter,
         category: categoryFilter,
@@ -254,7 +268,8 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
         document.body.removeChild(link);
     };
 
-    if (isLoading) {
+    /** Full skeleton only before the first page loads; search/filter refetches keep prior rows (see useAssetsPaged placeholderData). */
+    if (isPending && !paged) {
         return (
             <div className="rounded-md border overflow-hidden">
                 <div className="p-6">
@@ -295,7 +310,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                                 placeholder="Search assets..."
                                 ariaLabel="Search assets"
                             />
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                                 <SelectTrigger className={dataTableFilterTriggerClass}>
                                     <Filter className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                                     <SelectValue placeholder="Status" />
@@ -307,7 +322,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                            <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
                                 <SelectTrigger className={dataTableFilterTriggerClass}>
                                     <Package className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                                     <SelectValue placeholder="Category" />
@@ -336,7 +351,7 @@ export function AssetTable({ onAssetClick, onRegisterAsset, readOnly = false }: 
                             {!readOnly && (
                                 <ArchiveViewToggleButton
                                     showArchived={showArchived}
-                                    onToggle={() => setShowArchived(!showArchived)}
+                                    onToggle={toggleShowArchived}
                                     activeCount={assetArchiveCounts?.active}
                                     archivedCount={assetArchiveCounts?.archived}
                                 />

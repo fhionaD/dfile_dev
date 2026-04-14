@@ -19,9 +19,7 @@ function fieldMap(obj: Record<string, unknown>): Map<string, unknown> {
     return m;
 }
 
-/**
- * Read string fields regardless of JSON casing (tagNumber, TagNumber, TAG_NUMBER).
- */
+/** Read string fields regardless of JSON casing (e.g. assetCode, AssetCode). */
 function pickStringField(obj: Record<string, unknown>, logicalNames: readonly string[]): string | undefined {
     const m = fieldMap(obj);
     for (const name of logicalNames) {
@@ -65,24 +63,14 @@ export function coercePurchaseDateToString(raw: unknown): string | undefined {
     return undefined;
 }
 
-function normalizeTagNumberFromApi(
-    obj: Record<string, unknown>,
-    id: string | undefined,
-): string | undefined {
-    const tag = pickStringField(obj, ["tagNumber", "TagNumber", "tag_number"]);
-    if (!tag) return undefined;
-    if (looksLikeUuid(tag)) return undefined;
-    if (id && tag === id.trim()) return undefined;
-    return tag;
-}
-
 function normalizeAssetCodeFromApi(obj: Record<string, unknown>): string | undefined {
     return pickStringField(obj, ["assetCode", "AssetCode", "asset_code"]);
 }
 
 /**
  * Maps any /api/assets row shape into a consistent Asset.
- * Resolves fields case-insensitively so TagNumber / purchaseDate survive any JSON casing.
+ * Resolves fields case-insensitively so purchaseDate survives any JSON casing.
+ * Tag numbers are deprecated; {@link Asset.assetCode} is the canonical identifier.
  */
 export function mapAssetFromApi(a: Record<string, unknown>): Asset {
     const base = { ...(a as unknown as Asset) };
@@ -91,8 +79,6 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
     const purchaseRaw = pickPurchaseDateRaw(a) ?? base.purchaseDate;
     const purchaseDate =
         coercePurchaseDateToString(purchaseRaw) ?? coercePurchaseDateToString(base.purchaseDate as unknown);
-
-    const tagNumber = normalizeTagNumberFromApi(a, id);
 
     let assetCode =
         normalizeAssetCodeFromApi(a) ??
@@ -117,7 +103,7 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
     return {
         ...base,
         id,
-        tagNumber,
+        tagNumber: undefined,
         assetCode,
         purchaseDate,
         allocationState,

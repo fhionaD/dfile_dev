@@ -328,6 +328,10 @@ namespace dfile.backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("MaintenanceRecordId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<int>("NewCondition")
                         .HasColumnType("int");
 
@@ -584,8 +588,7 @@ namespace dfile.backend.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("LinkedPurchaseOrderId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Priority")
                         .IsRequired()
@@ -595,16 +598,19 @@ namespace dfile.backend.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ReplacementRegisteredAssetId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ScheduleSeriesId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RequestId")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("ScheduleSeriesId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
@@ -642,10 +648,6 @@ namespace dfile.backend.Migrations
 
                     b.HasIndex("TenantId", "Status", "IsArchived")
                         .HasDatabaseName("IX_MaintenanceRecords_Tenant_Status_Archived");
-
-                    b.HasIndex("TenantId", "ScheduleSeriesId")
-                        .HasDatabaseName("IX_MaintenanceRecords_Tenant_ScheduleSeriesId")
-                        .HasFilter("[ScheduleSeriesId] IS NOT NULL");
 
                     b.ToTable("MaintenanceRecords");
                 });
@@ -816,8 +818,7 @@ namespace dfile.backend.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("MaintenanceRecordId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Manufacturer")
                         .HasColumnType("nvarchar(max)");

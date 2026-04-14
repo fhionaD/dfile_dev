@@ -21,11 +21,12 @@ export default function DisposalsPage() {
     const filtered = useMemo(() => {
         if (!searchQuery) return disposedAssets;
         const q = searchQuery.toLowerCase();
-        return disposedAssets.filter(a =>
-            a.desc.toLowerCase().includes(q) ||
-            a.tagNumber?.toLowerCase().includes(q) ||
-            a.categoryName?.toLowerCase().includes(q) ||
-            a.serialNumber?.toLowerCase().includes(q)
+        return disposedAssets.filter(
+            (a) =>
+                (a.desc ?? "").toLowerCase().includes(q) ||
+                (a.assetCode ?? "").toLowerCase().includes(q) ||
+                (a.categoryName ?? "").toLowerCase().includes(q) ||
+                (a.serialNumber ?? "").toLowerCase().includes(q),
         );
     }, [disposedAssets, searchQuery]);
 
@@ -100,7 +101,7 @@ export default function DisposalsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Tag</TableHead>
+                                <TableHead>Asset code</TableHead>
                                 <TableHead>Description</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Purchase Date</TableHead>
@@ -112,7 +113,7 @@ export default function DisposalsPage() {
                         <TableBody>
                             {filtered.map(a => (
                                 <TableRow key={a.id}>
-                                    <TableCell className="font-mono text-sm">{a.tagNumber ?? "—"}</TableCell>
+                                    <TableCell className="font-mono text-sm">{a.assetCode ?? a.id ?? "—"}</TableCell>
                                     <TableCell className="font-medium max-w-[200px] truncate">{a.desc}</TableCell>
                                     <TableCell>{a.categoryName ?? "—"}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">

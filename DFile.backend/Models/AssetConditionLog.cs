@@ -21,6 +21,10 @@ namespace DFile.backend.Models
         [MaxLength(500)]
         public string? Notes { get; set; }
 
+        /// <summary>Optional link when this log row records a completed corrective repair (maintenance ticket).</summary>
+        [MaxLength(50)]
+        public string? MaintenanceRecordId { get; set; }
+
         [MaxLength(100)]
         public string? ChangedBy { get; set; }
 

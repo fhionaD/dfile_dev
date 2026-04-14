@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import type { Notification } from '@/types/asset';
 
-export function useNotifications(unreadOnly: boolean = false) {
+export function useNotifications(unreadOnly: boolean = false, refetchIntervalMs: number | false = 30_000) {
     return useQuery({
         queryKey: ['notifications', unreadOnly],
         queryFn: async () => {
@@ -11,18 +11,24 @@ export function useNotifications(unreadOnly: boolean = false) {
             });
             return data;
         },
-        refetchInterval: 30000,
+        staleTime: 0,
+        refetchInterval: refetchIntervalMs === false ? false : refetchIntervalMs,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
     });
 }
 
-export function useUnreadCount() {
+export function useUnreadCount(refetchIntervalMs: number | false = 30_000) {
     return useQuery({
         queryKey: ['notifications', 'unread-count'],
         queryFn: async () => {
             const { data } = await api.get<{ count: number }>('/api/notifications/unread-count');
             return data.count;
         },
-        refetchInterval: 30000,
+        staleTime: 0,
+        refetchInterval: refetchIntervalMs === false ? false : refetchIntervalMs,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
     });
 }
 

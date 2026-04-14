@@ -9,23 +9,32 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     Wrench, Calendar, AlertTriangle, Package, RefreshCw, ChevronRight,
     ClipboardCheck, CheckCircle2, Search, FileQuestion, ArrowRight,
     Upload, FileText, PhilippinePeso, X
 } from "lucide-react";
-import { MaintenanceRecord } from "@/types/asset";
+import { FinanceMaintenanceSubmissionDetail, MaintenanceDetailsShellRecord, MaintenanceRecord } from "@/types/asset";
 import { useAssets } from "@/hooks/use-assets";
 import { useUpdateMaintenanceRecord, useUploadAttachment, useMarkBeyondRepair } from "@/hooks/use-maintenance";
+
+export type MaintenanceDetailsModalView = "default" | "schedulePeek" | "financeRequest";
 
 interface MaintenanceDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    record: MaintenanceRecord | null;
+    record: MaintenanceDetailsShellRecord | null;
     onEdit?: () => void;
     onRequestReplacement?: (assetId: string) => void;
     onOpenInspectionModal?: (record: MaintenanceRecord) => void;
     enableGlassmorphism?: boolean;
+    /** Finance: only submitted request fields. Schedules: asset + inspection only (pending flow). */
+    detailView?: MaintenanceDetailsModalView;
+    /** When detailView is financeRequest, optional API payload from GET .../submission-detail (preferred over raw record). */
+    financeSubmissionDetail?: FinanceMaintenanceSubmissionDetail | null;
+    financeSubmissionLoading?: boolean;
+    financeSubmissionIsError?: boolean;
 }
 
 const STATUS_FLOW = ["Open", "Inspection", "Quoted", "In Progress", "Completed"] as const;
@@ -57,7 +66,118 @@ const priorityVariant: Record<string, "success" | "warning" | "danger"> = {
     High: "danger",
 };
 
-export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, onRequestReplacement, onOpenInspectionModal, enableGlassmorphism = false }: MaintenanceDetailsModalProps) {
+function formatPhp(n: number | undefined | null): string {
+    if (n == null || Number.isNaN(Number(n))) return "—";
+    return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(Number(n));
+}
+
+function isFullMaintenanceRecord(r: MaintenanceDetailsShellRecord): r is MaintenanceRecord {
+    return "description" in r && typeof (r as MaintenanceRecord).description === "string";
+}
+
+function FinanceMaintenanceSubmissionBody({ sub }: { sub: FinanceMaintenanceSubmissionDetail }) {
+    const isReplacement = sub.financeRequestType === "Replacement";
+    const displayName = sub.assetName?.trim() || sub.assetId;
+    const displayCode = sub.assetCode;
+    const roomLine = [sub.roomCode, sub.roomName].filter(Boolean).join(" · ") || "—";
+    const categoryLabel = sub.categoryName;
+    const repairDesc = sub.repairDescription;
+    const replacementNotes = sub.notRepairableExplanation;
+    const estCost = sub.estimatedRepairCost;
+    const imageUrls = sub.damagedPartImageUrls?.length ? sub.damagedPartImageUrls : [];
+
+    return (
+        <>
+            <div>
+                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Package size={16} className="text-primary" /> Asset details
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm bg-muted/10 p-4 border border-border/50 rounded-lg">
+                    <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-medium">{displayName}</p>
+                    </div>
+                    {displayCode ? (
+                        <div className="col-span-2">
+                            <p className="text-xs text-muted-foreground">Asset code</p>
+                            <p className="font-mono text-xs">{displayCode}</p>
+                        </div>
+                    ) : null}
+                    <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">Room unit</p>
+                        <p>{roomLine}</p>
+                    </div>
+                    {categoryLabel ? (
+                        <div className="col-span-2">
+                            <p className="text-xs text-muted-foreground">Category</p>
+                            <p>{categoryLabel}</p>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
+            {isReplacement ? (
+                <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                        <AlertTriangle size={16} className="text-primary" /> Why not repairable
+                    </h4>
+                    <p className="text-sm whitespace-pre-wrap bg-muted/10 p-4 border border-border/50 rounded-lg">
+                        {(replacementNotes || "").trim() || "—"}
+                    </p>
+                </div>
+            ) : (
+                <>
+                    <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                            <Wrench size={16} className="text-primary" /> Repair description
+                        </h4>
+                        <p className="text-sm whitespace-pre-wrap bg-muted/10 p-4 border border-border/50 rounded-lg">
+                            {(repairDesc || "").trim() || "—"}
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                            <PhilippinePeso size={16} className="text-primary" /> Estimated cost
+                        </h4>
+                        <p className="text-lg font-semibold tabular-nums">{formatPhp(estCost)}</p>
+                    </div>
+                    {imageUrls.length > 0 ? (
+                        <div>
+                            <h4 className="text-sm font-semibold text-foreground mb-2">Damaged-part images</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {imageUrls.map((url) => (
+                                    <a
+                                        key={url}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block rounded-md border overflow-hidden max-w-[140px] shrink-0"
+                                    >
+                                        <img src={url} alt="" className="max-h-32 w-full object-cover bg-background" />
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </>
+            )}
+        </>
+    );
+}
+
+export function MaintenanceDetailsModal({
+    open,
+    onOpenChange,
+    record,
+    onEdit,
+    onRequestReplacement,
+    onOpenInspectionModal,
+    enableGlassmorphism = false,
+    detailView = "default",
+    financeSubmissionDetail = null,
+    financeSubmissionLoading = false,
+    financeSubmissionIsError = false,
+}: MaintenanceDetailsModalProps) {
     const { data: assets = [] } = useAssets();
     const updateMutation = useUpdateMaintenanceRecord();
     const uploadMutation = useUploadAttachment();
@@ -72,7 +192,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (record) {
+        if (record && isFullMaintenanceRecord(record)) {
             setInspectionNotes(record.inspectionNotes || "");
             setDiagnosisOutcome(record.diagnosisOutcome || "");
             setQuotationNotes(record.quotationNotes || "");
@@ -82,6 +202,119 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
     }, [record]);
 
     if (!record) return null;
+
+    const glass = enableGlassmorphism
+        ? "border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-2xl ring-1 ring-white/10"
+        : "";
+
+    if (detailView === "financeRequest") {
+        const sub = financeSubmissionDetail;
+        const headerRef = sub?.requestId ?? record.requestId ?? record.id;
+
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className={`max-w-lg rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh] ${glass}`}>
+                    <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
+                        <DialogTitle className="text-lg font-semibold text-foreground">Maintenance request</DialogTitle>
+                        <DialogDescription className="text-sm text-muted-foreground">
+                            Submitted for Finance review · <span className="font-mono text-xs">{headerRef}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="p-6 space-y-5 flex-1 overflow-y-auto">
+                        {financeSubmissionLoading ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-20 w-full" />
+                            </div>
+                        ) : financeSubmissionIsError ? (
+                            <p className="text-sm text-destructive">
+                                Could not load the submitted request details. Close and try again, or contact support if this persists.
+                            </p>
+                        ) : !sub ? (
+                            <p className="text-sm text-muted-foreground">
+                                No finance submission payload is available for this queue item yet.
+                            </p>
+                        ) : (
+                            <FinanceMaintenanceSubmissionBody sub={sub} />
+                        )}
+                    </div>
+                    <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
+    if (detailView === "schedulePeek") {
+        if (!isFullMaintenanceRecord(record)) return null;
+        const assetPeek = assets.find((a) => a.id === record.assetId);
+        const assetNamePeek = assetPeek?.desc || record.assetName || record.assetId;
+        const inspectionLines: string[] = [];
+        if (record.diagnosisOutcome) inspectionLines.push(`Outcome: ${record.diagnosisOutcome}`);
+        const noteText = (record.quotationNotes || "").trim() || (record.inspectionNotes || "").trim();
+        if (noteText) inspectionLines.push(noteText);
+        const inspectionDisplay =
+            inspectionLines.length > 0 ? inspectionLines.join("\n\n") : "Inspection has not been completed for this schedule yet.";
+
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className={`max-w-lg rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh] ${glass}`}>
+                    <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
+                        <DialogTitle className="text-lg font-semibold text-foreground">Schedule overview</DialogTitle>
+                        <DialogDescription className="text-sm text-muted-foreground">
+                            Asset and inspection context only · <span className="font-mono text-xs">{record.requestId ?? record.id}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="p-6 space-y-5 flex-1 overflow-y-auto">
+                        <div>
+                            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <Package size={16} className="text-primary" /> Asset details
+                            </h4>
+                            <div className="grid grid-cols-2 gap-3 text-sm bg-muted/10 p-4 border border-border/50 rounded-lg">
+                                <div className="col-span-2">
+                                    <p className="text-xs text-muted-foreground">Name</p>
+                                    <p className="font-medium">{assetNamePeek}</p>
+                                </div>
+                                {(record.assetCode || assetPeek?.assetCode) && (
+                                    <div className="col-span-2">
+                                        <p className="text-xs text-muted-foreground">Asset code</p>
+                                        <p className="font-mono text-xs">{record.assetCode || assetPeek?.assetCode}</p>
+                                    </div>
+                                )}
+                                {(record.roomCode || record.roomName) && (
+                                    <div className="col-span-2">
+                                        <p className="text-xs text-muted-foreground">Room unit</p>
+                                        <p>
+                                            {record.roomCode && <span className="font-mono mr-2">{record.roomCode}</span>}
+                                            {record.roomName}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                                <ClipboardCheck size={16} className="text-primary" /> Inspection result
+                            </h4>
+                            <p className="text-sm whitespace-pre-wrap bg-muted/10 p-4 border border-border/50 rounded-lg leading-relaxed">
+                                {inspectionDisplay}
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter className="p-6 bg-muted/40 border-t border-border shrink-0 flex justify-end">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
+    if (!isFullMaintenanceRecord(record)) return null;
 
     const asset = assets.find(a => a.id === record.assetId);
     const assetName = asset ? asset.desc : record.assetId;
@@ -172,9 +405,7 @@ export function MaintenanceDetailsModal({ open, onOpenChange, record, onEdit, on
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className={`max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh] ${
-                enableGlassmorphism ? 'border border-white/20 bg-white/10 dark:bg-black/10 backdrop-blur-2xl ring-1 ring-white/10' : ''
-            }`}>
+            <DialogContent className={`max-w-2xl rounded-2xl border-border p-0 overflow-hidden flex flex-col max-h-[90vh] ${glass}`}>
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 bg-primary/10 flex items-center justify-center text-primary rounded-xl">

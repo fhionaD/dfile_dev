@@ -1,83 +1,145 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { StatusText } from "@/components/ui/status-text";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Wrench, CheckCircle2, XCircle, Package, Loader2 } from "lucide-react";
 import {
     useFinanceMaintenanceRequests,
+    useFinanceMaintenanceSubmissionDetail,
     useFinanceRepairsAwaitingParts,
     useFinanceApproveRepair,
     useFinanceRejectMaintenance,
     useFinanceApproveReplacement,
-    useFinanceCompleteReplacement,
     useFinanceMarkPartsReady,
-    type CompleteReplacementPayload,
 } from "@/hooks/use-maintenance";
 import { useCategories } from "@/hooks/use-categories";
-import { MaintenanceRecord } from "@/types/asset";
+import { useAddAsset, useAssets } from "@/hooks/use-assets";
+import { AddAssetModal } from "@/components/modals/add-asset-modal";
+import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
+import { Asset, CreateAssetPayload, FinanceMaintenanceQueueRow, ReplacementRegistrationContext } from "@/types/asset";
 
-function displayFinanceStatus(r: MaintenanceRecord): string {
+function displayFinanceStatus(r: FinanceMaintenanceQueueRow): string {
     if (r.financeWorkflowStatus) return r.financeWorkflowStatus;
     if (r.status === "Finance Review") return "Pending Approval";
     return r.status;
 }
 
-function rowType(r: MaintenanceRecord): string {
+function rowType(r: FinanceMaintenanceQueueRow): string {
     if (r.financeRequestType) return r.financeRequestType;
     if (r.diagnosisOutcome === "Not Repairable" || r.linkedPurchaseOrderId) return "Replacement";
     return "Repair";
 }
 
+function buildCreateAssetPayload(asset: Asset, replacementMaintenanceRecordId?: string): CreateAssetPayload {
+    const asNullableDate = (v?: string) => (v && v.trim() ? v : undefined);
+    return {
+        assetName: asset.desc?.trim() || "",
+        categoryId: asset.categoryId!,
+        lifecycleStatus: asset.lifecycleStatus ?? 0,
+        currentCondition: asset.currentCondition ?? 0,
+        image: asset.image || undefined,
+        manufacturer: asset.manufacturer || undefined,
+        model: asset.model || undefined,
+        serialNumber: asset.serialNumber || undefined,
+        purchaseDate: asNullableDate(asset.purchaseDate),
+        vendor: asset.vendor || undefined,
+        acquisitionCost: Number(asset.purchasePrice ?? 0),
+        usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
+        purchasePrice: Number(asset.purchasePrice ?? 0),
+        residualValue: null,
+        salvagePercentage: asset.salvagePercentage ?? undefined,
+        isSalvageOverride: asset.isSalvageOverride ?? false,
+        currentBookValue: Number(asset.currentBookValue ?? asset.purchasePrice ?? 0),
+        monthlyDepreciation: Number(asset.monthlyDepreciation ?? 0),
+        warrantyExpiry: asNullableDate(asset.warrantyExpiry),
+        notes: asset.notes || undefined,
+        documents: asset.documents || undefined,
+        rowVersion: asset.rowVersion || undefined,
+        ...(replacementMaintenanceRecordId ? { replacementMaintenanceRecordId } : {}),
+    };
+}
+
 export default function FinanceMaintenanceRequestsPage() {
+    const { user, isLoading: authLoading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (authLoading || !user) return;
+        if (user.role === "Admin") {
+            router.replace("/finance/assets");
+        }
+    }, [authLoading, user, router]);
+
+    const queryClient = useQueryClient();
     const { data: rows = [], isLoading } = useFinanceMaintenanceRequests();
     const { data: awaitingParts = [], isLoading: awaitingLoading } = useFinanceRepairsAwaitingParts();
     const { data: categoriesRaw = [] } = useCategories(false);
     const categories = useMemo(() => categoriesRaw.filter((c) => c.status !== "Archived"), [categoriesRaw]);
+    const { data: assetsForSerial = [] } = useAssets(false);
+    const addAsset = useAddAsset();
 
     const approveRepair = useFinanceApproveRepair();
     const rejectReq = useFinanceRejectMaintenance();
     const approveReplacement = useFinanceApproveReplacement();
-    const completeReplacement = useFinanceCompleteReplacement();
     const markPartsReady = useFinanceMarkPartsReady();
 
-    const [completeOpen, setCompleteOpen] = useState(false);
-    const [completeId, setCompleteId] = useState<string | null>(null);
-    const [form, setForm] = useState<CompleteReplacementPayload>({
-        assetName: "",
-        categoryId: "",
-        serialNumber: "",
-        cost: 0,
-        dateOfAcquisition: "",
-        documentation: "",
-    });
+    const [replacementTarget, setReplacementTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [detailRecord, setDetailRecord] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [rejectionTarget, setRejectionTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const {
+        data: financeSubmissionDetail,
+        isLoading: financeSubmissionLoading,
+        isError: financeSubmissionIsError,
+    } = useFinanceMaintenanceSubmissionDetail(detailRecord?.id, detailOpen && !!detailRecord);
 
-    const openComplete = (id: string) => {
-        setCompleteId(id);
-        setForm({
-            assetName: "",
-            categoryId: categories[0]?.id ?? "",
-            serialNumber: "",
-            cost: 0,
-            dateOfAcquisition: new Date().toISOString().split("T")[0],
-            documentation: "",
-        });
-        setCompleteOpen(true);
+    const replacementContext: ReplacementRegistrationContext | null = useMemo(() => {
+        if (!replacementTarget) return null;
+        return {
+            maintenanceRecordId: replacementTarget.id,
+            requestLabel: replacementTarget.requestId ?? null,
+            originalAssetId: replacementTarget.assetId,
+            originalAssetName: replacementTarget.assetName ?? null,
+            originalAssetCode: replacementTarget.assetCode ?? null,
+        };
+    }, [replacementTarget]);
+
+    const existingSerialNumbers = useMemo(
+        () =>
+            assetsForSerial
+                .map((a) => (a.serialNumber ?? "").trim())
+                .filter((s): s is string => s.length > 0),
+        [assetsForSerial],
+    );
+
+    const openReplacementModal = (record: FinanceMaintenanceQueueRow) => {
+        setReplacementTarget(record);
     };
 
     const busy =
         approveRepair.isPending ||
         rejectReq.isPending ||
         approveReplacement.isPending ||
-        completeReplacement.isPending ||
-        markPartsReady.isPending;
+        markPartsReady.isPending ||
+        addAsset.isPending;
+
+    if (!authLoading && user?.role === "Admin") {
+        return (
+            <div className="space-y-6">
+                <Card className="overflow-hidden p-6">
+                    <Skeleton className="h-72 w-full" />
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -126,7 +188,14 @@ export default function FinanceMaintenanceRequestsPage() {
                                     const isRepair = rowType(r) === "Repair";
 
                                     return (
-                                        <TableRow key={r.id}>
+                                        <TableRow
+                                            key={r.id}
+                                            className="cursor-pointer hover:bg-muted/50"
+                                            onClick={() => {
+                                                setDetailRecord(r);
+                                                setDetailOpen(true);
+                                            }}
+                                        >
                                             <TableCell className="font-mono text-xs">{r.requestId ?? r.id}</TableCell>
                                             <TableCell>{rowType(r)}</TableCell>
                                             <TableCell>
@@ -139,7 +208,7 @@ export default function FinanceMaintenanceRequestsPage() {
                                             <TableCell>
                                                 <StatusText variant="muted">{r.status}</StatusText>
                                             </TableCell>
-                                            <TableCell className="text-right space-x-2">
+                                            <TableCell className="text-right space-x-2" onClick={(e) => e.stopPropagation()}>
                                                 {pending && isRepair && (
                                                     <>
                                                         <Button
@@ -154,7 +223,7 @@ export default function FinanceMaintenanceRequestsPage() {
                                                             size="sm"
                                                             variant="outline"
                                                             className="gap-1"
-                                                            onClick={() => rejectReq.mutate({ id: r.id })}
+                                                            onClick={() => setRejectionTarget(r)}
                                                             disabled={busy}
                                                         >
                                                             <XCircle className="h-3.5 w-3.5" /> Reject
@@ -175,7 +244,7 @@ export default function FinanceMaintenanceRequestsPage() {
                                                             size="sm"
                                                             variant="outline"
                                                             className="gap-1"
-                                                            onClick={() => rejectReq.mutate({ id: r.id })}
+                                                            onClick={() => setRejectionTarget(r)}
                                                             disabled={busy}
                                                         >
                                                             <XCircle className="h-3.5 w-3.5" /> Reject
@@ -187,7 +256,7 @@ export default function FinanceMaintenanceRequestsPage() {
                                                         size="sm"
                                                         variant="secondary"
                                                         className="gap-1"
-                                                        onClick={() => openComplete(r.id)}
+                                                        onClick={() => openReplacementModal(r)}
                                                         disabled={busy}
                                                     >
                                                         <Package className="h-3.5 w-3.5" /> Register replacement asset
@@ -233,7 +302,14 @@ export default function FinanceMaintenanceRequestsPage() {
                             </TableHeader>
                             <TableBody>
                                 {awaitingParts.map((r) => (
-                                    <TableRow key={r.id}>
+                                    <TableRow
+                                        key={r.id}
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => {
+                                            setDetailRecord(r);
+                                            setDetailOpen(true);
+                                        }}
+                                    >
                                         <TableCell className="font-mono text-xs">{r.requestId ?? r.id}</TableCell>
                                         <TableCell>
                                             <div className="text-sm font-medium">{r.assetName ?? r.assetId}</div>
@@ -244,7 +320,7 @@ export default function FinanceMaintenanceRequestsPage() {
                                         <TableCell className="tabular-nums text-sm">
                                             {r.cost != null ? `₱${Number(r.cost).toFixed(2)}` : "—"}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                             <Button
                                                 size="sm"
                                                 className="gap-1"
@@ -262,76 +338,57 @@ export default function FinanceMaintenanceRequestsPage() {
                 )}
             </Card>
 
-            <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Register replacement asset</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 py-2">
-                        <div className="space-y-1">
-                            <Label>Asset name</Label>
-                            <Input value={form.assetName} onChange={(e) => setForm({ ...form, assetName: e.target.value })} />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Category</Label>
-                            <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.categoryName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Serial number</Label>
-                            <Input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Cost</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={form.cost || ""}
-                                onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Date of acquisition</Label>
-                            <Input
-                                type="date"
-                                value={form.dateOfAcquisition}
-                                onChange={(e) => setForm({ ...form, dateOfAcquisition: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Documentation (URLs or notes)</Label>
-                            <Input value={form.documentation} onChange={(e) => setForm({ ...form, documentation: e.target.value })} />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setCompleteOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            disabled={!completeId || !form.assetName.trim() || !form.categoryId || form.cost <= 0 || completeReplacement.isPending}
-                            onClick={async () => {
-                                if (!completeId) return;
-                                await completeReplacement.mutateAsync({ id: completeId, payload: form });
-                                setCompleteOpen(false);
-                                setCompleteId(null);
-                            }}
-                        >
-                            Submit
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {detailOpen && detailRecord && (
+                <MaintenanceDetailsModal
+                    open={detailOpen}
+                    onOpenChange={(open) => {
+                        setDetailOpen(open);
+                        if (!open) setDetailRecord(null);
+                    }}
+                    record={detailRecord}
+                    detailView="financeRequest"
+                    financeSubmissionDetail={financeSubmissionDetail ?? null}
+                    financeSubmissionLoading={financeSubmissionLoading}
+                    financeSubmissionIsError={financeSubmissionIsError}
+                />
+            )}
+
+            <AddAssetModal
+                open={!!replacementTarget}
+                onOpenChange={(open) => {
+                    if (!open) setReplacementTarget(null);
+                }}
+                categories={categories}
+                existingSerialNumbers={existingSerialNumbers}
+                replacementContext={replacementContext}
+                onAddAsset={async (asset) => {
+                    if (!replacementTarget) return;
+                    const payload = buildCreateAssetPayload(asset, replacementTarget.id);
+                    await addAsset.mutateAsync(payload);
+                    queryClient.invalidateQueries({ queryKey: ["finance-maintenance-requests"] });
+                    queryClient.invalidateQueries({ queryKey: ["finance-maintenance-awaiting-parts"] });
+                    queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+                    setReplacementTarget(null);
+                }}
+            />
+
+            <ConfirmDialog
+                open={rejectionTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRejectionTarget(null);
+                }}
+                title="Reject Maintenance Request"
+                description={`Are you sure you want to reject this ${rejectionTarget ? rowType(rejectionTarget).toLowerCase() : "request"}? The request will be returned to Maintenance for re-inspection.`}
+                confirmLabel="Reject"
+                confirmVariant="destructive"
+                onConfirm={async () => {
+                    if (rejectionTarget) {
+                        await rejectReq.mutateAsync({ id: rejectionTarget.id });
+                        setRejectionTarget(null);
+                    }
+                }}
+                isLoading={rejectReq.isPending}
+            />
         </div>
     );
 }

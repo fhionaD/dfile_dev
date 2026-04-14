@@ -1,5 +1,6 @@
 using DFile.backend.Configuration;
 using DFile.backend.Data;
+using DFile.backend.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -21,6 +22,8 @@ builder.Services.AddControllers(options =>
 }).AddJsonOptions(o =>
 {
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    o.JsonSerializerOptions.Converters.Add(new UtcRfc3339DateTimeConverter());
+    o.JsonSerializerOptions.Converters.Add(new UtcRfc3339NullableDateTimeConverter());
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<DFile.backend.Services.ITenantContext, DFile.backend.Services.HttpTenantContext>();
@@ -45,6 +48,7 @@ builder.Services.AddScoped<DFile.backend.Controllers.RequireTenantFilter>();
 builder.Services.AddScoped<DFile.backend.Services.PermissionService>();
 builder.Services.AddScoped<DFile.backend.Services.IAuditService, DFile.backend.Services.AuditService>();
 builder.Services.AddScoped<DFile.backend.Services.INotificationService, DFile.backend.Services.NotificationService>();
+builder.Services.AddScoped<DFile.backend.Services.IMaintenanceReplacementRegistrationService, DFile.backend.Services.MaintenanceReplacementRegistrationService>();
 builder.Services.AddHostedService<DFile.backend.Services.DepreciationReconciliationService>();
 builder.Services.AddHostedService<DFile.backend.Services.MaintenanceDueReminderService>();
 builder.Services.AddScoped<DFile.backend.Authorization.PermissionAuthorizationFilter>();
@@ -204,16 +208,33 @@ app.MapFallback(async (HttpContext context) =>
     var webRoot = app.Environment.WebRootPath
         ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 
-    var pageIndex = Path.Combine(webRoot, requestPath.TrimStart('/'), "index.html");
-    if (File.Exists(pageIndex))
+    var trimmed = requestPath.TrimStart('/').TrimEnd('/');
+    if (!string.IsNullOrEmpty(trimmed))
     {
-        if (app.Environment.IsDevelopment())
+        var pageIndex = Path.Combine(webRoot, trimmed, "index.html");
+        if (File.Exists(pageIndex))
         {
-            context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+            if (app.Environment.IsDevelopment())
+            {
+                context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+            }
+            context.Response.ContentType = "text/html";
+            await context.Response.SendFileAsync(pageIndex);
+            return;
         }
-        context.Response.ContentType = "text/html";
-        await context.Response.SendFileAsync(pageIndex);
-        return;
+
+        // Next.js static export often emits flat `register.html` instead of `register/index.html`.
+        var flatPage = Path.Combine(webRoot, trimmed + ".html");
+        if (File.Exists(flatPage))
+        {
+            if (app.Environment.IsDevelopment())
+            {
+                context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+            }
+            context.Response.ContentType = "text/html";
+            await context.Response.SendFileAsync(flatPage);
+            return;
+        }
     }
 
     var rootIndex = Path.Combine(webRoot, "index.html");

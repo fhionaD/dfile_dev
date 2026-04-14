@@ -34,19 +34,32 @@ export function useAddCategory() {
 
     return useMutation({
         mutationFn: async (payload: CreateCategoryPayload) => {
-            const { data } = await api.post<Category>('/api/AssetCategories', payload);
+            const { data } = await api.post<Category>('/api/AssetCategories', {
+                ...payload,
+                categoryName: payload.categoryName.trim(),
+                description: (payload.description ?? '').trim(),
+            });
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
-            toast.success('Category added');
         },
         onError: (error: unknown) => {
             const axiosErr = error as AxiosError<{ message?: string }>;
             const status = axiosErr.response?.status;
-            const backendMessage = String(axiosErr.response?.data?.message ?? "").toLowerCase();
+            const rawMsg = axiosErr.response?.data?.message;
+            if (status === 400 && typeof rawMsg === "string" && rawMsg.trim()) {
+                toast.error(rawMsg);
+                return;
+            }
+            const backendMessage = String(rawMsg ?? "").toLowerCase();
             const isDuplicate = status === 409 || backendMessage.includes("exist") || backendMessage.includes("duplicate");
-            toast.error(isDuplicate ? 'Category Name already existed. Check again' : parseApiError(error, 'Failed to add category'));
+            if (isDuplicate) {
+                // Silently handle duplicate category conflict
+                throw error;
+            } else {
+                toast.error(parseApiError(error, "Failed to add category"));
+            }
         }
     });
 }

@@ -5,6 +5,7 @@ using DFile.backend.Models;
 using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -31,6 +32,45 @@ namespace DFile.backend.Controllers
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
         }
+
+        private static string NormalizeCategoryName(string? name) => (name ?? string.Empty).Trim();
+
+        /// <summary>
+        /// Matches DB unique index IX_AssetCategories_Name_HandlingType_Tenant (active rows only):
+        /// same normalized name + handling + tenant scope. Global rows use TenantId null; tenant rows use that tenant only.
+        /// Comparison is done in-memory after a narrow DB fetch so trimming/casing is deterministic (EF SQL translation of
+        /// <c>Trim().ToLower()</c> on columns was not reliably detecting duplicates in all cases).
+        /// </summary>
+        private async Task<bool> HasDuplicateActiveCategoryAsync(
+            string normalizedName,
+            HandlingType handling,
+            int? tenantScope,
+            string? excludeCategoryId)
+        {
+            var q = _context.AssetCategories.Where(c =>
+                !c.IsArchived &&
+                c.HandlingType == handling);
+
+            if (!string.IsNullOrEmpty(excludeCategoryId))
+                q = q.Where(c => c.Id != excludeCategoryId);
+
+            if (tenantScope == null)
+                q = q.Where(c => c.TenantId == null);
+            else
+                q = q.Where(c => c.TenantId == tenantScope);
+
+            var rows = await q.Select(c => c.CategoryName).ToListAsync();
+            foreach (var existingName in rows)
+            {
+                if (string.Equals(NormalizeCategoryName(existingName), normalizedName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
+            ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627);
 
         private static readonly string[] StatusLabels = { "", "Available", "In Use", "Maintenance", "Disposed" };
 
@@ -165,23 +205,25 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
 
-            // Validate uniqueness of CategoryName + HandlingType within scope
-            var duplicateExists = await _context.AssetCategories.AnyAsync(c =>
-                c.CategoryName == dto.CategoryName && c.HandlingType == dto.HandlingType && !c.IsArchived &&
-                (IsSuperAdmin() ? c.TenantId == null : (c.TenantId == null || c.TenantId == tenantId)));
-            if (duplicateExists)
-                return Conflict(new { message = "A category with the same name and handling type already exists." });
+            var normalizedName = NormalizeCategoryName(dto.CategoryName);
+            if (string.IsNullOrEmpty(normalizedName))
+                return BadRequest(new { message = "Category name is required." });
+
+            var tenantScopeForNewRow = IsSuperAdmin() ? null : tenantId;
+
+            if (await HasDuplicateActiveCategoryAsync(normalizedName, dto.HandlingType, tenantScopeForNewRow, excludeCategoryId: null))
+                return Conflict(new { message = "A category with the same name and handling type already exists for this scope." });
 
             var category = new AssetCategory
             {
                 Id = Guid.NewGuid().ToString(),
                 AssetCategoryCode = await RecordCodeGenerator.GenerateCategoryCodeAsync(_context),
-                CategoryName = dto.CategoryName,
+                CategoryName = normalizedName,
                 HandlingType = dto.HandlingType,
-                Description = dto.Description,
+                Description = dto.Description?.Trim() ?? string.Empty,
                 SalvagePercentage = dto.SalvagePercentage,
                 IsArchived = false,
-                TenantId = IsSuperAdmin() ? null : tenantId,
+                TenantId = tenantScopeForNewRow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
@@ -201,7 +243,14 @@ namespace DFile.backend.Controllers
                 NewValues = JsonSerializer.Serialize(new { category.CategoryName, HandlingType = category.HandlingType.ToString(), category.Description }),
             });
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                return Conflict(new { message = "A category with the same name and handling type already exists for this scope." });
+            }
 
             return CreatedAtAction("GetAssetCategory", new { id = category.Id }, new AssetCategoryResponseDto
             {
@@ -232,14 +281,18 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != null && existing.TenantId != tenantId)
                 return NotFound();
 
-            // Check uniqueness if name or handling type changed
-            if (existing.CategoryName != dto.CategoryName || existing.HandlingType != dto.HandlingType)
+            var normalizedName = NormalizeCategoryName(dto.CategoryName);
+            if (string.IsNullOrEmpty(normalizedName))
+                return BadRequest(new { message = "Category name is required." });
+
+            var tenantScope = existing.TenantId;
+
+            // Check uniqueness if name or handling type changed (same scope as this row — matches DB unique index)
+            if (!string.Equals(NormalizeCategoryName(existing.CategoryName), normalizedName, StringComparison.OrdinalIgnoreCase)
+                || existing.HandlingType != dto.HandlingType)
             {
-                var duplicateExists = await _context.AssetCategories.AnyAsync(c =>
-                    c.Id != id && c.CategoryName == dto.CategoryName && c.HandlingType == dto.HandlingType && !c.IsArchived &&
-                    (IsSuperAdmin() ? c.TenantId == null : (c.TenantId == null || c.TenantId == tenantId)));
-                if (duplicateExists)
-                    return Conflict(new { message = "A category with the same name and handling type already exists." });
+                if (await HasDuplicateActiveCategoryAsync(normalizedName, dto.HandlingType, tenantScope, excludeCategoryId: id))
+                    return Conflict(new { message = "A category with the same name and handling type already exists for this scope." });
             }
 
             // Block HandlingType change if category has linked assets
@@ -258,9 +311,9 @@ namespace DFile.backend.Controllers
 
             var oldValues = JsonSerializer.Serialize(new { existing.CategoryName, HandlingType = existing.HandlingType.ToString(), existing.Description, existing.SalvagePercentage });
 
-            existing.CategoryName = dto.CategoryName;
+            existing.CategoryName = normalizedName;
             existing.HandlingType = dto.HandlingType;
-            existing.Description = dto.Description;
+            existing.Description = dto.Description?.Trim() ?? string.Empty;
             existing.SalvagePercentage = dto.SalvagePercentage;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
@@ -274,7 +327,7 @@ namespace DFile.backend.Controllers
                 UserId = userId,
                 TenantId = tenantId,
                 OldValues = oldValues,
-                NewValues = JsonSerializer.Serialize(new { dto.CategoryName, HandlingType = dto.HandlingType.ToString(), dto.Description, dto.SalvagePercentage }),
+                NewValues = JsonSerializer.Serialize(new { CategoryName = normalizedName, HandlingType = dto.HandlingType.ToString(), dto.Description, dto.SalvagePercentage }),
             });
 
             try
@@ -284,6 +337,10 @@ namespace DFile.backend.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 return Conflict(new { message = "This record was modified by another user. Please refresh and try again." });
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                return Conflict(new { message = "A category with the same name and handling type already exists for this scope." });
             }
 
             return NoContent();
@@ -339,11 +396,8 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin() && tenantId.HasValue && category.TenantId != null && category.TenantId != tenantId)
                 return NotFound();
 
-            // Check that restoring won't create a duplicate (Name + HandlingType)
-            var duplicateExists = await _context.AssetCategories.AnyAsync(c =>
-                c.Id != id && c.CategoryName == category.CategoryName && c.HandlingType == category.HandlingType && !c.IsArchived &&
-                (IsSuperAdmin() ? c.TenantId == null : (c.TenantId == null || c.TenantId == tenantId)));
-            if (duplicateExists)
+            var restoreScope = category.TenantId;
+            if (await HasDuplicateActiveCategoryAsync(NormalizeCategoryName(category.CategoryName), category.HandlingType, restoreScope, excludeCategoryId: id))
                 return Conflict(new { message = "Cannot restore: an active category with the same name and handling type already exists." });
 
             category.IsArchived = false;
@@ -361,7 +415,15 @@ namespace DFile.backend.Controllers
                 NewValues = JsonSerializer.Serialize(new { category.CategoryName, IsArchived = false }),
             });
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                return Conflict(new { message = "Cannot restore: an active category with the same name and handling type already exists." });
+            }
+
             return NoContent();
         }
     }

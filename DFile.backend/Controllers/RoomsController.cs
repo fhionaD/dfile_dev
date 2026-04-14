@@ -59,12 +59,20 @@ namespace DFile.backend.Controllers
             {
                 search = search.ToLower();
                 query = query.Where(r =>
-                    r.Name.ToLower().Contains(search) ||
-                    r.RoomCode.ToLower().Contains(search) ||
+                    (r.Name != null && r.Name.ToLower().Contains(search)) ||
+                    (r.RoomCode != null && r.RoomCode.ToLower().Contains(search)) ||
                     (r.Floor != null && r.Floor.ToLower().Contains(search)));
             }
 
             var rooms = await query.ToListAsync();
+
+            var roomIds = rooms.Select(r => r.Id).ToList();
+            var allocationCounts = roomIds.Count == 0
+                ? new Dictionary<string, int>()
+                : await _context.AssetAllocations.AsNoTracking()
+                    .Where(aa => roomIds.Contains(aa.RoomId) && aa.Status == "Active")
+                    .GroupBy(aa => aa.RoomId)
+                    .ToDictionaryAsync(g => g.Key, g => g.Count());
 
             var result = rooms.Select(r => new RoomResponseDto
             {
@@ -82,7 +90,8 @@ namespace DFile.backend.Controllers
                 UpdatedByName = r.UpdatedByUser != null ? r.UpdatedByUser.FirstName + " " + r.UpdatedByUser.LastName : null,
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt,
-                RowVersion = r.RowVersion
+                RowVersion = r.RowVersion,
+                ActiveAllocationCount = allocationCounts.GetValueOrDefault(r.Id)
             }).ToList();
 
             return Ok(result);
@@ -103,6 +112,9 @@ namespace DFile.backend.Controllers
             if (room == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
 
+            var activeAllocationCount = await _context.AssetAllocations.AsNoTracking()
+                .CountAsync(aa => aa.RoomId == room.Id && aa.Status == "Active");
+
             return Ok(new RoomResponseDto
             {
                 Id = room.Id,
@@ -119,7 +131,8 @@ namespace DFile.backend.Controllers
                 UpdatedByName = room.UpdatedByUser != null ? room.UpdatedByUser.FirstName + " " + room.UpdatedByUser.LastName : null,
                 CreatedAt = room.CreatedAt,
                 UpdatedAt = room.UpdatedAt,
-                RowVersion = room.RowVersion
+                RowVersion = room.RowVersion,
+                ActiveAllocationCount = activeAllocationCount
             });
         }
 
@@ -206,7 +219,8 @@ namespace DFile.backend.Controllers
                 TenantId = room.TenantId,
                 CreatedAt = room.CreatedAt,
                 UpdatedAt = room.UpdatedAt,
-                RowVersion = room.RowVersion
+                RowVersion = room.RowVersion,
+                ActiveAllocationCount = 0
             });
         }
 
@@ -276,6 +290,16 @@ namespace DFile.backend.Controllers
 
             if (room == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && room.TenantId != tenantId) return NotFound();
+
+            var hasActiveAllocations = await _context.AssetAllocations.AsNoTracking()
+                .AnyAsync(aa => aa.RoomId == id && aa.Status == "Active");
+            if (hasActiveAllocations)
+            {
+                return Conflict(new
+                {
+                    message = "This room unit has one or more assets currently allocated to it. Deallocate or move those assets before archiving this room.",
+                });
+            }
 
             room.IsArchived = true;
             room.ArchivedAt = DateTime.UtcNow;

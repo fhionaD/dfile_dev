@@ -104,7 +104,6 @@ export default function FinanceAssetsPage() {
                         notes: asset.notes || null,
                         documents: asset.documents || null,
                         rowVersion: asset.rowVersion || null,
-                        tagNumber: asset.tagNumber || asset.assetCode || asset.id || `AST-${Date.now()}`,
                     };
                     if (isEditMode && selectedAsset) {
                         await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as never });

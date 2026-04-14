@@ -283,6 +283,29 @@ namespace DFile.backend.Controllers
             if (sub == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && sub.TenantId != tenantId) return NotFound();
 
+            var roomsUsingSub = await _context.Rooms.AsNoTracking()
+                .Where(r => r.SubCategoryId == id && !r.IsArchived)
+                .AnyAsync();
+            if (roomsUsingSub)
+            {
+                return Conflict(new
+                {
+                    message = "This sub-category is assigned to one or more room units. Update or archive those units before archiving this sub-category.",
+                });
+            }
+
+            var hasActiveAllocations = await _context.AssetAllocations
+                .AsNoTracking()
+                .Where(a => a.Status == "Active")
+                .AnyAsync(a =>
+                    _context.Rooms.AsNoTracking().Any(r =>
+                        r.Id == a.RoomId && r.SubCategoryId == id && !r.IsArchived));
+
+            if (hasActiveAllocations)
+            {
+                return BadRequest(new { message = "Cannot archive sub-category while allocated assets are assigned to a room using it." });
+            }
+
             sub.IsArchived = true;
             sub.UpdatedAt = DateTime.UtcNow;
             sub.UpdatedBy = userId;

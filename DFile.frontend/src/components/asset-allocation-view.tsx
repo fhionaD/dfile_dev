@@ -14,6 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Asset, Room } from "@/types/asset";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function includesIgnoreCase(haystack: string | undefined | null, needle: string): boolean {
+    const h = (haystack ?? "").toLowerCase();
+    const n = needle.toLowerCase();
+    return n.length === 0 || h.includes(n);
+}
+
 function roomCategoryLabel(room: Room) {
     if (!room.categoryName) return null;
     return room.subCategoryName ? `${room.categoryName} — ${room.subCategoryName}` : room.categoryName;
@@ -55,7 +61,7 @@ function AssetCard({ asset, selected, onClick }: { asset: Asset; selected: boole
             <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{asset.desc}</p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{asset.tagNumber || asset.assetCode}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{asset.assetCode || asset.id}</p>
                     {asset.categoryName && <p className="text-xs text-muted-foreground truncate">{asset.categoryName}</p>}
                 </div>
                 {selected && <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
@@ -82,11 +88,11 @@ function RoomCard({ room, selected, assetCount, onClick, disabled }: {
             <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-foreground">{room.name}</span>
-                        <span className="text-xs font-mono text-muted-foreground">{room.unitId}</span>
+                        <span className="text-sm font-semibold text-foreground">{room.name ?? "—"}</span>
+                        <span className="text-xs font-mono text-muted-foreground">{room.unitId ?? "—"}</span>
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        <span>Floor {room.floor}</span>
+                        <span>Floor {room.floor ?? "—"}</span>
                         {catLabel && (
                             <><span className="text-muted-foreground/30">·</span><span className="truncate max-w-[140px]">{catLabel}</span></>
                         )}
@@ -152,12 +158,15 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
     const filteredAssets = useMemo(() => {
         let list = availableAssets;
         if (assetSearch) {
-            const q = assetSearch.toLowerCase();
-            list = list.filter(a =>
-                a.desc.toLowerCase().includes(q) ||
-                a.tagNumber?.toLowerCase().includes(q) ||
-                a.assetCode?.toLowerCase().includes(q)
-            );
+            const q = assetSearch.trim();
+            if (q) {
+                list = list.filter(
+                    (a) =>
+                        includesIgnoreCase(a.desc, q) ||
+                        includesIgnoreCase(a.assetCode, q) ||
+                        includesIgnoreCase(a.serialNumber, q),
+                );
+            }
         }
         if (assetCatFilter !== "all") list = list.filter(a => a.categoryName === assetCatFilter);
         return list;
@@ -166,8 +175,17 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
     const filteredRooms = useMemo(() => {
         let list = activeRooms;
         if (roomSearch) {
-            const q = roomSearch.toLowerCase();
-            list = list.filter(r => r.name.toLowerCase().includes(q) || r.unitId.toLowerCase().includes(q));
+            const q = roomSearch.trim();
+            if (q) {
+                list = list.filter(
+                    (r) =>
+                        includesIgnoreCase(r.name, q) ||
+                        includesIgnoreCase(r.unitId, q) ||
+                        includesIgnoreCase(r.floor, q) ||
+                        includesIgnoreCase(r.categoryName, q) ||
+                        includesIgnoreCase(r.subCategoryName, q),
+                );
+            }
         }
         if (roomFloorFilter !== "all") list = list.filter(r => r.floor === roomFloorFilter);
         return list;
@@ -249,7 +267,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search by name or tag..."
+                                    placeholder="Search by name or asset code..."
                                     value={assetSearch}
                                     onChange={e => setAssetSearch(e.target.value)}
                                     className="pl-8 h-8 text-sm"
@@ -347,7 +365,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                     <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-0.5">
                                         <p className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Asset</p>
                                         <p className="text-sm font-semibold text-foreground truncate">{selectedAsset.desc}</p>
-                                        <p className="text-xs text-muted-foreground font-mono">{selectedAsset.tagNumber || selectedAsset.assetCode}</p>
+                                        <p className="text-xs text-muted-foreground font-mono">{selectedAsset.assetCode || selectedAsset.id}</p>
                                         {selectedAsset.categoryName && (
                                             <p className="text-xs text-muted-foreground">{selectedAsset.categoryName}</p>
                                         )}
@@ -419,7 +437,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Asset</th>
-                                            <th className="text-left p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tag / Code</th>
+                                            <th className="text-left p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Asset code</th>
                                             <th className="text-left p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Category</th>
                                             <th className="text-left p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Room Unit</th>
                                             <th className="text-center p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Action</th>
@@ -432,7 +450,7 @@ export function AssetAllocationView({ assets, rooms, onAllocate, onDeallocate, i
                                                     <p className="truncate">{asset.desc}</p>
                                                 </td>
                                                 <td className="p-3 text-xs font-mono text-muted-foreground">
-                                                    {asset.tagNumber || asset.assetCode || "—"}
+                                                    {asset.assetCode || asset.id || "—"}
                                                 </td>
                                                 <td className="p-3 text-xs text-muted-foreground max-w-[150px]">
                                                     <span className="truncate block">{asset.categoryName || "—"}</span>

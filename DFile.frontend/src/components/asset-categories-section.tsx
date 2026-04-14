@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +34,7 @@ const handlingTextColors: Record<number, string> = {
 
 /**
  * Shared Asset Categories UI (toolbar + table + modals).
- * Used by Registration & Tagging → Asset Categories tab and /tenant/asset-categories.
+ * Used by Registration & Tagging → Asset Categories tab (URL: /tenant/inventory?tab=categories).
  */
 export function AssetCategoriesSection() {
     const [showArchived, setShowArchived] = useState(false);
@@ -49,6 +49,7 @@ export function AssetCategoriesSection() {
     const [searchQuery, setSearchQuery] = useState("");
     const [handlingTypeFilter, setHandlingTypeFilter] = useState("All");
     const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+    const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [form, setForm] = useState({ categoryName: "", description: "", handlingType: 0, salvagePercentage: "10" });
     const [pageIndex, setPageIndex] = useState(0);
@@ -58,15 +59,28 @@ export function AssetCategoriesSection() {
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-    useEffect(() => {
+    const handleSearchQueryChange = useCallback((v: string) => {
         setPageIndex(0);
-    }, [searchQuery, handlingTypeFilter, showArchived]);
+        setSearchQuery(v);
+    }, []);
+
+    const handleHandlingTypeFilterChange = useCallback((v: string) => {
+        setPageIndex(0);
+        setHandlingTypeFilter(v);
+    }, []);
+
+    const toggleShowArchived = useCallback(() => {
+        setPageIndex(0);
+        setShowArchived((prev) => !prev);
+    }, []);
 
     const filtered = useMemo(() => {
         return categories.filter((c) => {
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                if (!c.categoryName.toLowerCase().includes(q) && !c.description.toLowerCase().includes(q)) return false;
+                const name = (c.categoryName ?? "").toLowerCase();
+                const desc = (c.description ?? "").toLowerCase();
+                if (!name.includes(q) && !desc.includes(q)) return false;
             }
             if (handlingTypeFilter !== "All" && (handlingLabels[c.handlingType] ?? "Unknown") !== handlingTypeFilter) return false;
             return true;
@@ -117,11 +131,11 @@ export function AssetCategoriesSection() {
                             <>
                                 <DataTableSearch
                                     value={searchQuery}
-                                    onChange={setSearchQuery}
+                                    onChange={handleSearchQueryChange}
                                     placeholder="Search categories..."
                                     ariaLabel="Search categories"
                                 />
-                                <Select value={handlingTypeFilter} onValueChange={setHandlingTypeFilter}>
+                                <Select value={handlingTypeFilter} onValueChange={handleHandlingTypeFilterChange}>
                                     <SelectTrigger className={dataTableFilterTriggerClass}>
                                         <Filter className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                                         <SelectValue placeholder="Handling" />
@@ -143,7 +157,7 @@ export function AssetCategoriesSection() {
                                 </DataTablePrimaryButton>
                                 <ArchiveViewToggleButton
                                     showArchived={showArchived}
-                                    onToggle={() => setShowArchived(!showArchived)}
+                                    onToggle={toggleShowArchived}
                                     activeCount={categoriesActive.length}
                                     archivedCount={categoriesArchived.length}
                                 />
@@ -239,7 +253,7 @@ export function AssetCategoriesSection() {
                                                                     title="Restore"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        void restoreMutation.mutate(c.id);
+                                                                        setRestoreTarget(c.id);
                                                                     }}
                                                                 >
                                                                     <RotateCcw className="h-4 w-4" />
@@ -352,6 +366,26 @@ export function AssetCategoriesSection() {
                     }
                 }}
                 isLoading={archiveMutation.isPending}
+            />
+
+            <ConfirmDialog
+                open={restoreTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRestoreTarget(null);
+                }}
+                title="Restore Category"
+                description="Are you sure you want to restore this category? It will become active again."
+                confirmLabel="Restore"
+                onConfirm={async () => {
+                    if (!restoreTarget) return;
+                    try {
+                        await restoreMutation.mutateAsync(restoreTarget);
+                        setRestoreTarget(null);
+                    } catch {
+                        setRestoreTarget(null);
+                    }
+                }}
+                isLoading={restoreMutation.isPending}
             />
 
             <CategoryDetailsModal open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen} category={selectedCategory} onEdit={openEditModal} />

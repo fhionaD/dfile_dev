@@ -229,7 +229,7 @@ namespace DFile.backend.Controllers
             AssetId = a.AssetId,
             AssetName = asset?.AssetName ?? string.Empty,
             AssetCode = asset?.AssetCode,
-            TagNumber = asset?.TagNumber,
+            TagNumber = null,
             RoomId = a.RoomId,
             RoomCode = room?.RoomCode ?? string.Empty,
             RoomName = room?.Name ?? string.Empty,

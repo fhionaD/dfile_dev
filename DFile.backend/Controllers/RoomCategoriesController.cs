@@ -156,8 +156,27 @@ namespace DFile.backend.Controllers
                 baseQuery = baseQuery.Where(c => c.TenantId == tenantId);
 
             var active = await baseQuery.CountAsync(c => !c.IsArchived);
-            var archived = await baseQuery.CountAsync(c => c.IsArchived);
-            return Ok(new { active, archived });
+            var archivedRoomCategories = await baseQuery.CountAsync(c => c.IsArchived);
+
+            // Archived sub-categories under still-active parents count as archive-tab items but not parent rows.
+            var subArchivedQuery = _context.RoomSubCategories.AsQueryable().Where(s => s.IsArchived);
+            if (!IsSuperAdmin() && tenantId.HasValue)
+                subArchivedQuery = subArchivedQuery.Where(s => s.TenantId == tenantId);
+
+            var archivedStandaloneSubCategories = await subArchivedQuery
+                .Where(s => _context.RoomCategories.Any(c => c.Id == s.RoomCategoryId && !c.IsArchived
+                    && (IsSuperAdmin() || !tenantId.HasValue || c.TenantId == tenantId)))
+                .CountAsync();
+
+            var archived = archivedRoomCategories + archivedStandaloneSubCategories;
+
+            return Ok(new
+            {
+                active,
+                archived,
+                archivedRoomCategories,
+                archivedStandaloneSubCategories,
+            });
         }
 
         [HttpGet("{id}")]
@@ -342,7 +361,7 @@ namespace DFile.backend.Controllers
 
         [HttpPatch("{id}/archive")]
         [RequirePermission("RoomCategories", "CanArchive")]
-        public async Task<IActionResult> ArchiveRoomCategory(string id)
+        public async Task<IActionResult> ArchiveRoomCategory(string id, CancellationToken cancellationToken)
         {
             const string notFoundMessage = "Room category not found.";
             const string conflictTitle = "Unable to Archive Category";
@@ -401,92 +420,96 @@ namespace DFile.backend.Controllers
                 var now = DateTime.UtcNow;
                 var userIdStr = userId?.ToString();
 
-                await using var transaction = await _context.Database.BeginTransactionAsync();
-
-                try
+                // SqlServerRetryingExecutionStrategy (EnableRetryOnFailure) requires user transactions to run inside CreateExecutionStrategy.
+                return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async (ct) =>
                 {
-                    var activeSubs = await ActiveSubCategoriesForCategory(_context, category, tenantId, IsSuperAdmin())
-                        .ToListAsync();
+                    await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
-                    foreach (var sub in activeSubs)
+                    try
                     {
-                        sub.IsArchived = true;
-                        sub.UpdatedAt = now;
-                        sub.UpdatedBy = userId;
+                        var activeSubs = await ActiveSubCategoriesForCategory(_context, category, tenantId, IsSuperAdmin())
+                            .ToListAsync(ct);
+
+                        foreach (var sub in activeSubs)
+                        {
+                            sub.IsArchived = true;
+                            sub.UpdatedAt = now;
+                            sub.UpdatedBy = userId;
+
+                            _auditService.Add(HttpContext, new AuditLog
+                            {
+                                Action = "Archive",
+                                EntityType = "RoomSubCategory",
+                                EntityId = sub.Id,
+                                Module = "Configuration",
+                                UserId = userId,
+                                TenantId = tenantId,
+                                NewValues = JsonSerializer.Serialize(new { sub.Name, IsArchived = true, Reason = "Cascade from category archive" }),
+                            });
+                        }
+
+                        category.IsArchived = true;
+                        category.ArchivedAt = now;
+                        category.ArchivedBy = userIdStr;
+                        category.UpdatedAt = now;
+                        category.UpdatedBy = userId;
 
                         _auditService.Add(HttpContext, new AuditLog
                         {
                             Action = "Archive",
-                            EntityType = "RoomSubCategory",
-                            EntityId = sub.Id,
+                            EntityType = "RoomCategory",
+                            EntityId = id,
                             Module = "Configuration",
                             UserId = userId,
                             TenantId = tenantId,
-                            NewValues = JsonSerializer.Serialize(new { sub.Name, IsArchived = true, Reason = "Cascade from category archive" }),
+                            NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = true, CascadedSubCategories = activeSubs.Count }),
                         });
-                    }
 
-                    category.IsArchived = true;
-                    category.ArchivedAt = now;
-                    category.ArchivedBy = userIdStr;
-                    category.UpdatedAt = now;
-                    category.UpdatedBy = userId;
+                        await _context.SaveChangesAsync(ct);
+                        await transaction.CommitAsync(ct);
 
-                    _auditService.Add(HttpContext, new AuditLog
-                    {
-                        Action = "Archive",
-                        EntityType = "RoomCategory",
-                        EntityId = id,
-                        Module = "Configuration",
-                        UserId = userId,
-                        TenantId = tenantId,
-                        NewValues = JsonSerializer.Serialize(new { category.Name, IsArchived = true, CascadedSubCategories = activeSubs.Count }),
-                    });
-
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    return Ok(new
-                    {
-                        message = "Room category archived successfully.",
-                        cascadedRoomCount = 0,
-                        cascadedSubCategoryCount = activeSubs.Count,
-                    });
-                }
-                catch (Exception inner)
-                {
-                    try
-                    {
-                        await transaction.RollbackAsync();
-                    }
-                    catch (Exception rollbackEx)
-                    {
-                        _logger.LogWarning(rollbackEx, "Rollback failed after archive error for category {CategoryId}", id);
-                    }
-
-                    if (inner is DbUpdateException dbEx)
-                    {
-                        _logger.LogWarning(dbEx, "DbUpdateException archiving room category {CategoryId}", id);
-                        return Conflict(new
+                        return (IActionResult)Ok(new
                         {
-                            title = conflictTitle,
-                            message = "Could not archive this room category. Try again or contact support if the problem persists.",
+                            message = "Room category archived successfully.",
+                            cascadedRoomCount = 0,
+                            cascadedSubCategoryCount = activeSubs.Count,
                         });
                     }
-
-                    if (inner is DbUpdateConcurrencyException cex)
+                    catch (Exception inner)
                     {
-                        _logger.LogWarning(cex, "Concurrency conflict archiving room category {CategoryId}", id);
-                        return Conflict(new
+                        try
                         {
-                            title = conflictTitle,
-                            message = "This category was modified by another user. Please refresh and try again.",
-                        });
-                    }
+                            await transaction.RollbackAsync(ct);
+                        }
+                        catch (Exception rollbackEx)
+                        {
+                            _logger.LogWarning(rollbackEx, "Rollback failed after archive error for category {CategoryId}", id);
+                        }
 
-                    _logger.LogError(inner, "Unexpected error in archive transaction for room category {CategoryId}", id);
-                    return StatusCode(StatusCodes.Status500InternalServerError, new { message = unexpectedMessage });
-                }
+                        if (inner is DbUpdateException dbEx)
+                        {
+                            _logger.LogWarning(dbEx, "DbUpdateException archiving room category {CategoryId}", id);
+                            return (IActionResult)Conflict(new
+                            {
+                                title = conflictTitle,
+                                message = "Could not archive this room category. Try again or contact support if the problem persists.",
+                            });
+                        }
+
+                        if (inner is DbUpdateConcurrencyException cex)
+                        {
+                            _logger.LogWarning(cex, "Concurrency conflict archiving room category {CategoryId}", id);
+                            return (IActionResult)Conflict(new
+                            {
+                                title = conflictTitle,
+                                message = "This category was modified by another user. Please refresh and try again.",
+                            });
+                        }
+
+                        _logger.LogError(inner, "Unexpected error in archive transaction for room category {CategoryId}", id);
+                        return (IActionResult)StatusCode(StatusCodes.Status500InternalServerError, new { message = unexpectedMessage });
+                    }
+                }, cancellationToken);
             }
             catch (Exception ex)
             {

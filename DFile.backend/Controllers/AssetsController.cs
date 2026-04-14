@@ -1,4 +1,5 @@
 using DFile.backend.Authorization;
+using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Mapping;
@@ -20,6 +21,8 @@ namespace DFile.backend.Controllers
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
         private readonly PermissionService _permissionService;
+        private readonly IMaintenanceReplacementRegistrationService _replacementRegistrationService;
+        private readonly INotificationService _notificationService;
 
         private static readonly Dictionary<LifecycleStatus, string> StatusLabels = new()
         {
@@ -42,17 +45,32 @@ namespace DFile.backend.Controllers
             { AssetCondition.Unknown, "Unknown" }
         };
 
-        public AssetsController(AppDbContext context, IAuditService auditService, PermissionService permissionService)
+        public AssetsController(
+            AppDbContext context,
+            IAuditService auditService,
+            PermissionService permissionService,
+            IMaintenanceReplacementRegistrationService replacementRegistrationService,
+            INotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
             _permissionService = permissionService;
+            _replacementRegistrationService = replacementRegistrationService;
+            _notificationService = notificationService;
         }
 
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+        }
+
+        private async Task<bool> CanRegisterFinanceReplacementAsync(int? userId, int? tenantId)
+        {
+            if (IsSuperAdmin()) return true;
+            if (User.IsInRole(UserRoleConstants.Finance)) return true;
+            if (!userId.HasValue || !tenantId.HasValue) return false;
+            return await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanApprove");
         }
 
         private static string? NormalizeSerial(string? value)
@@ -92,7 +110,9 @@ namespace DFile.backend.Controllers
             query = query.Where(a => a.IsArchived == showArchived);
 
             if (!showArchived && !includeDisposed)
-                query = query.Where(a => a.LifecycleStatus != LifecycleStatus.Disposed);
+                query = query.Where(a =>
+                    a.LifecycleStatus != LifecycleStatus.Disposed &&
+                    a.LifecycleStatus != LifecycleStatus.ForReplacement);
 
             if (page.HasValue)
             {
@@ -101,6 +121,7 @@ namespace DFile.backend.Controllers
                     var term = q.Trim();
                     query = query.Where(a =>
                         a.AssetName.Contains(term) ||
+                        a.AssetCode.Contains(term) ||
                         (a.TagNumber != null && a.TagNumber.Contains(term)) ||
                         a.Id.Contains(term) ||
                         (a.Model != null && a.Model.Contains(term)) ||
@@ -191,7 +212,10 @@ namespace DFile.backend.Controllers
                     return StatusCode(403, new { message = "You do not have permission to view assets." });
             }
 
-            var query = _context.Assets.Where(a => !a.IsArchived && a.LifecycleStatus != LifecycleStatus.Disposed);
+            var query = _context.Assets.Where(a =>
+                !a.IsArchived &&
+                a.LifecycleStatus != LifecycleStatus.Disposed &&
+                a.LifecycleStatus != LifecycleStatus.ForReplacement);
             if (!IsSuperAdmin() && tenantId.HasValue)
             {
                 query = query.Where(a => a.TenantId == tenantId);
@@ -293,12 +317,45 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
-        [RequirePermission("Assets", "CanCreate")]
+        [RequirePermissionOrRoles("Assets", "CanCreate", UserRoleConstants.Finance)]
         public async Task<ActionResult<AssetResponseDto>> PostAsset(CreateAssetDto dto)
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
             var effectiveTenantId = IsSuperAdmin() ? null : tenantId;
+
+            var replacementRecordId = dto.ReplacementMaintenanceRecordId?.Trim();
+            if (!string.IsNullOrEmpty(replacementRecordId))
+            {
+                if (!await CanRegisterFinanceReplacementAsync(userId, tenantId))
+                    return StatusCode(403, new { message = "You do not have permission to register a replacement asset for maintenance." });
+
+                var outcome = await _replacementRegistrationService.RegisterReplacementAssetAsync(
+                    dto,
+                    replacementRecordId,
+                    tenantId,
+                    userId,
+                    IsSuperAdmin());
+
+                if (!outcome.Success)
+                    return StatusCode(outcome.StatusCode, new { message = outcome.ErrorMessage });
+
+                var ra = outcome.NewAsset!;
+                var rcat = outcome.Category!;
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Create",
+                    EntityType = "Asset",
+                    EntityId = ra.Id,
+                    Module = "Asset Management",
+                    UserId = userId,
+                    TenantId = effectiveTenantId,
+                    Description = $"Replacement asset registered: {ra.AssetName} ({ra.AssetCode}) via maintenance {replacementRecordId}.",
+                    NewValues = JsonSerializer.Serialize(new { ra.AssetName, ra.AssetCode, ra.CategoryId, Status = StatusLabels.GetValueOrDefault(ra.LifecycleStatus, "Unknown") }),
+                });
+
+                return CreatedAtAction("GetAsset", new { id = ra.Id }, AssetResponseMapper.ToDto(ra, rcat, new Dictionary<int, string>(), null));
+            }
 
             var category = await _context.AssetCategories.FindAsync(dto.CategoryId);
             if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
@@ -320,8 +377,6 @@ namespace DFile.backend.Controllers
                 }
             }
 
-            var generatedTag = await RecordCodeGenerator.GenerateTagNumberAsync(_context);
-
             var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
                 ? dto.SalvagePercentage.Value
                 : category.SalvagePercentage;
@@ -331,7 +386,7 @@ namespace DFile.backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                TagNumber = generatedTag,
+                TagNumber = null,
                 AssetName = dto.AssetName,
                 CategoryId = dto.CategoryId,
                 LifecycleStatus = LifecycleStatus.Registered,
@@ -378,8 +433,11 @@ namespace DFile.backend.Controllers
                 UserId = userId,
                 TenantId = effectiveTenantId,
                 Description = $"Asset registered: {asset.AssetName} ({asset.AssetCode}).",
-                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.TagNumber, asset.CategoryId, Status = StatusLabels.GetValueOrDefault(asset.LifecycleStatus, "Unknown") }),
+                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, asset.CategoryId, Status = StatusLabels.GetValueOrDefault(asset.LifecycleStatus, "Unknown") }),
             });
+
+            if (User.IsInRole(UserRoleConstants.Finance))
+                await _notificationService.NotifyAdminFinanceRegisteredNewAssetAsync(asset);
 
             try
             {
@@ -435,7 +493,7 @@ namespace DFile.backend.Controllers
                 _context.Entry(existing).Property(p => p.RowVersion).OriginalValue = dto.RowVersion;
             }
 
-            var oldValues = JsonSerializer.Serialize(new { existing.AssetName, existing.TagNumber, existing.CategoryId, Status = StatusLabels.GetValueOrDefault(existing.LifecycleStatus, "Unknown") });
+            var oldValues = JsonSerializer.Serialize(new { existing.AssetName, existing.AssetCode, existing.CategoryId, Status = StatusLabels.GetValueOrDefault(existing.LifecycleStatus, "Unknown") });
 
             // Operational fields
             existing.AssetName = dto.AssetName;
@@ -486,7 +544,7 @@ namespace DFile.backend.Controllers
                 UserId = userId,
                 TenantId = tenantId,
                 OldValues = oldValues,
-                NewValues = JsonSerializer.Serialize(new { dto.AssetName, existing.TagNumber, dto.CategoryId, Status = StatusLabels.GetValueOrDefault(dto.LifecycleStatus, "Unknown") }),
+                NewValues = JsonSerializer.Serialize(new { dto.AssetName, existing.AssetCode, dto.CategoryId, Status = StatusLabels.GetValueOrDefault(dto.LifecycleStatus, "Unknown") }),
             });
 
             try
@@ -577,7 +635,7 @@ namespace DFile.backend.Controllers
                 Module = "Asset Management",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.TagNumber, IsArchived = true }),
+                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, IsArchived = true }),
             });
 
             await _context.SaveChangesAsync();
@@ -608,7 +666,7 @@ namespace DFile.backend.Controllers
                 Module = "Asset Management",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.TagNumber, IsArchived = false }),
+                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, IsArchived = false }),
             });
 
             await _context.SaveChangesAsync();
@@ -634,7 +692,7 @@ namespace DFile.backend.Controllers
                 Module = "Asset Management",
                 UserId = userId,
                 TenantId = tenantId,
-                OldValues = JsonSerializer.Serialize(new { asset.AssetName, asset.TagNumber, asset.CategoryId }),
+                OldValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, asset.CategoryId }),
             });
 
             _context.Assets.Remove(asset);

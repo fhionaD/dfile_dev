@@ -16,6 +16,39 @@ function Get-Token($email, $password) {
 
 function Auth($t) { return @{ Authorization = "Bearer $t" } }
 
+function Normalize-RestArray($Raw) {
+    if ($null -eq $Raw) { return @() }
+    if ($Raw -is [System.Array]) { return @($Raw) }
+    return @($Raw)
+}
+
+function Get-AssetsPaged([hashtable]$headers) {
+    $p = Invoke-RestMethod -Uri "$base/api/assets?page=1&pageSize=200" -Headers $headers
+    if ($null -ne $p.data) { return @(Normalize-RestArray $p.data) }
+    return @(Normalize-RestArray $p)
+}
+
+function Get-FirstAssetCategoryId([hashtable]$headers) {
+    $cats = Invoke-RestMethod -Uri "$base/api/AssetCategories" -Headers $headers
+    $row = $cats | Select-Object -First 1
+    if (-not $row) { return $null }
+    if ($row.id) { return [string]$row.id }
+    if ($row.Id) { return [string]$row.Id }
+    return $null
+}
+
+function Get-UnallocatedAssetIds([hashtable]$headersMaint) {
+    # Prefer API that returns only unallocated assets (avoids missing rows beyond GET /api/assets first page).
+    $available = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/assets/available-for-allocation" -Headers $headersMaint))
+    $ids = @()
+    foreach ($ast in $available) {
+        if ($ast.id) { $ids += [string]$ast.id }
+        elseif ($ast.Id) { $ids += [string]$ast.Id }
+        if ($ids.Count -ge 2) { break }
+    }
+    return $ids
+}
+
 function Invoke-Api {
     param(
         [string]$Method,
@@ -82,24 +115,98 @@ $f = $tok["finance"]
 $a = $tok["admin"]
 $s = $tok["superadmin"]
 
-# --- Assets (use [0] for most tests; [1] for replacement flow so we do not dispose the primary asset) ---
-$assets = Invoke-RestMethod -Uri "$base/api/assets" -Headers (Auth $m)
-if ($assets.Count -lt 2) { throw "Need at least 2 assets for paranoid verify (replacement disposes one)." }
-$aid = $assets[0].id
-$aidNR = $assets[1].id
+# Ensure two assets exist with no active allocation (maintenance POST requires active allocation; we create it next).
+$unallocIds = @(Get-UnallocatedAssetIds (Auth $m))
+while ($unallocIds.Count -lt 2) {
+    $cid = Get-FirstAssetCategoryId (Auth $a)
+    if ([string]::IsNullOrWhiteSpace($cid)) { throw "Need at least one asset category in the database to create verify assets." }
+    $sn = "PND-SEED-" + [guid]::NewGuid().ToString("N")
+    $assetPayload = @{
+        assetName         = "Paranoid DB verify asset"
+        categoryId        = $cid
+        acquisitionCost   = 100
+        purchasePrice     = 100
+        usefulLifeYears   = 5
+        currentCondition  = 0
+        lifecycleStatus   = 0
+        serialNumber      = $sn
+    } | ConvertTo-Json -Depth 5
+    try {
+        $null = Invoke-RestMethod -Uri "$base/api/assets" -Method POST -Headers (Auth $a) -ContentType "application/json" -Body $assetPayload
+    }
+    catch {
+        $detail = $_.ErrorDetails.Message
+        if (-not $detail -and $_.Exception.Response) {
+            $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $detail = $sr.ReadToEnd()
+        }
+        throw "POST /api/assets (bootstrap) failed: $detail"
+    }
+    $unallocIds = @(Get-UnallocatedAssetIds (Auth $m))
+}
+
+# --- Assets: maintenance POST requires active room allocation per asset (MaintenanceController) ---
+$allocsPick = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/maintenance/allocated-assets" -Headers (Auth $m)))
+$roomAid = $null
+$roomAidNR = $null
+if ($allocsPick.Count -lt 2) {
+    $rooms = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/rooms" -Headers (Auth $a)))
+    if ($rooms.Count -lt 1) { throw "Need at least one room unit (GET /api/rooms) to allocate assets for paranoid verify." }
+    $availableForAlloc = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/assets/available-for-allocation" -Headers (Auth $m)))
+    if ($availableForAlloc.Count -lt 2) { throw "Need at least 2 assets without an active allocation (GET /api/assets/available-for-allocation)." }
+    $needAlloc = @()
+    foreach ($ast in $availableForAlloc) {
+        if ($ast.id) { $needAlloc += [string]$ast.id }
+        elseif ($ast.Id) { $needAlloc += [string]$ast.Id }
+        if ($needAlloc.Count -ge 2) { break }
+    }
+    $actives = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/allocations/active" -Headers (Auth $a)))
+    if ($needAlloc.Count -ge 2) {
+        $roomIds = @($rooms | ForEach-Object { $_.id })
+        for ($i = 0; $i -lt $needAlloc.Count; $i++) {
+            $rid = $roomIds[$i % $roomIds.Count]
+            $bodyAlloc = (@{ assetId = $needAlloc[$i]; roomId = $rid } | ConvertTo-Json -Depth 4)
+            try {
+                Invoke-WebRequest -Uri "$base/api/allocations" -Method POST -Headers (Auth $a) -ContentType "application/json" -Body $bodyAlloc -UseBasicParsing | Out-Null
+            }
+            catch {
+                $code = $null
+                if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+                if ($code -ne 409) { throw "Allocate failed for $($needAlloc[$i]): $($_.Exception.Message)" }
+            }
+        }
+        $allocsPick = @(Normalize-RestArray (Invoke-RestMethod -Uri "$base/api/maintenance/allocated-assets" -Headers (Auth $m)))
+    }
+    if ($allocsPick.Count -lt 2 -and $actives.Count -ge 2) {
+        $allocsPick = @(
+            [pscustomobject]@{ assetId = $actives[0].assetId; roomId = $actives[0].roomId },
+            [pscustomobject]@{ assetId = $actives[1].assetId; roomId = $actives[1].roomId }
+        )
+        Add-Result "maintenance_alloc_pair_from_active_api" $true "maintenance list short; used /api/allocations/active"
+    }
+    if ($allocsPick.Count -lt 2) {
+        throw "Need 2 actively allocated assets (GET /api/maintenance/allocated-assets or /api/allocations/active). Have $($allocsPick.Count)."
+    }
+}
+$aid = $allocsPick[0].assetId
+$roomAid = $allocsPick[0].roomId
+$aidNR = $allocsPick[1].assetId
+$roomAidNR = $allocsPick[1].roomId
 Add-Result "maintenance_GET_assets" ($aid.Length -gt 10) "asset0=$aid asset1=$aidNR"
 
 # --- Schedule generation ---
 function Test-Batch($freq, $start, $end, $expectCount, $expectDates) {
     $sid = [guid]::NewGuid().ToString()
-    $body = (@{
-            assetId            = $aid
-            description        = "paranoid $freq"
-            frequency          = $freq
-            startDate          = $start
-            endDate            = $end
-            scheduleSeriesId   = $sid
-        } | ConvertTo-Json)
+    $batch = @{
+        assetId            = $aid
+        description        = "paranoid $freq"
+        frequency          = $freq
+        startDate          = $start
+        endDate            = $end
+        scheduleSeriesId   = $sid
+    }
+    if ($roomAid) { $batch.roomId = $roomAid }
+    $body = ($batch | ConvertTo-Json)
     $resp = Invoke-RestMethod -Uri "$base/api/maintenance" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body $body
     $ok = ($resp.count -eq $expectCount)
     $dates = @($resp.items | ForEach-Object { ($_.startDate -replace 'T.*', '') })
@@ -127,10 +234,9 @@ $okY = ($y.Body.count -eq 3) -and (($ysorted -join ",") -eq ($yexp -join ","))
 Add-Result "yearly_count_set" $okY "dates=$($y.Dates -join ',')"
 
 # duplicate series
-$dup = Invoke-Api -Method POST -Uri "$base/api/maintenance" -Headers (Auth $m) -Body (@{
-        assetId = $aid; description = "dup"; frequency = "Daily"
-        startDate = "2026-05-01"; endDate = "2026-05-02"; scheduleSeriesId = $d.Sid
-    } | ConvertTo-Json) -ExpectStatus @(409)
+$dupH = @{ assetId = $aid; description = "dup"; frequency = "Daily"; startDate = "2026-05-01"; endDate = "2026-05-02"; scheduleSeriesId = $d.Sid }
+if ($roomAid) { $dupH.roomId = $roomAid }
+$dup = Invoke-Api -Method POST -Uri "$base/api/maintenance" -Headers (Auth $m) -Body ($dupH | ConvertTo-Json) -ExpectStatus @(409)
 Add-Result "duplicate_series_409" $dup.Ok "code=$($dup.Code)"
 
 # --- List: active vs completed (client-side same as UI) ---
@@ -141,7 +247,9 @@ $overlap = @($active | Where-Object { $_.status -eq "Completed" })
 Add-Result "active_history_disjoint" ($overlap.Count -eq 0) "active=$($active.Count) history=$($hist.Count)"
 
 # --- No fix ---
-$b1 = '{"assetId":"'+$aid+'","description":"paranoid nofix","frequency":"One-time","startDate":"2026-04-05","status":"Pending"}'
+$b1obj = @{ assetId = $aid; description = "paranoid nofix"; frequency = "One-time"; startDate = "2026-04-05"; status = "Pending" }
+if ($roomAid) { $b1obj.roomId = $roomAid }
+$b1 = ($b1obj | ConvertTo-Json)
 $r1 = Invoke-RestMethod -Uri "$base/api/maintenance" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body $b1
 $id1 = $r1.items[0].id
 $nfBad = Invoke-Api -Method POST -Uri "$base/api/maintenance/$id1/inspection-workflow" -Headers (Auth $m) -Body '{"outcome":"No Fix Needed"}' -ExpectStatus @(400)
@@ -151,7 +259,9 @@ $chk1 = Invoke-RestMethod -Uri "$base/api/maintenance/$id1" -Headers (Auth $m)
 Add-Result "nofix_completed" ($chk1.status -eq "Completed") "status=$($chk1.status)"
 
 # --- Repairable full chain ---
-$br = '{"assetId":"'+$aid+'","description":"paranoid repair","frequency":"One-time","startDate":"2026-04-05","status":"Pending"}'
+$brobj = @{ assetId = $aid; description = "paranoid repair"; frequency = "One-time"; startDate = "2026-04-05"; status = "Pending" }
+if ($roomAid) { $brobj.roomId = $roomAid }
+$br = ($brobj | ConvertTo-Json)
 $rr = Invoke-RestMethod -Uri "$base/api/maintenance" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body $br
 $rid = $rr.items[0].id
 Invoke-RestMethod -Uri "$base/api/maintenance/$rid/inspection-workflow" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body '{"outcome":"Repairable","detailNotes":"fix","estimatedRepairCost":250}' | Out-Null
@@ -159,9 +269,23 @@ $r2 = Invoke-RestMethod -Uri "$base/api/maintenance/$rid" -Headers (Auth $m)
 $s1 = ($r2.status -eq "Finance Review") -and ($r2.financeWorkflowStatus -eq "Pending Approval")
 Add-Result "repairable_after_inspect" $s1 "st=$($r2.status) fw=$($r2.financeWorkflowStatus)"
 
+$subRep = Invoke-RestMethod -Uri "$base/api/finance/maintenance-requests/$rid/submission-detail" -Headers (Auth $f)
+$subRepKeys = ($subRep | Get-Member -MemberType NoteProperty).Name
+$allowedRep = @("id","requestId","financeRequestType","assetId","assetName","assetCode","categoryName","roomId","roomCode","roomName","repairDescription","estimatedRepairCost","damagedPartImageUrls","notRepairableExplanation")
+$extraRep = $subRepKeys | Where-Object { $allowedRep -notcontains $_ }
+$subRepOk = ($subRep.financeRequestType -eq "Repair") -and ($subRep.repairDescription -match "fix") -and ($null -ne $subRep.estimatedRepairCost) -and ($extraRep.Count -eq 0)
+Add-Result "finance_submission_detail_repair" $subRepOk "extraProps=$($extraRep -join ',')"
+
 $q = Invoke-RestMethod -Uri "$base/api/finance/maintenance-requests" -Headers (Auth $f)
 $inq = @($q | Where-Object { $_.id -eq $rid })
 Add-Result "finance_queue_has_repair" ($inq.Count -ge 1) "queueMatch=$($inq.Count)"
+$queueSample = @($q | Select-Object -First 1)
+if ($queueSample) {
+    $qk = ($queueSample | Get-Member -MemberType NoteProperty).Name
+    $allowedQ = @("id","requestId","assetId","assetName","assetCode","status","financeRequestType","financeWorkflowStatus","diagnosisOutcome","linkedPurchaseOrderId","cost")
+    $extraQ = $qk | Where-Object { $allowedQ -notcontains $_ }
+    Add-Result "finance_queue_row_scoped" ($extraQ.Count -eq 0) "extra=$($extraQ -join ',')"
+}
 
 $maintCannotApprove = Invoke-Api -Method PATCH -Uri "$base/api/finance/maintenance-requests/$rid/approve-repair" -Headers (Auth $m) -ExpectStatus @(403)
 Add-Result "maintenance_forbidden_PATCH_approve_repair" $maintCannotApprove.Ok "code=$($maintCannotApprove.Code)"
@@ -187,18 +311,30 @@ $poBody = '{"assetName":"Paranoid Replacement Asset","category":"IT","purchasePr
 $po = Invoke-RestMethod -Uri "$base/api/purchaseorders" -Method POST -Headers (Auth $a) -ContentType "application/json" -Body $poBody
 $poid = $po.id
 
-$bnr = '{"assetId":"'+$aidNR+'","description":"paranoid NR","frequency":"One-time","startDate":"2026-04-05","status":"Pending"}'
+$bnrobj = @{ assetId = $aidNR; description = "paranoid NR"; frequency = "One-time"; startDate = "2026-04-05"; status = "Pending" }
+if ($roomAidNR) { $bnrobj.roomId = $roomAidNR }
+$bnr = ($bnrobj | ConvertTo-Json)
 $rnr = Invoke-RestMethod -Uri "$base/api/maintenance" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body $bnr
 $nrid = $rnr.items[0].id
-Invoke-RestMethod -Uri "$base/api/maintenance/$nrid/inspection-workflow" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body ('{"outcome":"Not Repairable","detailNotes":"dead","linkedPurchaseOrderId":"'+$poid+'"}') | Out-Null
+Invoke-RestMethod -Uri "$base/api/maintenance/$nrid/inspection-workflow" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body '{"outcome":"Not Repairable","detailNotes":"dead unit per inspection"}' | Out-Null
 $nr = Invoke-RestMethod -Uri "$base/api/maintenance/$nrid" -Headers (Auth $m)
+$poIgnored = [string]::IsNullOrWhiteSpace($nr.linkedPurchaseOrderId)
 Add-Result "not_repairable_finance_review" (($nr.status -eq "Finance Review") -and ($nr.financeRequestType -eq "Replacement")) "st=$($nr.status)"
+Add-Result "not_repairable_po_not_linked_from_inspection" $poIgnored "linkedPO=$($nr.linkedPurchaseOrderId)"
+
+$subNr = Invoke-RestMethod -Uri "$base/api/finance/maintenance-requests/$nrid/submission-detail" -Headers (Auth $f)
+$subKeys = ($subNr | Get-Member -MemberType NoteProperty).Name
+$allowed = @("id","requestId","financeRequestType","assetId","assetName","assetCode","categoryName","roomId","roomCode","roomName","repairDescription","estimatedRepairCost","damagedPartImageUrls","notRepairableExplanation")
+$extra = $subKeys | Where-Object { $allowed -notcontains $_ }
+$subOk = ($subNr.financeRequestType -eq "Replacement") -and ($subNr.notRepairableExplanation -match "dead") -and ($extra.Count -eq 0)
+Add-Result "finance_submission_detail_scoped" $subOk "extraProps=$($extra -join ',')"
 
 Invoke-WebRequest -Uri "$base/api/finance/maintenance-requests/$nrid/approve-replacement" -Method PATCH -Headers (Auth $f) -UseBasicParsing | Out-Null
 $nr2 = Invoke-RestMethod -Uri "$base/api/maintenance/$nrid" -Headers (Auth $m)
 $assetAfter = Invoke-RestMethod -Uri "$base/api/assets/$aidNR" -Headers (Auth $a)
-$disp = ($assetAfter.lifecycleStatus -eq 6) -or ($assetAfter.status -like "*Disposed*")
-Add-Result "approve_replacement_disposes" (($nr2.status -eq "Waiting for Replacement") -and $disp) "assetLife=$($assetAfter.lifecycleStatus) st=$($nr2.status)"
+# Backend sets original asset to ForReplacement (5) on approve; Disposed (6) occurs after replacement registration completes.
+$forReplacement = ($assetAfter.lifecycleStatus -eq 5)
+Add-Result "approve_replacement_marks_original" (($nr2.status -eq "Waiting for Replacement") -and $forReplacement) "assetLife=$($assetAfter.lifecycleStatus) st=$($nr2.status)"
 
 $cats = Invoke-RestMethod -Uri "$base/api/assetcategories" -Headers (Auth $f)
 $catId = @($cats | Where-Object { -not $_.isArchived })[0].id
@@ -217,7 +353,9 @@ $nr3 = Invoke-RestMethod -Uri "$base/api/maintenance/$nrid" -Headers (Auth $m)
 Add-Result "replacement_record_completed" ($nr3.status -eq "Completed") "st=$($nr3.status) fw=$($nr3.financeWorkflowStatus)"
 
 # --- Negative: invalid transition ---
-$bOpen = '{"assetId":"'+$aid+'","description":"bad transition","frequency":"One-time","startDate":"2026-04-05","status":"Open"}'
+$bOpenObj = @{ assetId = $aid; description = "bad transition"; frequency = "One-time"; startDate = "2026-04-05"; status = "Open" }
+if ($roomAid) { $bOpenObj.roomId = $roomAid }
+$bOpen = ($bOpenObj | ConvertTo-Json)
 $ro = Invoke-RestMethod -Uri "$base/api/maintenance" -Method POST -Headers (Auth $m) -ContentType "application/json" -Body $bOpen
 $oid = $ro.items[0].id
 $rec = Invoke-RestMethod -Uri "$base/api/maintenance/$oid" -Headers (Auth $m)

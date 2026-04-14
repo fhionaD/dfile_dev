@@ -5,9 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-    LogOut, Menu, Bell, ChevronRight, Settings,
+    LogOut, Menu, ChevronRight, Settings,
     PanelLeftClose, PanelLeft
 } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
     Dialog,
@@ -407,15 +408,7 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
                                 <TooltipContent side="bottom">Maintenance Settings</TooltipContent>
                             </Tooltip>
 
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 relative text-muted-foreground hover:text-foreground hover:bg-accent"
-                                aria-label="Notifications"
-                            >
-                                <Bell size={18} />
-                                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[var(--amber)] ring-2 ring-background" />
-                            </Button>
+                            <NotificationBell />
 
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>

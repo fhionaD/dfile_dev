@@ -51,5 +51,8 @@ namespace DFile.backend.Models
 
         [ForeignKey("TenantId")]
         public Tenant? Tenant { get; set; }
+
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
     }
 }

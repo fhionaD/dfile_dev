@@ -24,6 +24,7 @@ namespace DFile.backend.DTOs
         [Range(0, double.MaxValue, ErrorMessage = "Acquisition cost must be >= 0.")]
         public decimal AcquisitionCost { get; set; }
 
+        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 year.")]
         public int UsefulLifeYears { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Purchase price must be >= 0.")]
@@ -38,6 +39,9 @@ namespace DFile.backend.DTOs
         public DateTime? WarrantyExpiry { get; set; }
         public string? Notes { get; set; }
         public string? Documents { get; set; }
+
+        /// <summary>When set, completes finance replacement workflow: creates asset, disposes original, completes maintenance record.</summary>
+        public string? ReplacementMaintenanceRecordId { get; set; }
     }
 
     public class UpdateAssetDto
@@ -61,6 +65,7 @@ namespace DFile.backend.DTOs
         [Range(0, double.MaxValue, ErrorMessage = "Acquisition cost must be >= 0.")]
         public decimal AcquisitionCost { get; set; }
 
+        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 year.")]
         public int UsefulLifeYears { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Purchase price must be >= 0.")]

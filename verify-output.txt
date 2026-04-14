@@ -1,0 +1,56 @@
+﻿
+=== HEALTH ===
+health 200
+=== LOGIN ===
+token sa : OK
+token m : OK
+token a : OK
+token f : OK
+=== ME ===
+me maint role=Maintenance Manager tenant=1
+=== ROOM COUNTS (admin) ===
+{"active":2,"archived":0,"archivedRoomCategories":0,"archivedStandaloneSubCategories":0}
+PASS archived sum
+=== ROOM CATEGORIES LIST (admin, active) ===
+active categories: 1
+SKIP isolation need 2+ categories
+=== NOTIFICATIONS ISOLATION ===
+notif counts m=5 a=15 f=50
+PASS maint no finance-approval
+PASS fin no parts-ready
+=== MAINT CREATE no desc + frequency ===
+create body: {"assetId":"2a292482-a0cc-4e00-bc37-55907fdd260b","startDate":"2026-04-13T12:00:00Z","description":"","roomId":"3663f206-b290-4167-a67f-9f8b81f9d00f","type":"Preventive","frequency":"One-time","status":"Open"}
+PASS create one-time empty desc count=1
+PASS negative no-freq requires desc
+=== INSPECTION workflow (pending if any) ===
+SKIP inspection no Pending row
+=== FINANCE submission-detail + 403 ===
+submission-detail id=73f194a5-185b-4b9e-84cc-c7fd203a1dd5
+detail keys: id,requestId,financeRequestType,assetId,assetName,assetCode,categoryName,roomId,roomCode,roomName,repairDescription,estimatedRepairCost,damagedPartImageUrls,notRepairableExplanation
+PASS no leaked workflow keys
+PASS maint forbidden finance detail
+=== REPAIR complete + history ===
+complete-repair id=7e61c710-a8e0-40df-a0dd-67f856c67e98 asset=e7cebaed-1177-457e-b8fe-b2d17d8583fc
+PASS complete-repair 7e61c710-a8e0-40df-a0dd-67f856c67e98
+PASS repair-history row for record
+=== BUILDS ===
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.29
+Γö£ Γùï /tenant/roles
+Γö£ Γùï /tenant/tasks
+Γöö Γùï /tenant/users
+
+
+Γùï  (Static)  prerendered as static content
+
+
+> dfile.client@0.1.0 postbuild
+> node scripts/copy-wwwroot.cjs
+
+[copy-wwwroot] OK ΓåÆ C:\Users\Fhiona Domini\source\repos\dfile_it15\dfile_up\DFile.backend\wwwroot
+VERDICT: Review PASS/FAIL/SKIP above. If no FAIL, runtime READY (subject to product rules).
+DONE log: C:\Users\Fhiona Domini\source\repos\dfile_it15\dfile_up\tools\..\verify-output.txt

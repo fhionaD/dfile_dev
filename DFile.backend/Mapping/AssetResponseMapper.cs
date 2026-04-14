@@ -38,7 +38,7 @@ namespace DFile.backend.Mapping
             {
                 Id = a.Id,
                 AssetCode = a.AssetCode,
-                TagNumber = a.TagNumber,
+                TagNumber = null,
                 AssetName = a.AssetName,
                 CategoryId = a.CategoryId,
                 CategoryName = cat?.CategoryName,

@@ -1,15 +1,18 @@
 import {
-    LayoutDashboard, Building2, MapPin, Tag, ShoppingCart, Package, ArrowRightLeft,
+    LayoutDashboard, Building2, MapPin, ShoppingCart, Package, ArrowRightLeft,
     PieChart, TrendingDown, Trash2, FileBarChart, CreditCard,
     Wrench, CalendarClock, HeartPulse,
     ShieldCheck, AlertTriangle, BarChart3, KeyRound, ShieldAlert, CheckCircle2, ClipboardList,
 } from "lucide-react";
+import type { UserRole } from "@/types/asset";
 
 export interface PermNavItem {
     href: string;
     label: string;
     icon: React.ElementType;
     requiredModules?: string[];
+    /** When set, the item is shown only if the signed-in user's role is in this list (after module checks). */
+    allowedRoles?: UserRole[];
 }
 
 export interface PermNavSection {
@@ -35,13 +38,13 @@ const TENANT_NAV: PermNavSection[] = [
         items: [
             { href: "/tenant/inventory", label: "Registration & Tagging", icon: Package, requiredModules: ["Assets"] },
             { href: "/tenant/allocation", label: "Allocation", icon: ArrowRightLeft, requiredModules: ["Assets"] },
+            { href: "/tenant/disposals", label: "Disposals", icon: Trash2, requiredModules: ["Assets"] },
         ],
     },
     {
         label: "Configuration",
         items: [
             { href: "/tenant/locations", label: "Locations", icon: MapPin, requiredModules: ["Rooms"] },
-            { href: "/tenant/asset-categories", label: "Asset Categories", icon: Tag, requiredModules: ["AssetCategories"] },
         ],
     },
     {
@@ -59,13 +62,13 @@ const TENANT_NAV: PermNavSection[] = [
     {
         label: "Finance",
         items: [
-            { href: "/finance/dashboard", label: "Finance Dashboard", icon: PieChart, requiredModules: ["Assets"] },
+            { href: "/finance/dashboard", label: "Finance Dashboard", icon: PieChart, requiredModules: ["Assets"], allowedRoles: ["Finance"] },
             { href: "/finance/assets", label: "Assets", icon: Package, requiredModules: ["Assets"] },
             { href: "/finance/depreciation", label: "Depreciation", icon: TrendingDown, requiredModules: ["Assets"] },
             { href: "/finance/disposals", label: "Disposals", icon: Trash2, requiredModules: ["Assets"] },
             { href: "/finance/reports", label: "Reports", icon: FileBarChart, requiredModules: ["Reports"] },
             { href: "/finance/procurement-approvals", label: "Procurement Approvals", icon: ShoppingCart, requiredModules: ["PurchaseOrders"] },
-            { href: "/finance/maintenance-requests", label: "Maintenance Requests", icon: Wrench, requiredModules: ["Assets"] },
+            { href: "/finance/maintenance-requests", label: "Maintenance Requests", icon: Wrench, requiredModules: ["Assets"], allowedRoles: ["Finance"] },
         ],
     },
     {
@@ -102,7 +105,8 @@ export type CanViewFn = (moduleName: string) => boolean;
 
 export function getPermittedNavSections(
     canView: CanViewFn,
-    isSuperAdmin: boolean
+    isSuperAdmin: boolean,
+    userRole?: UserRole | null
 ): PermNavSection[] {
     if (isSuperAdmin) return SUPERADMIN_NAV;
 
@@ -110,8 +114,13 @@ export function getPermittedNavSections(
         .map(section => ({
             ...section,
             items: section.items.filter(item => {
-                if (!item.requiredModules || item.requiredModules.length === 0) return true;
-                return item.requiredModules.some(mod => canView(mod));
+                if (item.requiredModules && item.requiredModules.length > 0) {
+                    if (!item.requiredModules.some(mod => canView(mod))) return false;
+                }
+                if (item.allowedRoles && item.allowedRoles.length > 0) {
+                    if (!userRole || !item.allowedRoles.includes(userRole)) return false;
+                }
+                return true;
             }),
         }))
         .filter(section => section.items.length > 0);

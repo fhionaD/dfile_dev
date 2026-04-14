@@ -5,6 +5,7 @@ import {
     LayoutDashboard,
     Building2,
     Package,
+    Trash2,
     ArrowLeftRight,
     MapPin,
     ShoppingCart,
@@ -15,7 +16,6 @@ import {
     CreditCard,
     Users,
     Shield,
-    Tag,
     Briefcase,
     ListChecks,
 } from "lucide-react";
@@ -41,13 +41,13 @@ const navSections: NavSection[] = [
         items: [
             { href: "/tenant/inventory",          label: "Registration & Tagging", icon: Package },
             { href: "/tenant/allocation",         label: "Allocation",             icon: ArrowLeftRight },
+            { href: "/tenant/disposals",         label: "Disposals",              icon: Trash2 },
         ]
     },
     {
         label: "Configuration",
         items: [
             { href: "/tenant/locations",          label: "Locations",              icon: MapPin },
-            { href: "/tenant/asset-categories",   label: "Asset Categories",       icon: Tag },
         ],
     },
     {
@@ -61,8 +61,8 @@ const navSections: NavSection[] = [
         items: [
             { href: "/tenant/tasks",              label: "Tasks",                  icon: CheckCircle2 },
             { href: "/tenant/maintenance",        label: "Maintenance",            icon: Wrench },
-            { href: "/finance/dashboard",         label: "Finance Dashboard",      icon: PieChart },
-            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ListChecks },
+            { href: "/finance/dashboard",         label: "Finance Dashboard",      icon: PieChart, allowedRoles: ["Finance"] },
+            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ListChecks, allowedRoles: ["Finance"] },
         ],
     },
 ];

@@ -67,7 +67,7 @@ export function CreateMaintenanceModal({
         return allocated.map((a) => ({
             value: a.assetId,
             label: `${a.assetName || a.assetId}${roomLabel(a) ? ` – ${roomLabel(a)}` : ""}`,
-            keywords: `${a.assetCode ?? ""} ${a.tagNumber ?? ""} ${a.categoryName ?? ""} ${a.roomName ?? ""} ${a.roomCode ?? ""}`,
+            keywords: `${a.assetCode ?? ""} ${a.categoryName ?? ""} ${a.roomName ?? ""} ${a.roomCode ?? ""}`,
         }));
     }, [allocated]);
 
@@ -185,6 +185,11 @@ export function CreateMaintenanceModal({
         e.preventDefault();
         setValidationError(null);
 
+        if (!formData.frequency?.trim() && !formData.description?.trim()) {
+            setValidationError("Description is required when no schedule frequency is set.");
+            return;
+        }
+
         if (formData.frequency === "One-time") {
             if (!formData.startDate) {
                 setValidationError("Start date is required for one-time maintenance.");
@@ -212,7 +217,7 @@ export function CreateMaintenanceModal({
                     payload: {
                         assetId: formData.assetId || initialData.assetId,
                         roomId: resolveRoomId(),
-                        description: formData.description || "No description provided",
+                        description: (formData.description ?? "").trim(),
                         priority: formData.priority as string,
                         type: formData.type as string,
                         frequency: formData.frequency as string,
@@ -241,7 +246,7 @@ export function CreateMaintenanceModal({
                 await addRecordMutation.mutateAsync({
                     assetId: formData.assetId,
                     roomId,
-                    description: formData.description || "No description provided",
+                    description: (formData.description ?? "").trim(),
                     priority: (formData.priority as string) || "Medium",
                     status: "Pending",
                     type: (formData.type as string) || "Corrective",

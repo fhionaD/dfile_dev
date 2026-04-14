@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
-import { Asset, Category } from "@/types/asset";
+import { Asset, Category, ReplacementRegistrationContext } from "@/types/asset";
 import { cn } from "@/lib/utils";
 
 interface AddAssetFormProps {
@@ -23,9 +23,19 @@ interface AddAssetFormProps {
     onAddAsset?: (asset: Asset) => void;
     isModal?: boolean;
     initialData?: Asset;
+    replacementContext?: ReplacementRegistrationContext | null;
 }
 
-export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel, onSuccess, onAddAsset, isModal = false, initialData }: AddAssetFormProps) {
+export function AddAssetForm({
+    categories,
+    existingSerialNumbers = [],
+    onCancel,
+    onSuccess,
+    onAddAsset,
+    isModal = false,
+    initialData,
+    replacementContext,
+}: AddAssetFormProps) {
     const isCreating = !initialData;
 
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData?.image || null);
@@ -57,11 +67,12 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
     const computedSalvageValue = costInput > 0 ? Math.round(costInput * effectiveSalvagePct / 100 * 100) / 100 : 0;
 
     /* Required-field gate */
-    const isFormValid = useMemo(() => (
-        assetName.trim().length > 0 &&
-        selectedCategoryId.length > 0 &&
-        warrantyExpiryValue.length > 0
-    ), [assetName, selectedCategoryId, warrantyExpiryValue]);
+    const isFormValid = useMemo(() => {
+        const base =
+            assetName.trim().length > 0 && selectedCategoryId.length > 0 && warrantyExpiryValue.length > 0;
+        if (!isCreating) return base;
+        return base && costInput > 0;
+    }, [assetName, selectedCategoryId, warrantyExpiryValue, costInput, isCreating]);
 
     const canSubmit = !isSubmitting && isFormValid;
 
@@ -118,6 +129,13 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
         if (onAddAsset) {
             const purchasePrice = Number(formData.get("purchasePrice")) || 0;
             const usefulLifeYears = Number(formData.get("usefulLifeYears")) || 0;
+            
+            // Validate UsefulLifeYears
+            if (usefulLifeYears <= 0) {
+                toast.error("Useful life must be at least 1 year.");
+                return;
+            }
+            
             const currentEffectivePct = isSalvageOverride ? manualSalvagePct : (category?.salvagePercentage ?? 10);
             const newAsset: Asset = {
                 id: initialData?.id || (formData.get("assetId") as string || `AST-${Date.now().toString().slice(-6)}`),
@@ -154,6 +172,10 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
         }
     };
 
+    const scrollToSection = (id: string) => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -167,9 +189,47 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
         <form onSubmit={handleCalculate} className={isModal ? "flex flex-col flex-1 min-h-0 bg-background/50" : "space-y-8"}>
             <div className="flex-1 overflow-y-auto px-1">
                 <div className="p-6 space-y-10">
+                    {replacementContext && isCreating && (
+                        <div
+                            role="status"
+                            className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground"
+                        >
+                            <p className="font-semibold text-amber-900 dark:text-amber-100">Replacement registration</p>
+                            <p className="mt-1 text-muted-foreground">
+                                Request{" "}
+                                <span className="font-mono text-foreground">
+                                    {replacementContext.requestLabel || replacementContext.maintenanceRecordId}
+                                </span>
+                                {" · "}Replacing{" "}
+                                <span className="font-medium text-foreground">
+                                    {replacementContext.originalAssetName || replacementContext.originalAssetId}
+                                </span>
+                                {replacementContext.originalAssetCode ? (
+                                    <>
+                                        {" "}
+                                        (<span className="font-mono">{replacementContext.originalAssetCode}</span>)
+                                    </>
+                                ) : null}
+                            </p>
+                        </div>
+                    )}
+
+                    {isModal && isCreating && (
+                        <div className="flex flex-wrap gap-2 pb-2 border-b border-border/60">
+                            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => scrollToSection("asset-section-overview")}>
+                                Overview &amp; cost
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => scrollToSection("asset-section-docs")}>
+                                Documentation
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => scrollToSection("asset-section-mfr")}>
+                                Manufacturer &amp; warranty
+                            </Button>
+                        </div>
+                    )}
 
                     {/* Section 1: General Information */}
-                    <div className="border rounded-lg bg-card shadow-sm">
+                    <div id="asset-section-overview" className="border rounded-lg bg-card shadow-sm scroll-mt-4">
                         <Collapsible open={isGenInfoOpen} onOpenChange={setIsGenInfoOpen}>
                             <CollapsibleTrigger asChild>
                                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
@@ -224,6 +284,20 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                                         />
                                     </div>
 
+                                    {/* Handling type follows the selected category (no separate asset-subcategory entity in this product). */}
+                                    <div className="space-y-2.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Category handling type
+                                        </Label>
+                                        <Input
+                                            readOnly
+                                            tabIndex={-1}
+                                            value={selectedCategory ? getHandlingTypeLabel(selectedCategory.handlingType) : "—"}
+                                            className="h-10 w-full bg-muted cursor-default"
+                                            aria-label="Handling type for selected category"
+                                        />
+                                    </div>
+
                                     {/* Serial Number */}
                                     <div className="space-y-2.5">
                                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Serial Number</Label>
@@ -238,7 +312,9 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
 
                                     {/* Cost */}
                                     <div className="space-y-2.5">
-                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost</Label>
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Cost <span className="text-destructive">*</span>
+                                        </Label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-muted-foreground font-semibold">₱</span>
                                             <Input
@@ -254,8 +330,8 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
 
                                     {/* Useful Life */}
                                     <div className="space-y-2.5">
-                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years)</Label>
-                                        <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10 w-full" />
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Useful Life (Years) <span className="text-red-500">*</span></Label>
+                                        <Input name="usefulLifeYears" defaultValue={initialData?.usefulLifeYears} type="number" placeholder="e.g. 5" className="h-10 w-full" required min="1" />
                                     </div>
 
                                     {/* Salvage Value – plain grid cell, no border box */}
@@ -338,7 +414,7 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                     </div>
 
                     {/* Section 2: Image & Notes */}
-                    <div className="border rounded-lg bg-card shadow-sm">
+                    <div id="asset-section-docs" className="border rounded-lg bg-card shadow-sm scroll-mt-4">
                         <Collapsible open={isDocOpen} onOpenChange={setIsDocOpen}>
                             <CollapsibleTrigger asChild>
                                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
@@ -415,7 +491,7 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
                     </div>
 
                     {/* Section 3: Manufacturer & Warranty */}
-                    <div className="border rounded-lg bg-card shadow-sm">
+                    <div id="asset-section-mfr" className="border rounded-lg bg-card shadow-sm scroll-mt-4">
                         <Collapsible open={isManufacturerOpen} onOpenChange={setIsManufacturerOpen}>
                             <CollapsibleTrigger asChild>
                                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg group">
@@ -467,9 +543,12 @@ export function AddAssetForm({ categories, existingSerialNumbers = [], onCancel,
 
             {/* Footer */}
             <div className="p-4 px-6 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between mt-auto z-10">
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground max-w-[min(100%,28rem)]">
                     {!isFormValid && isCreating && (
-                        <span>Fill in all required fields <span className="text-destructive font-bold">*</span> to enable registration.</span>
+                        <span>
+                            Fill required fields <span className="text-destructive font-bold">*</span>
+                            {costInput <= 0 ? " and enter a cost greater than zero." : " to enable registration."}
+                        </span>
                     )}
                 </div>
                 <div className="flex items-center gap-3">

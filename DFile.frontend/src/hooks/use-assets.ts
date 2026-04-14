@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import api from '@/lib/api';
 import { parseApiError } from '@/lib/api-errors';
@@ -25,6 +25,7 @@ export function useAssetsPaged(
 ) {
     return useQuery({
         queryKey: ["assets", "paged", showArchived, page, pageSize, filters.q, filters.status, filters.category, filters.includeDisposed],
+        placeholderData: keepPreviousData,
         queryFn: async () => {
             const { data } = await api.get<{
                 totalCount: number;
@@ -117,6 +118,7 @@ export function useAddAsset() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             queryClient.invalidateQueries({ queryKey: ['asset-archive-counts'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
             toast.success('Asset added successfully');
         },
         onError: (error: Error) => {

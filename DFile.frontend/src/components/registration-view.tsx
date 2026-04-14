@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -26,14 +26,20 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    const tabParam = searchParams.get("tab");
-    const activeTab = tabParam === "categories" ? "categories" : "inventory";
+    const tabFromUrl = searchParams.get("tab") === "categories" ? "categories" : "inventory";
+    const [activeTab, setActiveTab] = useState<"inventory" | "categories">(tabFromUrl);
 
-    const setActiveTab = useCallback(
+    useEffect(() => {
+        setActiveTab(tabFromUrl);
+    }, [tabFromUrl]);
+
+    const setActiveTabHandler = useCallback(
         (v: string) => {
+            const next = v === "categories" ? "categories" : "inventory";
+            setActiveTab(next);
             const p = new URLSearchParams(searchParams.toString());
-            if (v === "inventory") p.delete("tab");
-            else p.set("tab", v);
+            if (next === "inventory") p.delete("tab");
+            else p.set("tab", "categories");
             const qs = p.toString();
             router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
         },
@@ -80,7 +86,7 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
 
     return (
         <div className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTabHandler} className="w-full">
                 <div className="mb-8 space-y-4">
                     <TabsList className="grid h-11 w-full max-w-[400px] grid-cols-2">
                         <TabsTrigger value="inventory" className="text-sm">
@@ -135,7 +141,8 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                         usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
                         purchasePrice: Number(asset.purchasePrice ?? 0),
                         residualValue: null,
-                        salvagePercentage: asset.salvagePercentage ?? null,
+                        salvagePercentage:
+                            asset.isSalvageOverride === true ? asset.salvagePercentage ?? null : null,
                         isSalvageOverride: asset.isSalvageOverride ?? false,
                         currentBookValue: Number(asset.currentBookValue ?? asset.purchasePrice ?? 0),
                         monthlyDepreciation: Number(asset.monthlyDepreciation ?? 0),
@@ -143,7 +150,6 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                         notes: asset.notes || null,
                         documents: asset.documents || null,
                         rowVersion: asset.rowVersion || null,
-                        tagNumber: asset.tagNumber || asset.assetCode || asset.id || `AST-${Date.now()}`,
                     };
                     if (isEditMode && selectedAsset) {
                         await updateAssetMutation.mutateAsync({ id: selectedAsset.id, payload: payload as never });

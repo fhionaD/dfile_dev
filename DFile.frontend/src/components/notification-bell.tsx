@@ -7,8 +7,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotifications, useUnreadCount, useMarkAsRead, useMarkAllAsRead, useDeleteNotification } from '@/hooks/use-notifications';
 import type { Notification, NotificationType } from '@/types/asset';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
-import { useState } from 'react';
+import { formatDistanceToNow, isValid, parseISO } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 const typeConfig: Record<NotificationType, { icon: typeof Info; className: string }> = {
     Info: { icon: Info, className: 'text-blue-500' },
@@ -17,13 +20,133 @@ const typeConfig: Record<NotificationType, { icon: typeof Info; className: strin
     Error: { icon: XCircle, className: 'text-red-500' },
 };
 
+/**
+ * Maps notification data to target route
+ * Priority order:
+ * 1. Explicit link (backend-provided)
+ * 2. Entity-based routing (MaintenanceRecord -> /maintenance/work-orders/{id}, etc.)
+ * 3. Module-based routing (Maintenance -> /maintenance/work-orders, etc.)
+ * 4. Role-based dashboard fallback
+ */
+function getNotificationRoute(notification: Notification, userRole?: string): string | null {
+    // Prefer explicit link from backend
+    if (notification.link) {
+        return notification.link;
+    }
+
+    const { entityType, entityId, module } = notification;
+
+    // Entity-based routing: use entityType + entityId to build specific route
+    if (entityType && entityId) {
+        switch (entityType) {
+            case 'MaintenanceRecord':
+                return `/maintenance/work-orders/${entityId}`;
+            case 'Room':
+                return `/rooms/${entityId}`;
+            case 'Asset':
+                return `/assets/${entityId}`;
+            case 'Category':
+            case 'AssetCategory':
+                return `/asset-categories/${entityId}`;
+            case 'MaintenanceSchedule':
+                return `/maintenance/schedules/${entityId}`;
+            case 'PurchaseOrder':
+                return `/finance/purchase-orders/${entityId}`;
+            case 'RoomCategory':
+                return `/room-categories/${entityId}`;
+            // For Finance/Procurement specific entities
+            case 'MaintenanceRequest':
+                if (userRole === 'Finance') {
+                    return `/finance/maintenance-requests/${entityId}`;
+                }
+                return `/maintenance/work-orders/${entityId}`;
+            default:
+                break; // Fall through to module-based routing
+        }
+    }
+
+    // Module-based routing: generic module navigation
+    if (module) {
+        if (userRole === 'Finance') {
+            if (module === 'Maintenance' || module === 'Asset' || module === 'MaintenanceRequest') {
+                return `/finance/maintenance-requests`;
+            }
+            if (module === 'Procurement' || module === 'PurchaseOrder') {
+                return `/finance/procurement-approvals`;
+            }
+            return `/finance/dashboard`;
+        }
+
+        if (userRole === 'Maintenance') {
+            if (module === 'Maintenance' || module === 'Parts' || module === 'MaintenanceRecord') {
+                return `/maintenance/work-orders`;
+            }
+            if (module === 'Schedule' || module === 'MaintenanceSchedule') {
+                return `/maintenance/schedules`;
+            }
+            return `/maintenance/dashboard`;
+        }
+
+        if (userRole === 'Admin' || userRole === 'Super Admin') {
+            if (module === 'Maintenance' || module === 'MaintenanceRecord') {
+                return `/tenantadmin/dashboard`;
+            }
+            if (module === 'Asset') {
+                return `/tenantadmin/inventory`;
+            }
+            if (module === 'Admin' || userRole === 'Super Admin') {
+                return `/superadmin/dashboard`;
+            }
+            return `/tenantadmin/dashboard`;
+        }
+    }
+
+    // Role-based dashboard fallback
+    if (userRole === 'Finance') {
+        return `/finance/dashboard`;
+    }
+    if (userRole === 'Maintenance') {
+        return `/maintenance/dashboard`;
+    }
+    if (userRole === 'Super Admin') {
+        return `/superadmin/dashboard`;
+    }
+    if (userRole === 'Admin') {
+        return `/tenantadmin/dashboard`;
+    }
+
+    return `/tenantadmin/dashboard`;
+}
+
 export function NotificationBell() {
     const [open, setOpen] = useState(false);
-    const { data: notifications = [] } = useNotifications();
-    const { data: unreadCount = 0 } = useUnreadCount();
+    const router = useRouter();
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
+    const pollMs = open ? 10_000 : 15_000;
+    const { data: notifications = [] } = useNotifications(false, pollMs);
+    const { data: unreadCount = 0 } = useUnreadCount(pollMs);
+
+    useEffect(() => {
+        if (!open) return;
+        void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    }, [open, queryClient]);
     const markRead = useMarkAsRead();
     const markAllRead = useMarkAllAsRead();
     const deleteNotification = useDeleteNotification();
+
+    const handleNotificationClick = (notification: Notification) => {
+        // Mark as read
+        if (!notification.isRead) {
+            markRead.mutate(notification.id);
+        }
+        // Navigate to relevant page
+        const route = getNotificationRoute(notification, user?.role);
+        if (route) {
+            setOpen(false);
+            router.push(route);
+        }
+    };
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -67,13 +190,15 @@ export function NotificationBell() {
                             {notifications.map((n: Notification) => {
                                 const config = typeConfig[n.type] ?? typeConfig.Info;
                                 const Icon = config.icon;
+                                const createdAt = parseISO(n.createdAt);
                                 return (
                                     <div
                                         key={n.id}
                                         className={cn(
-                                            'flex gap-3 px-4 py-3 hover:bg-accent/50 transition-colors group',
+                                            'flex gap-3 px-4 py-3 hover:bg-accent/50 transition-colors group cursor-pointer',
                                             !n.isRead && 'bg-accent/30'
                                         )}
+                                        onClick={() => handleNotificationClick(n)}
                                     >
                                         <Icon size={16} className={cn('mt-0.5 shrink-0', config.className)} />
                                         <div className="flex-1 min-w-0 space-y-1">
@@ -86,7 +211,11 @@ export function NotificationBell() {
                                                         {n.module}
                                                     </span>
                                                 )}
-                                                <span>{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</span>
+                                                <span>
+                                                    {isValid(createdAt)
+                                                        ? formatDistanceToNow(createdAt, { addSuffix: true })
+                                                        : '—'}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -95,7 +224,10 @@ export function NotificationBell() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-7 w-7"
-                                                    onClick={() => markRead.mutate(n.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        markRead.mutate(n.id);
+                                                    }}
                                                     title="Mark as read"
                                                 >
                                                     <Check size={14} />
@@ -105,7 +237,10 @@ export function NotificationBell() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                onClick={() => deleteNotification.mutate(n.id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteNotification.mutate(n.id);
+                                                }}
                                                 title="Delete"
                                             >
                                                 <Trash2 size={14} />

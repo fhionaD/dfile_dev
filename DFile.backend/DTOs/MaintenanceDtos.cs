@@ -10,7 +10,7 @@ namespace DFile.backend.DTOs
         /// <summary>Optional; when set must match the asset's active allocation room (disambiguation + validation).</summary>
         public string? RoomId { get; set; }
 
-        [Required]
+        /// <summary>Optional when Frequency is set (scheduled batch); otherwise required by the API.</summary>
         public string Description { get; set; } = string.Empty;
 
         public string Status { get; set; } = "Open";
@@ -36,7 +36,6 @@ namespace DFile.backend.DTOs
         /// <summary>Optional; when set must match the asset's active allocation room.</summary>
         public string? RoomId { get; set; }
 
-        [Required]
         public string Description { get; set; } = string.Empty;
 
         public string Status { get; set; } = "Open";
@@ -99,6 +98,74 @@ namespace DFile.backend.DTOs
         public string? ScheduleSeriesId { get; set; }
     }
 
+    /// <summary>
+    /// Schedule-focused view: no finance execution fields, quotation, inspection notes, or attachments.
+    /// </summary>
+    public class MaintenanceScheduleSummaryDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? RequestId { get; set; }
+        public string AssetId { get; set; } = string.Empty;
+        public string? AssetName { get; set; }
+        public string? AssetCode { get; set; }
+        public string? RoomId { get; set; }
+        public string? RoomCode { get; set; }
+        public string? RoomName { get; set; }
+        public string? RoomFloor { get; set; }
+        public string Type { get; set; } = "Corrective";
+        public string Priority { get; set; } = "Medium";
+        public string? Frequency { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public DateTime? NextDueDate { get; set; }
+        public string Status { get; set; } = "Open";
+        public string? ScheduleSeriesId { get; set; }
+    }
+
+    /// <summary>
+    /// Finance-only view of what Maintenance submitted (repair vs replacement). Excludes workflow/status/history fields.
+    /// </summary>
+    public class FinanceMaintenanceSubmissionDetailDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? RequestId { get; set; }
+        public string FinanceRequestType { get; set; } = string.Empty;
+
+        public string AssetId { get; set; } = string.Empty;
+        public string? AssetName { get; set; }
+        public string? AssetCode { get; set; }
+        public string? CategoryName { get; set; }
+        public string? RoomId { get; set; }
+        public string? RoomCode { get; set; }
+        public string? RoomName { get; set; }
+
+        /// <summary>Repair path: text from Maintenance inspection.</summary>
+        public string? RepairDescription { get; set; }
+        public decimal? EstimatedRepairCost { get; set; }
+        public IReadOnlyList<string> DamagedPartImageUrls { get; set; } = Array.Empty<string>();
+
+        /// <summary>Replacement / not repairable path: explanation from Maintenance.</summary>
+        public string? NotRepairableExplanation { get; set; }
+    }
+
+    /// <summary>
+    /// Finance queue / awaiting-parts list: triage identifiers and workflow flags only (no description, notes, dates, or attachments).
+    /// </summary>
+    public class FinanceMaintenanceQueueRowDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? RequestId { get; set; }
+        public string AssetId { get; set; } = string.Empty;
+        public string? AssetName { get; set; }
+        public string? AssetCode { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? FinanceRequestType { get; set; }
+        public string? FinanceWorkflowStatus { get; set; }
+        public string? DiagnosisOutcome { get; set; }
+        public string? LinkedPurchaseOrderId { get; set; }
+        public decimal? Cost { get; set; }
+    }
+
     public class InspectionWorkflowSubmitDto
     {
         /// <summary>Repairable | Not Repairable | No Fix Needed</summary>
@@ -113,8 +180,17 @@ namespace DFile.backend.DTOs
 
         public string? Attachments { get; set; }
 
-        /// <summary>Optional for Not Repairable — link when a replacement PO already exists; otherwise Finance reviews first.</summary>
+        /// <summary>Ignored for maintenance inspection (replacement PO is not captured at this step).</summary>
         public string? LinkedPurchaseOrderId { get; set; }
+    }
+
+    /// <summary>Maintenance completes an on-site finance-approved repair visit.</summary>
+    public class CompleteRepairDto
+    {
+        [Required]
+        [MinLength(1)]
+        [MaxLength(2000)]
+        public string RepairDescription { get; set; } = string.Empty;
     }
 
     public class CompleteReplacementAssetDto

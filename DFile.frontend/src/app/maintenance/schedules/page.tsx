@@ -8,16 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, RefreshCw } from "lucide-react";
+import { Plus, CalendarClock, Search, Clock, CheckCircle2, Calendar, RefreshCw, Archive, RotateCcw } from "lucide-react";
 import { useAllocatedAssetsForMaintenance, useMaintenanceRecords, useUpdateMaintenanceStatus, useArchiveMaintenanceRecord, useSubmitInspectionWorkflow } from "@/hooks/use-maintenance";
 import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
+import { ScheduleDetailsModal } from "@/components/modals/schedule-details-modal";
+import { RepairCompletionModal } from "@/components/modals/repair-completion-modal";
 import { InspectionDiagnosisModal } from "@/components/modals/inspection-diagnosis-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ArchiveViewToggleButton } from "@/components/data-table/data-table-toolbar";
 import { MaintenanceRecord } from "@/types/asset";
 import { toast } from "sonner";
 
@@ -184,13 +187,25 @@ export default function SchedulesPage() {
 
     const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [detailsModalView, setDetailsModalView] = useState<"default" | "schedulePeek">("default");
+    const [schedulePeek, setSchedulePeek] = useState<{
+        record: MaintenanceRecord;
+        scheduledDateOverride?: string;
+        occurrenceLabel?: string;
+    } | null>(null);
     const [inspectionTarget, setInspectionTarget] = useState<MaintenanceRecord | null>(null);
-    const [scheduleTabView, setScheduleTabView] = useState<"active" | "history" | "archived">("active");
+    const [repairTarget, setRepairTarget] = useState<MaintenanceRecord | null>(null);
+    const [scheduleTabView, setScheduleTabView] = useState<"active" | "archived">("active");
     const [archiveScheduleTarget, setArchiveScheduleTarget] = useState<{ id: string; description: string } | null>(null);
 
     const updateStatusMutation = useUpdateMaintenanceStatus();
     const archiveScheduleMutation = useArchiveMaintenanceRecord();
     const submitInspectionMutation = useSubmitInspectionWorkflow();
+
+    const isFinanceRepairVisit = (r: MaintenanceRecord) =>
+        r.financeRequestType === "Repair" &&
+        (r.financeWorkflowStatus === "Parts Ready" || r.financeWorkflowStatus === "Approved") &&
+        (r.status === "Scheduled" || r.status === "In Progress");
 
     const { data: archivedSchedules = [], isLoading: archivedSchedulesLoading } = useMaintenanceRecords(true);
 
@@ -201,15 +216,14 @@ export default function SchedulesPage() {
 
     const scheduledRecords = useMemo(() => {
         if (scheduleTabView === "active") return activeParents;
-        if (scheduleTabView === "history") return historyParents;
         return archivedParents;
-    }, [scheduleTabView, activeParents, historyParents, archivedParents]);
+    }, [scheduleTabView, activeParents, archivedParents]);
 
     const scheduledOccurrences = useMemo(() => activeParents.flatMap((r) => generateOccurrences(r)), [activeParents]);
 
     const getAssetDisplay = useCallback((assetId: string) => {
         const alloc = allocatedAssets.find((a) => a.assetId === assetId);
-        if (alloc) return { name: alloc.assetName || assetId, code: alloc.assetCode || alloc.tagNumber || "" };
+        if (alloc) return { name: alloc.assetName || assetId, code: alloc.assetCode || "" };
         return { name: assetId, code: "" };
     }, [allocatedAssets]);
 
@@ -245,9 +259,8 @@ export default function SchedulesPage() {
     /** KPI counts match the current tab so filter buttons align with visible rows. */
     const kpiScopeRecords = useMemo(() => {
         if (scheduleTabView === "active") return activeParents;
-        if (scheduleTabView === "history") return historyParents;
         return archivedParents;
-    }, [scheduleTabView, activeParents, historyParents, archivedParents]);
+    }, [scheduleTabView, activeParents, archivedParents]);
 
     const priorityKpi = useMemo(() => {
         return {
@@ -427,8 +440,15 @@ export default function SchedulesPage() {
                                                 key={occ.id}
                                                 className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg border border-border/50 cursor-pointer hover:bg-muted/60 transition-colors"
                                                 onClick={() => {
-                                                    setSelectedRecord(parent);
-                                                    setIsDetailsModalOpen(true);
+                                                    const label =
+                                                        occ.totalOccurrences > 1
+                                                            ? `#${occ.occurrenceIndex + 1}/${occ.totalOccurrences}`
+                                                            : undefined;
+                                                    setSchedulePeek({
+                                                        record: parent,
+                                                        scheduledDateOverride: occ.occurrenceDate,
+                                                        occurrenceLabel: label,
+                                                    });
                                                 }}
                                             >
                                                 <div
@@ -468,20 +488,6 @@ export default function SchedulesPage() {
             })()}
 
             <div className="flex flex-col gap-3">
-                <Tabs value={scheduleTabView} onValueChange={(v) => setScheduleTabView(v as typeof scheduleTabView)} className="w-full">
-                    <TabsList className="grid h-11 w-full max-w-xl grid-cols-3">
-                        <TabsTrigger value="active" className="text-sm">
-                            Active ({activeParents.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="history" className="text-sm">
-                            History ({historyParents.length})
-                        </TabsTrigger>
-                        <TabsTrigger value="archived" className="text-sm">
-                            Archived ({archivedParents.length})
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                     <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
                         <div className="relative flex-1">
@@ -524,6 +530,12 @@ export default function SchedulesPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <ArchiveViewToggleButton
+                        showArchived={scheduleTabView === "archived"}
+                        onToggle={() => setScheduleTabView(scheduleTabView === "active" ? "archived" : "active")}
+                        activeCount={activeParents.length}
+                        archivedCount={archivedParents.length}
+                    />
                 </div>
             </div>
 
@@ -550,20 +562,17 @@ export default function SchedulesPage() {
                     </div>
                 ) : (
                     <div
-                        className={`rounded-md border overflow-auto min-h-[400px] max-h-[560px] ${cardClassName} bg-background/50 backdrop-blur-sm`}
+                        className={`rounded-md border overflow-y-auto overflow-x-auto min-h-[400px] max-h-[560px] ${cardClassName} bg-background/50 backdrop-blur-sm`}
                     >
-                        <Table>
+                        <Table className="w-full min-w-[720px] table-fixed text-sm">
                             <TableHeader className="bg-muted/60 border-b-2 border-muted sticky top-0 z-10">
                                 <TableRow className="hover:bg-muted/80 transition-colors">
-                                    <TableHead className="font-bold text-foreground">Request</TableHead>
-                                    <TableHead className="font-bold text-foreground">Asset</TableHead>
-                                    <TableHead className="font-bold text-foreground">Room Unit</TableHead>
-                                    <TableHead className="font-bold text-foreground">Description</TableHead>
-                                    <TableHead className="font-bold text-foreground">Frequency</TableHead>
-                                    <TableHead className="font-bold text-foreground">Priority</TableHead>
-                                    <TableHead className="font-bold text-foreground">Status</TableHead>
-                                    <TableHead className="font-bold text-foreground">Date</TableHead>
-                                    <TableHead className="text-right font-bold text-foreground">Action</TableHead>
+                                    <TableHead className="font-bold text-foreground w-[96px] px-3 py-3 whitespace-normal">Request</TableHead>
+                                    <TableHead className="font-bold text-foreground min-w-[200px] px-3 py-3 whitespace-normal">Asset & task</TableHead>
+                                    <TableHead className="font-bold text-foreground min-w-[200px] px-3 py-3 hidden md:table-cell whitespace-normal">Room</TableHead>
+                                    <TableHead className="font-bold text-foreground w-[112px] px-3 py-3 whitespace-normal">Schedule Date</TableHead>
+                                    <TableHead className="font-bold text-foreground w-[80px] px-3 py-3 whitespace-normal">Pri.</TableHead>
+                                    <TableHead className="text-right font-bold text-foreground w-[104px] px-3 py-3 whitespace-normal">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -579,56 +588,106 @@ export default function SchedulesPage() {
                                                 isNewlyCompleted || isHighlighted ? "relative overflow-hidden" : ""
                                             }`}
                                             onClick={() => {
-                                                setSelectedRecord(record);
-                                                setIsDetailsModalOpen(true);
+                                                setSchedulePeek({ record });
                                             }}
                                         >
-                                            <TableCell className="py-3 px-4 font-mono text-xs">{record.requestId ?? "—"}</TableCell>
-                                            <TableCell className="py-3 px-4">
-                                                <div className="space-y-0.5">
-                                                    <span className="text-sm font-semibold text-foreground block truncate max-w-[180px]">
+                                            <TableCell className="py-3 px-3 font-mono text-[11px] align-top">
+                                                <span className="block truncate" title={record.requestId ?? record.id}>
+                                                    {record.requestId ?? "—"}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="py-3 px-3 min-w-0 align-top">
+                                                <div className="space-y-1 min-w-0">
+                                                    <span className="font-semibold text-foreground block truncate text-[13px]">
                                                         {record.assetName || assetInfo.name}
                                                     </span>
                                                     {(record.assetCode || assetInfo.code) && (
-                                                        <span className="text-xs text-muted-foreground/80 font-mono block">
+                                                        <span className="text-[11px] text-muted-foreground font-mono block truncate">
                                                             {record.assetCode || assetInfo.code}
                                                         </span>
                                                     )}
+                                                    <span
+                                                        className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed break-words"
+                                                        title={record.description}
+                                                    >
+                                                        {record.description}
+                                                    </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-3 px-4 max-w-[160px]">
+                                            <TableCell className="py-3 px-3 min-w-0 align-top hidden md:table-cell">
                                                 {record.roomCode || record.roomName ? (
-                                                    <div className="space-y-0.5">
-                                                        <span className="text-sm font-medium block truncate">{record.roomCode ?? record.roomName}</span>
+                                                    <div className="space-y-0.5 min-w-0">
+                                                        <span className="font-medium block truncate text-[12px]">{record.roomCode ?? record.roomName}</span>
                                                         {record.roomName && record.roomCode && (
-                                                            <span className="text-xs text-muted-foreground block truncate">{record.roomName}</span>
+                                                            <span className="text-[11px] text-muted-foreground block truncate">{record.roomName}</span>
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                    <span className="text-[11px] text-muted-foreground">—</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="font-semibold text-foreground max-w-[200px] truncate py-3 px-4">
-                                                {record.description}
-                                            </TableCell>
-                                            <TableCell className="py-3 px-4">
-                                                <div className="flex items-center gap-1.5 text-foreground font-medium">
-                                                    <RefreshCw className="h-3 w-3 text-muted-foreground" />
-                                                    <span className="text-sm">{record.frequency ?? "One-time"}</span>
+                                            <TableCell className="py-3 px-3 align-top tabular-nums text-[11px] leading-snug text-foreground">
+                                                <div>{record.startDate ? new Date(record.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}</div>
+                                                <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                                                    <RefreshCw className="h-3 w-3 shrink-0" />
+                                                    <span className="truncate">{record.frequency ?? "One-time"}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-3 px-4">
-                                                <StatusText variant={priorityVariant[record.priority] ?? "muted"}>{record.priority}</StatusText>
+                                            <TableCell className="py-3 px-3 align-top">
+                                                <StatusText variant={priorityVariant[record.priority] ?? "muted"} className="text-[11px]">
+                                                    {record.priority}
+                                                </StatusText>
                                             </TableCell>
-                                            <TableCell className="py-3 px-4">
-                                                <StatusText variant={statusVariant[record.status] ?? "muted"}>{record.status}</StatusText>
-                                            </TableCell>
-                                            <TableCell className="text-sm tabular-nums font-medium text-foreground py-3 px-4">
-                                                {record.startDate ? new Date(record.startDate).toLocaleDateString() : "—"}
-                                            </TableCell>
-                                            <TableCell className="text-right py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                                            <TableCell className="py-3 px-3 align-top" onClick={(e) => e.stopPropagation()}>
                                                 {(() => {
-                                                    if (scheduleTabView === "history" && record.status === "Completed") {
+                                                    if (scheduleTabView === "archived") {
+                                                        return <StatusText variant="muted">Archived</StatusText>;
+                                                    }
+                                                    if (record.financeWorkflowStatus === "Rejected") {
+                                                        return (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                disabled={!inspectOk}
+                                                                title={!inspectOk ? "Available on or after the scheduled start date" : undefined}
+                                                                onClick={() => {
+                                                                    if (!inspectOk) {
+                                                                        toast.error("Inspection is not available before the scheduled date.");
+                                                                        return;
+                                                                    }
+                                                                    setInspectionTarget(record);
+                                                                }}
+                                                            >
+                                                                Inspection
+                                                            </Button>
+                                                        );
+                                                    }
+                                                    if (record.status === "Finance Review" || record.status === "Waiting for Replacement") {
+                                                        return <StatusText variant="warning">{record.status}</StatusText>;
+                                                    }
+                                                    if (record.status === "Completed") {
+                                                        const isWaitingForFinance = record.financeWorkflowStatus === "Pending Approval";
+                                                        if (isWaitingForFinance) {
+                                                            return (
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                disabled
+                                                                                className="text-muted-foreground"
+                                                                            >
+                                                                                Archive
+                                                                            </Button>
+                                                                        </span>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="left">
+                                                                        Cannot archive while waiting for Finance approval
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            );
+                                                        }
                                                         return (
                                                             <Button
                                                                 size="sm"
@@ -639,11 +698,18 @@ export default function SchedulesPage() {
                                                             </Button>
                                                         );
                                                     }
-                                                    if (scheduleTabView === "archived") {
-                                                        return <StatusText variant="muted">Archived</StatusText>;
-                                                    }
-                                                    if (record.status === "Finance Review" || record.status === "Waiting for Replacement") {
-                                                        return <StatusText variant="warning">{record.status}</StatusText>;
+
+                                                    if (scheduleTabView === "active" && isFinanceRepairVisit(record)) {
+                                                        return (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="default"
+                                                                className="bg-sky-600 hover:bg-sky-700 text-white"
+                                                                onClick={() => setRepairTarget(record)}
+                                                            >
+                                                                Repair
+                                                            </Button>
+                                                        );
                                                     }
 
                                                     const nextStatus = NEXT_STATUS[record.status];
@@ -667,6 +733,7 @@ export default function SchedulesPage() {
                                                                     setInspectionTarget(record);
                                                                 } else if (needsQuotation) {
                                                                     setSelectedRecord(record);
+                                                                    setDetailsModalView("default");
                                                                     setIsDetailsModalOpen(true);
                                                                 } else {
                                                                     setAdvanceTarget({ id: record.id, nextStatus });
@@ -705,10 +772,31 @@ export default function SchedulesPage() {
                 enableGlassmorphism={enableGlassmorphism}
             />
 
+            <ScheduleDetailsModal
+                open={schedulePeek !== null}
+                onOpenChange={(open) => {
+                    if (!open) setSchedulePeek(null);
+                }}
+                record={schedulePeek?.record ?? null}
+                scheduledDateOverride={schedulePeek?.scheduledDateOverride}
+                occurrenceLabel={schedulePeek?.occurrenceLabel}
+                enableGlassmorphism={enableGlassmorphism}
+                onOpenWorkflowDetails={(r) => {
+                    setSchedulePeek(null);
+                    setSelectedRecord(r);
+                    setDetailsModalView("schedulePeek");
+                    setIsDetailsModalOpen(true);
+                }}
+            />
+
             <MaintenanceDetailsModal
                 open={isDetailsModalOpen}
-                onOpenChange={setIsDetailsModalOpen}
+                onOpenChange={(open) => {
+                    setIsDetailsModalOpen(open);
+                    if (!open) setDetailsModalView("default");
+                }}
                 record={selectedRecord}
+                detailView={detailsModalView}
                 enableGlassmorphism={enableGlassmorphism}
                 onOpenInspectionModal={(record) => setInspectionTarget(record)}
                 onEdit={() => {
@@ -735,6 +823,15 @@ export default function SchedulesPage() {
                     await submitInspectionMutation.mutateAsync({ id: inspectionTarget.id, payload });
                     setInspectionTarget(null);
                 }}
+            />
+
+            <RepairCompletionModal
+                open={repairTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRepairTarget(null);
+                }}
+                record={repairTarget}
+                enableGlassmorphism={enableGlassmorphism}
             />
 
             <ConfirmDialog

@@ -2,10 +2,11 @@ const ROUTE_MODULE_MAP: Record<string, string[]> = {
     "/tenant/dashboard": [],
     "/tenant/billing": [],
     "/tenant/organization": ["Departments", "Employees"],
-    "/tenant/inventory": ["Assets"],
+    "/tenant/inventory": ["Assets", "AssetCategories"],
+    /** Legacy URL: redirects to Registration & Tagging → Asset Categories tab. */
+    "/tenant/asset-categories": ["Assets", "AssetCategories"],
     "/tenant/allocation": ["Assets"],
     "/tenant/locations": ["Rooms"],
-    "/tenant/asset-categories": ["AssetCategories"],
     "/tenant/procurement": ["PurchaseOrders"],
     "/tenant/tasks": ["Tasks"],
     "/tenant/departments": ["Departments"],

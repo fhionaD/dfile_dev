@@ -67,17 +67,12 @@ export function InspectionDiagnosisModal({
     const [outcome, setOutcome] = useState<"" | "Repairable" | "Not Repairable" | "No Fix Needed">("");
     const [detailNotes, setDetailNotes] = useState("");
     const [estimatedRepairCost, setEstimatedRepairCost] = useState<string>("");
-    const [linkedPurchaseOrderId, setLinkedPurchaseOrderId] = useState("");
-    /** When true, replacement PO id is required before submit. */
-    const [linkReplacementPoNow, setLinkReplacementPoNow] = useState(false);
     const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
 
     const reset = () => {
         setOutcome("");
         setDetailNotes("");
         setEstimatedRepairCost("");
-        setLinkedPurchaseOrderId("");
-        setLinkReplacementPoNow(false);
         setUploadedUrls([]);
     };
 
@@ -112,8 +107,7 @@ export function InspectionDiagnosisModal({
             : outcome === "Repairable"
               ? detailNotes.trim().length > 0 && parseFloat(estimatedRepairCost) > 0
               : outcome === "Not Repairable"
-                ? detailNotes.trim().length > 0 &&
-                  (!linkReplacementPoNow || linkedPurchaseOrderId.trim().length > 0)
+                ? detailNotes.trim().length > 0
                 : false;
 
     const handleSubmit = async () => {
@@ -127,8 +121,6 @@ export function InspectionDiagnosisModal({
             if (uploadedUrls.length) payload.attachments = uploadedUrls.join(",");
         } else {
             payload.detailNotes = detailNotes.trim();
-            if (linkReplacementPoNow && linkedPurchaseOrderId.trim())
-                payload.linkedPurchaseOrderId = linkedPurchaseOrderId.trim();
         }
         await onSubmit(payload);
         reset();
@@ -171,7 +163,7 @@ export function InspectionDiagnosisModal({
                         Inspection
                     </DialogTitle>
                     <DialogDescription>
-                        Choose exactly one outcome. The form shows asset context for repair and replacement paths.
+                        Choose exactly one outcome. For repairs, submit scope and cost to Finance. For not repairable, provide an explanation only — Finance handles replacement procurement.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -206,7 +198,7 @@ export function InspectionDiagnosisModal({
                                 <ShieldAlert className={`h-5 w-5 shrink-0 ${outcome === "Not Repairable" ? "text-red-600" : "text-muted-foreground"}`} />
                                 <div>
                                     <p className="text-sm font-medium">Not Repairable</p>
-                                    <p className="text-xs text-muted-foreground">Link a replacement PO for Finance approval</p>
+                                    <p className="text-xs text-muted-foreground">Explain why replacement is required; Finance will review next</p>
                                 </div>
                             </button>
                             <button
@@ -374,8 +366,8 @@ export function InspectionDiagnosisModal({
                     {outcome === "Not Repairable" && (
                         <div className="space-y-4 border-t pt-4">
                             <p className="text-xs text-muted-foreground">
-                                This sends the case to <strong>Finance</strong> for approval. After approval, Procurement can fulfill a PO if needed, or Finance can register a
-                                replacement if you already have one.
+                                This sends the case to <strong>Finance</strong> with your explanation. Procurement or Finance will handle any replacement purchase order — you do not
+                                link a PO from this step.
                             </p>
                             <div className="space-y-2">
                                 <Label>Why not repairable?</Label>
@@ -383,50 +375,8 @@ export function InspectionDiagnosisModal({
                                     value={detailNotes}
                                     onChange={(e) => setDetailNotes(e.target.value)}
                                     rows={4}
-                                    placeholder="Explain why replacement is required..."
+                                    placeholder="Explain why the asset cannot be repaired..."
                                 />
-                            </div>
-                            <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
-                                <p className="text-xs font-medium text-foreground">Replacement purchase order</p>
-                                <div className="flex flex-col gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setLinkReplacementPoNow(false);
-                                            setLinkedPurchaseOrderId("");
-                                        }}
-                                        className={`text-left rounded-md border px-3 py-2 text-sm transition-colors ${
-                                            !linkReplacementPoNow
-                                                ? "border-primary bg-primary/10 ring-1 ring-primary"
-                                                : "border-border hover:bg-muted/50"
-                                        }`}
-                                    >
-                                        No PO yet — Finance reviews first
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setLinkReplacementPoNow(true)}
-                                        className={`text-left rounded-md border px-3 py-2 text-sm transition-colors ${
-                                            linkReplacementPoNow
-                                                ? "border-primary bg-primary/10 ring-1 ring-primary"
-                                                : "border-border hover:bg-muted/50"
-                                        }`}
-                                    >
-                                        Link an existing replacement PO
-                                    </button>
-                                </div>
-                                {linkReplacementPoNow && (
-                                    <div className="space-y-2 pt-1">
-                                        <Label htmlFor="nr-po-id">Purchase order ID</Label>
-                                        <Input
-                                            id="nr-po-id"
-                                            value={linkedPurchaseOrderId}
-                                            onChange={(e) => setLinkedPurchaseOrderId(e.target.value)}
-                                            placeholder="Paste PO id from Procurement"
-                                        />
-                                        <p className="text-xs text-muted-foreground">The PO must belong to your organization.</p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}

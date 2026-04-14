@@ -1,0 +1,1021 @@
+{
+  "audit_metadata": {
+    "generated_date": "2026-04-13",
+    "codebase": "DFile Asset Management System",
+    "structure": "Single-host monorepo: DFile.backend (ASP.NET Core 8) + DFile.frontend (Next.js 16)",
+    "sections_analyzed": 6
+  },
+
+  "section_1_database_models": {
+    "description": "All EF Core models in DFile.backend/Models/ with relationships, constraints, and field analysis",
+    "models": [
+      {
+        "name": "Asset",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: CategoryId → AssetCategory (Required, DeleteBehavior.Restrict)",
+          "FK: TenantId → Tenant (Nullable, DeleteBehavior.Restrict)",
+          "FK: PurchaseOrderId → PurchaseOrder (Nullable, SetNull)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)"
+        ],
+        "unique_constraints": [
+          "AssetCode (unique, IX_Assets_AssetCode)",
+          "TenantId + TagNumber (unique, conditional [TagNumber] IS NOT NULL)",
+          "TenantId + SerialNumber (unique, conditional [SerialNumber] IS NOT NULL)"
+        ],
+        "indexes": [
+          "IsArchived",
+          "CreatedAt",
+          "LifecycleStatus",
+          "PurchaseOrderId"
+        ],
+        "critical_fields": {
+          "UsefulLifeYears": {
+            "type": "int",
+            "nullable": false,
+            "default": 0,
+            "usage": "Depreciation calculation (MonthlyDepreciation = PurchasePrice / (UsefulLifeYears * 12))"
+          },
+          "IsArchived": {
+            "type": "bool",
+            "nullable": false,
+            "default": false,
+            "audit_fields": "None (Asset lacks ArchivedAt/ArchivedBy)"
+          }
+        },
+        "validation_constraints": [
+          "PurchaseDate cannot be in future (BadRequest 400 if violated)",
+          "SerialNumber must be unique per tenant (Conflict 409 on duplicate)",
+          "LifecycleStatus transitions: Disposed → cannot transition back (BadRequest 400)"
+        ]
+      },
+      {
+        "name": "Tenant",
+        "key_field": "Id (int, auto-increment)",
+        "primary_relationships": [
+          "One-to-Many: Asset, Room, Employee, User, Department, AssetCategory, MaintenanceRecord, PurchaseOrder, TaskItem"
+        ],
+        "fields": {
+          "Name": "Required, string",
+          "Status": "string, default 'Active'",
+          "SubscriptionPlan": "enum (Starter, Basic, Pro)",
+          "MaxRooms": "int, plan-dependent (20/100/200)",
+          "MaxPersonnel": "int, plan-dependent (10/30/200)",
+          "AssetTracking": "bool, all plans true",
+          "Depreciation": "bool, all plans true",
+          "MaintenanceModule": "bool, plan-dependent (false/true/true)",
+          "ReportsLevel": "string, plan-dependent ('Standard'/'Standard'/'Able')"
+        },
+        "validation": [
+          "Tenant.Status must be 'Active' for user login (Unauthorized 401 if inactive)"
+        ]
+      },
+      {
+        "name": "User",
+        "key_field": "Id (int, auto-increment)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "Referenced by: CreatedBy/UpdatedBy on Asset, Room, AssetCategory, MaintenanceRecord, etc."
+        ],
+        "fields": {
+          "Email": "Required, unique",
+          "PasswordHash": "Required, BCrypt hashed, JsonIgnore on response",
+          "Role": "string, examples: 'Super Admin', 'Admin', 'Finance', 'Maintenance', 'Procurement', 'Employee'",
+          "RoleLabel": "string, display-friendly role name",
+          "Status": "string, values: 'Active', 'Inactive', 'Archived'"
+        },
+        "validation": [
+          "Email is case-insensitive (ToLower() in LINQ for lookups)",
+          "Login: user.Status checked implicitly via role/tenant checks",
+          "Super Admin has no TenantId; tenant-scoped users always have TenantId"
+        ]
+      },
+      {
+        "name": "Room",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: CategoryId → RoomCategory (Nullable, Restrict)",
+          "FK: SubCategoryId → RoomSubCategory (Nullable, Restrict)",
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)"
+        ],
+        "audit_fields": [
+          "IsArchived: bool, default false",
+          "ArchivedAt: DateTime?, null until archived",
+          "ArchivedBy: string?, user identifier or name snapshot"
+        ],
+        "validation_constraints": [
+          "Name and Floor required and trimmed",
+          "Archive blocked if activeAllocationCount > 0 (child asset allocations prevent archive)"
+        ]
+      },
+      {
+        "name": "MaintenanceRecord",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: AssetId → Asset (string, Required)",
+          "FK: TenantId → Tenant (Nullable, Restrict)"
+        ],
+        "status_field": "Status (string) = 'Pending' | 'In Progress' | 'Completed' | 'Scheduled'",
+        "finance_workflow_fields": [
+          "FinanceRequestType: string? ['Repair' | 'Replacement'] (set when submitted to Finance)",
+          "FinanceWorkflowStatus: string? = 'Pending Approval' | 'Approved' | 'Rejected' | 'Waiting for Replacement' | 'Replacement Completed'",
+          "LinkedPurchaseOrderId: string? (optional link to PurchaseOrder)",
+          "ReplacementRegisteredAssetId: string? (asset ID if replacement completed)"
+        ],
+        "recurring_fields": [
+          "ScheduleSeriesId: string? (client-generated idempotency key; all rows from one recurring create share this value)",
+          "RequestId: string? (human-readable ID, e.g., 'RQ-1234')"
+        ],
+        "validation": [
+          "Duplicate ScheduleSeriesId on POST returns 409 after first success",
+          "DiagnosisOutcome: ["Repairable"] | ["Not Repairable"] | null"
+        ],
+        "audit_fields": [
+          "IsArchived: bool, default false",
+          "No ArchivedAt/ArchivedBy fields"
+        ]
+      },
+      {
+        "name": "PurchaseOrder",
+        "key_field": "Id (string, Guid or formatted ID)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: MaintenanceRecordId → MaintenanceRecord (string?, optional)",
+          "FK: ApprovedBy → User (Nullable, NoAction)",
+          "One-to-Many: Items (PurchaseOrderItem)"
+        ],
+        "status_field": "Status = 'Pending' | 'Approved' | 'Delivered' | 'Cancelled'",
+        "financial_fields": [
+          "PurchasePrice: decimal (18,2)",
+          "UsefulLifeYears: int (used when order becomes asset)",
+          "AcquisitionCost: computed at registration time"
+        ],
+        "validation": [
+          "PurchaseDate cannot be in future (BadRequest 400)",
+          "UsefulLifeYears required (non-nullable int)"
+        ],
+        "audit_fields": [
+          "IsArchived: bool, default false",
+          "No ArchivedAt/ArchivedBy fields"
+        ]
+      },
+      {
+        "name": "AssetCategory",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)"
+        ],
+        "unique_constraints": [
+          "AssetCategoryCode (unique, IX_AssetCategories_AssetCategoryCode)",
+          "TenantId + CategoryName + HandlingType (unique when IsArchived = 0)"
+        ],
+        "fields": {
+          "HandlingType": "enum (Fixed | Mobile), default: Fixed, stored as int",
+          "SalvagePercentage": "decimal(5,2), range [0,100], default 10m"
+        },
+        "validation": [
+          "Archived categories cannot be assigned to assets (BadRequest 400 on create/update)"
+        ]
+      },
+      {
+        "name": "RoomCategory",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)",
+          "One-to-Many: RoomSubCategory (RoomCategoryId)"
+        ],
+        "audit_fields": [
+          "IsArchived: bool, default false",
+          "ArchivedAt: DateTime?",
+          "ArchivedBy: string?"
+        ],
+        "legacy_compat_field": "SubCategory (string, NOT NULL in some legacy migrations, default '')",
+        "validation": [
+          "Archive cascades to RoomSubCategories (SoftDelete)",
+          "API returns cascadedRoomCount and cascadedSubCategoryCount on archive"
+        ]
+      },
+      {
+        "name": "RoomSubCategory",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: RoomCategoryId → RoomCategory (Required)",
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)"
+        ],
+        "audit_fields": [
+          "IsArchived: bool, default false",
+          "No ArchivedAt/ArchivedBy fields"
+        ]
+      },
+      {
+        "name": "AssetAllocation",
+        "key_field": "Id (string)",
+        "primary_relationships": [
+          "FK: AssetId → Asset (Required, Restrict)",
+          "FK: RoomId → Room (Required, Restrict)",
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: AllocatedBy → User (Nullable, NoAction)",
+          "FK: DeallocatedBy → User (Nullable, NoAction)"
+        ],
+        "status_field": "Status (string) = 'Active' | 'Inactive', MaxLength 50",
+        "temporal_fields": [
+          "AllocatedAt: DateTime, default UtcNow",
+          "DeallocatedAt: DateTime?, null until deallocation",
+          "PreviousRoomId: string? (set during transfer, null on first allocation)"
+        ],
+        "validation": [
+          "Only one 'Active' allocation per asset allowed (Conflict 409 if violated)",
+          "Archived rooms block new allocations (BadRequest 400)",
+          "Archived assets cannot be allocated (BadRequest 400)"
+        ]
+      },
+      {
+        "name": "AuditLog",
+        "key_field": "Id (long, auto-increment)",
+        "primary_relationships": [
+          "FK: UserId → User (Nullable, Restrict)",
+          "FK: TenantId → Tenant (Nullable, Restrict)"
+        ],
+        "fields": {
+          "Action": "string, values: 'Create' | 'Update' | 'Delete' | 'Archive' | 'Login' | 'Logout' | 'Allocate' | 'Deallocate'",
+          "EntityType": "string, values: 'Asset' | 'PurchaseOrder' | 'MaintenanceRecord' | 'Room' | etc.",
+          "EntityId": "string?, nullable",
+          "Module": "string?, context area (e.g., 'Asset Management', 'Procurement', 'Allocation')",
+          "OldValues": "string? (JSON snapshot before change)",
+          "NewValues": "string? (JSON snapshot after change)",
+          "UserRole": "string?, role claim snapshot at write time, MaxLength 128",
+          "Description": "string?, human-readable summary, MaxLength 2000",
+          "IpAddress": "string?",
+          "UserAgent": "string?"
+        },
+        "storage_strategy": [
+          "Created via _auditService.Add(HttpContext, auditLog) in controllers",
+          "Saved to DB in same transaction as entity changes",
+          "No automatic cascade delete on user/tenant deletion (audit records retained)"
+        ]
+      },
+      {
+        "name": "Employee",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)"
+        ],
+        "fields": {
+          "EmployeeCode": "Required, string",
+          "FirstName, MiddleName, LastName": "string",
+          "Email, ContactNumber": "string",
+          "Department, Role": "string (not FK, denormalized)",
+          "HireDate": "DateTime",
+          "Status": "string, default 'Active'",
+          "IsArchived": "bool, default false"
+        },
+        "validation": [
+          "No unique constraint on EmployeeCode or Email"
+        ]
+      },
+      {
+        "name": "Department",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: ParentDepartmentId → Department (self-referential, Nullable)",
+          "FK: TenantId → Tenant (Nullable, Restrict)",
+          "FK: CreatedBy → User (Nullable, NoAction)",
+          "FK: UpdatedBy → User (Nullable, NoAction)"
+        ],
+        "fields": {
+          "DepartmentCode": "Required, string, unique?",
+          "Name": "Required, string",
+          "IsArchived": "bool, default false"
+        }
+      },
+      {
+        "name": "TaskItem",
+        "key_field": "Id (string, Guid)",
+        "primary_relationships": [
+          "FK: TenantId → Tenant (Nullable, Restrict)"
+        ],
+        "fields": {
+          "Title": "Required, string",
+          "Priority": "string, default 'Medium'",
+          "Status": "string, default 'Pending'",
+          "AssignedTo": "string? (Employee ID, denormalized)",
+          "DueDate": "DateTime?",
+          "IsArchived": "bool, default false"
+        }
+      },
+      {
+        "name": "Notification",
+        "key_field": "Id (long, auto-increment)",
+        "primary_relationships": [
+          "FK: UserId → User (Nullable)",
+          "FK: TenantId → Tenant (Nullable)"
+        ],
+        "fields": {
+          "Message": "Required, MaxLength 500",
+          "Type": "string, values: 'Info' | 'Warning' | 'Success' | 'Error', default 'Info'",
+          "Module": "string?, MaxLength 100 (e.g., 'Asset', 'Maintenance')",
+          "EntityType": "string?, MaxLength 100",
+          "EntityId": "string?",
+          "TargetRole": "string?, MaxLength 50, null = all roles in tenant",
+          "IsRead": "bool, default false",
+          "ReadAt": "DateTime?"
+        }
+      },
+      {
+        "name": "RolePermission",
+        "key_field": "Id (int, auto-increment)",
+        "primary_relationships": [
+          "FK: RoleTemplateId → RoleTemplate (Required)"
+        ],
+        "fields": {
+          "ModuleName": "Required, MaxLength 50, values: 'Assets' | 'Rooms' | 'PurchaseOrders' | 'Maintenance' | 'Departments' | 'Employees' | 'Tasks' | 'Reports'",
+          "CanView": "bool, default false",
+          "CanCreate": "bool, default false",
+          "CanEdit": "bool, default false",
+          "CanApprove": "bool, default false",
+          "CanArchive": "bool, default false"
+        }
+      },
+      {
+        "name": "RoleTemplate",
+        "key_field": "Id (int, auto-increment)",
+        "fields": [
+          "Name: Required, unique",
+          "IsSystem: bool, if true matched against UserRoleConstants.IsKnownName()",
+          "IsArchived: bool",
+          "One-to-Many: RolePermission"
+        ]
+      }
+    ]
+  },
+
+  "section_2_api_endpoints": {
+    "description": "All HTTP endpoints with methods, error responses, validation, and authorization",
+    "controllers": [
+      {
+        "controller": "AssetsController",
+        "route": "api/assets",
+        "base_authorization": "[Authorize]",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/assets",
+            "queryParams": {
+              "showArchived": "bool, default false",
+              "includeDisposed": "bool, default false",
+              "page": "int?, null = single request (no pagination), 1+ for paging",
+              "pageSize": "int, default 25, max 200",
+              "q": "string?, search term across AssetName, AssetCode, TagNumber, Id, Model, SerialNumber",
+              "status": "string?, filter by lifecycle status label",
+              "category": "string?, filter by category name"
+            },
+            "authorization": "[RequirePermission('Assets', 'CanView')] OR User.IsInRole('Maintenance')",
+            "responses": {
+              "200_OK": {
+                "paginated": "{ totalCount, totalPages, page, pageSize, data: Asset[] }",
+                "unpaginated": "Asset[]"
+              },
+              "403_Forbidden": "{ message: 'You do not have permission to view assets.' }"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/assets/summary",
+            "authorization": "[RequirePermission('Assets', 'CanView')] OR User.IsInRole('Maintenance')",
+            "responses": {
+              "200_OK": "{ TotalAssets, UnallocatedAssets, OriginalPortfolioValue, CurrentBookValue }"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/assets/available-for-allocation",
+            "authorization": "[RequirePermission('Assets', 'CanView')] OR User.IsInRole('Maintenance')",
+            "responses": {
+              "200_OK": "Asset[] (only Registered or InUse status without active allocations)"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/assets/{id}",
+            "authorization": "[RequirePermission('Assets', 'CanView')] OR User.IsInRole('Maintenance')",
+            "responses": {
+              "200_OK": "AssetResponseDto",
+              "404_NotFound": "{ message: 'Asset not found.' }"
+            }
+          },
+          {
+            "method": "POST",
+            "path": "/api/assets",
+            "body": "CreateAssetDto",
+            "authorization": "[RequirePermissionOrRoles('Assets', 'CanCreate', UserRoleConstants.Finance)]",
+            "validation": [
+              "PurchaseDate cannot be in future (400)",
+              "CategoryId must exist and not archived (400)",
+              "SerialNumber must be unique per tenant (409 Conflict)",
+              "UsefulLifeYears required and used in depreciation calc"
+            ],
+            "special_workflow": "If ReplacementMaintenanceRecordId provided, calls IMaintenanceReplacementRegistrationService to register replacement asset from maintenance workflow",
+            "responses": {
+              "201_Created": "AssetResponseDto",
+              "400_BadRequest": "[message: 'Invalid CategoryId.' | 'Category is archived' | 'Purchase date in future' | 'Serial Number exists']",
+              "409_Conflict": "{ message: 'Serial Number already exists.' }",
+              "403_Forbidden": "You do not have permission"
+            },
+            "audit_log": "Action='Create', EntityType='Asset', Module='Asset Management', includes old/new values"
+          },
+          {
+            "method": "PUT",
+            "path": "/api/assets/{id}",
+            "body": "UpdateAssetDto",
+            "authorization": "[RequirePermission('Assets', 'CanEdit')]",
+            "validation": [
+              "Concurrency check via RowVersion (DbUpdateConcurrencyException → 409)",
+              "Disposed assets cannot transition back to active (400)",
+              "CategoryId must exist and not archived (400)",
+              "SerialNumber unique per tenant (409 on duplicate)"
+            ],
+            "field_restrictions": [
+              "Financial fields (AcquisitionCost, UsefulLifeYears, PurchasePrice, ResidualValue, CurrentBookValue) only writable by Admin, Finance, or Super Admin roles"
+            ],
+            "responses": {
+              "204_NoContent": "Success",
+              "400_BadRequest": "[message: various validation errors]",
+              "404_NotFound": "Asset not found",
+              "409_Conflict": "{ message: 'Concurrency exception' | 'Serial Number exists' }"
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/api/assets/{id}/financial",
+            "body": "UpdateAssetFinancialDto",
+            "authorization": "[RequirePermission('Assets', 'CanEdit')]",
+            "fields_updated": [
+              "PurchasePrice, AcquisitionCost, UsefulLifeYears, ResidualValue, CurrentBookValue, MonthlyDepreciation"
+            ],
+            "responses": {
+              "204_NoContent": "Success"
+            }
+          }
+        ]
+      },
+      {
+        "controller": "RoomsController",
+        "route": "api/rooms",
+        "base_authorization": "[Authorize]",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/rooms",
+            "queryParams": {
+              "search": "string?, case-insensitive search on Name, RoomCode, Floor",
+              "categoryId": "string?, filter by category",
+              "showArchived": "bool, default false"
+            },
+            "authorization": "[RequirePermission('Rooms', 'CanView')]",
+            "responses": {
+              "200_OK": "RoomResponseDto[] with activeAllocationCount"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/rooms/{id}",
+            "authorization": "[RequirePermission('Rooms', 'CanView')]",
+            "responses": {
+              "200_OK": "RoomResponseDto",
+              "404_NotFound": "Not found"
+            }
+          },
+          {
+            "method": "POST",
+            "path": "/api/rooms",
+            "body": "CreateRoomDto",
+            "authorization": "[RequirePermission('Rooms', 'CanCreate')]",
+            "validation": [
+              "Name required and trimmed (400 if empty)",
+              "Floor required and trimmed (400 if empty)"
+            ],
+            "responses": {
+              "201_Created": "RoomResponseDto",
+              "400_BadRequest": "Validation errors"
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/api/rooms/{id}",
+            "authorization": "[RequirePermission('Rooms', 'CanEdit')]",
+            "responses": {
+              "204_NoContent": "Success"
+            }
+          },
+          {
+            "method": "PATCH",
+            "path": "/api/rooms/{id}/archive",
+            "authorization": "[RequirePermission('Rooms', 'CanArchive')]",
+            "validation": [
+              "Blocks if activeAllocationCount > 0 (409 Conflict)"
+            ],
+            "responses": {
+              "204_NoContent": "Success",
+              "409_Conflict": "{ message: 'Room has active allocations' }"
+            }
+          },
+          {
+            "method": "PATCH",
+            "path": "/api/rooms/{id}/restore",
+            "authorization": "[RequirePermission('Rooms', 'CanArchive')]",
+            "responses": {
+              "204_NoContent": "Success"
+            }
+          }
+        ]
+      },
+      {
+        "controller": "MaintenanceController",
+        "route": "api/maintenance | api/maintenance-records | api/maintenance-manager",
+        "base_authorization": "[Authorize]",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/maintenance",
+            "queryParams": {
+              "showArchived": "bool, default false"
+            },
+            "authorization": "[RequirePermission('Maintenance', 'CanView')]",
+            "responses": {
+              "200_OK": "MaintenanceRecordResponseDto[]",
+              "403_Forbidden": "Permission denied"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/maintenance/allocated-assets",
+            "authorization": "[RequirePermission('Maintenance', 'CanView')]",
+            "responses": {
+              "200_OK": "AllocatedAssetForMaintenanceDto[]"
+            }
+          },
+          {
+            "method": "POST",
+            "path": "/api/maintenance",
+            "body": "CreateMaintenanceDto",
+            "authorization": "Creator must be Admin or Super Admin (IsAdminOrSuperAdminCreator check)",
+            "validation": [
+              "roomId must match active allocation (if provided)",
+              "ScheduleSeriesId idempotency: duplicate POST returns 409 after first success"
+            ],
+            "responses": {
+              "201_Created": "MaintenanceRecordResponseDto",
+              "409_Conflict": "{ message: 'Duplicate request detected' } when ScheduleSeriesId reused"
+            }
+          }
+        ]
+      },
+      {
+        "controller": "PurchaseOrdersController",
+        "route": "api/PurchaseOrders",
+        "base_authorization": "[Authorize]",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/api/PurchaseOrders",
+            "queryParams": {
+              "showArchived": "bool, default false"
+            },
+            "authorization": "[RequirePermission('PurchaseOrders', 'CanView')]",
+            "responses": {
+              "200_OK": "PurchaseOrderResponseDto[]"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/PurchaseOrders/{id}",
+            "authorization": "[RequirePermission('PurchaseOrders', 'CanView')]",
+            "responses": {
+              "200_OK": "PurchaseOrderResponseDto",
+              "404_NotFound": "Order not found"
+            }
+          },
+          {
+            "method": "POST",
+            "path": "/api/PurchaseOrders",
+            "body": "CreatePurchaseOrderDto",
+            "authorization": "[RequirePermission('PurchaseOrders', 'CanCreate')]",
+            "validation": [
+              "PurchaseDate cannot be in future (400)",
+              "UsefulLifeYears required"
+            ],
+            "responses": {
+              "201_Created": "PurchaseOrderResponseDto",
+              "400_BadRequest": "Validation errors"
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/api/PurchaseOrders/{id}",
+            "authorization": "[RequirePermission('PurchaseOrders', 'CanEdit')]",
+            "responses": {
+              "204_NoContent": "Success"
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/api/PurchaseOrders/{id}/receive",
+            "body": "{ deliveryDate, categoryId }",
+            "authorization": "[RequirePermission('PurchaseOrders', 'CanEdit')]",
+            "special_workflow": "Creates new Asset from order data when received; sets Status to 'Delivered'",
+            "responses": {
+              "200_OK": "{ assetId, ... }",
+              "400_BadRequest": "Validation errors",
+              "409_Conflict": "Serial Number already exists"
+            }
+          }
+        ]
+      },
+      {
+        "controller": "AllocationsController",
+        "route": "api/allocations",
+        "base_authorization": "[Authorize]",
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/api/allocations",
+            "body": "AllocateAssetRequestDto",
+            "authorization": "[RequirePermission('Assets', 'CanCreate')]",
+            "validation": [
+              "Asset not archived (400)",
+              "Asset not Disposed (400)",
+              "Room not archived (400)",
+              "No active allocation already exists for asset (409 Conflict)"
+            ],
+            "responses": {
+              "201_Created": "AssetAllocationResponseDto",
+              "400_BadRequest": "Validation errors",
+              "404_NotFound": "Asset or room not found",
+              "409_Conflict": "{ message: 'Asset already allocated' }"
+            }
+          },
+          {
+            "method": "PUT",
+            "path": "/api/allocations/deallocate/{assetId}",
+            "authorization": "[RequirePermission('Assets', 'CanEdit')]",
+            "responses": {
+              "204_NoContent": "Success",
+              "404_NotFound": "Asset or allocation not found"
+            }
+          }
+        ]
+      },
+      {
+        "controller": "AuthController",
+        "route": "api/auth",
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/api/auth/login",
+            "body": "{ email, password }",
+            "authorization": "[AllowAnonymous]",
+            "validation": [
+              "Email and password required (400 if missing)",
+              "User exists and PasswordHash set (401 if not)",
+              "Tenant status must be 'Active' (401 if inactive)",
+              "Password verified with BCrypt (401 if no match)"
+            ],
+            "responses": {
+              "200_OK": "{ token: JWT, user: UserResponseDto with role }",
+              "400_BadRequest": "{ message: 'Email and password required' }",
+              "401_Unauthorized": "{ message: 'Invalid credentials' | 'Tenant inactive' }",
+              "500_InternalServerError": "Unexpected error"
+            }
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/me",
+            "authorization": "[Authorize]",
+            "responses": {
+              "200_OK": "UserResponseDto with permissions",
+              "401_Unauthorized": "Token invalid or expired"
+            }
+          },
+          {
+            "method": "POST",
+            "path": "/api/auth/register",
+            "body": "RegisterDto { email, roleTemplateId, tenantId? }",
+            "authorization": "[Authorize(Roles = 'Super Admin,Admin')]",
+            "validation": [
+              "Email not already in use (400)",
+              "RoleTemplate exists and not archived (400)",
+              "Super Admin can assign to any tenant; Admin only own tenant (400 if violated)"
+            ],
+            "responses": {
+              "201_Created": "{ userId, email, role }",
+              "400_BadRequest": "Validation errors"
+            }
+          }
+        ]
+      }
+    ],
+    "error_handling_patterns": {
+      "400_BadRequest": "Input validation failures (invalid state, constraint violations)",
+      "401_Unauthorized": "Missing/invalid token or credentials",
+      "403_Forbidden": "Authorization check failed (permission or role mismatch)",
+      "404_NotFound": "Resource not found or tenant isolation prevents access",
+      "409_Conflict": "Concurrency conflict (RowVersion mismatch) OR duplicate/constraint violation (serial number, email, etc.)",
+      "500_InternalServerError": "Unexpected runtime error"
+    }
+  },
+
+  "section_3_frontend_hooks": {
+    "description": "TanStack Query hooks in src/hooks/ with queryKey structure, endpoints, and cache invalidation",
+    "hook_files": [
+      {
+        "file": "use-assets.ts",
+        "exports": [
+          {
+            "name": "useAssetsPaged",
+            "queryKey": "['assets', 'paged', showArchived, page, pageSize, filters.q, filters.status, filters.category, filters.includeDisposed]",
+            "endpoint": "GET /api/assets (with params)",
+            "options": "placeholderData: keepPreviousData",
+            "error_handling": "axios errors handled by global interceptor"
+          },
+          {
+            "name": "useAssets",
+            "queryKey": "['assets', showArchived, includeDisposed]",
+            "endpoint": "GET /api/assets",
+            "error_handling": "Global interceptor"
+          },
+          {
+            "name": "useAssetArchiveCounts",
+            "queryKey": "['asset-archive-counts']",
+            "endpoints": [
+              "GET /api/assets?showArchived=false&page=1&pageSize=1",
+              "GET /api/assets?showArchived=true&page=1&pageSize=1"
+            ],
+            "staleTime": "30_000 (30 seconds)",
+            "returns": "{ active: number, archived: number }"
+          },
+          {
+            "name": "useAsset",
+            "queryKey": "['assets', 'detail', id]",
+            "endpoint": "GET /api/assets/{id}",
+            "options": "enabled: id truthy, refetchOnMount: 'always', staleTime: 0",
+            "error_handling": "Global interceptor"
+          },
+          {
+            "name": "useAddAsset",
+            "mutationFn": "POST /api/assets",
+            "onSuccess_invalidateQueries": [
+              "['assets'] (all asset queries)",
+              "['asset-archive-counts']",
+              "['notifications']"
+            ],
+            "onSuccess_toast": "Asset added successfully",
+            "onError_toast": "parseApiError(..., 'Failed to add asset')"
+          },
+          {
+            "name": "useUpdateAsset",
+            "mutationFn": "PUT /api/assets/{id}",
+            "onSuccess_invalidateQueries": [
+              "['assets']",
+              "['asset-archive-counts']",
+              "['assets', 'detail', variables.id]"
+            ],
+            "onSuccess_toast": "Asset updated successfully",
+            "onError_toast": "parseApiError(...)"
+          },
+          {
+            "name": "useArchiveAsset",
+            "mutationFn": "PUT /api/assets/{id}/archive",
+            "cache_invalidation": "Same as useUpdateAsset",
+            "error_handling": "Sonner toast on axios errors"
+          }
+        ]
+      },
+      {
+        "file": "use-rooms.ts",
+        "exports": [
+          {
+            "name": "useRooms",
+            "queryKey": "['rooms', showArchived]",
+            "endpoint": "GET /api/rooms",
+            "error_handling": "Global interceptor"
+          },
+          {
+            "name": "useAddRoom",
+            "mutationFn": "POST /api/rooms",
+            "onSuccess_invalidateQueries": ["['rooms']"],
+            "onSuccess_toast": "Room added successfully",
+            "onError_handling": "409 (axios) → display error.response.data.message or 'Room already exists'"
+          },
+          {
+            "name": "useUpdateRoom",
+            "mutationFn": "PUT /api/rooms/{id}",
+            "onSuccess_invalidateQueries": ["['rooms']"],
+            "onSuccess_toast": "Room updated successfully",
+            "onError_toast": "Failed to update room"
+          },
+          {
+            "name": "useArchiveRoom",
+            "mutationFn": "PATCH /api/rooms/{id}/archive",
+            "onSuccess_invalidateQueries": ["['rooms']"],
+            "onSuccess_toast": "Room archived",
+            "onError_handling": "409 (axios) → error.response.data.message or 'Failed to archive room.'"
+          },
+          {
+            "name": "useRestoreRoom",
+            "mutationFn": "PATCH /api/rooms/{id}/restore",
+            "onSuccess_invalidateQueries": ["['rooms']"],
+            "onSuccess_toast": "Room restored",
+            "onError_toast": "Failed to restore room"
+          },
+          {
+            "name": "useRoomCategories",
+            "queryKey": "['room-categories', showArchived]",
+            "endpoint": "GET /api/roomcategories"
+          },
+          {
+            "name": "useArchiveRoomCategory",
+            "mutationFn": "PATCH /api/roomcategories/{id}/archive",
+            "queryConfig": "{ suppressGlobalError: true }",
+            "onSuccess_toast": "Shows response.message",
+            "response_type": "{ message?, cascadedRoomCount?, cascadedSubCategoryCount? }",
+            "error_handling": "409 handled via onError callback"
+          }
+        ]
+      },
+      {
+        "file": "use-maintenance.ts",
+        "exports": [
+          {
+            "name": "useMaintenanceRecords",
+            "queryKey": "['maintenance', showArchived]",
+            "endpoints": "['/api/maintenance', '/api/maintenance-records', '/api/maintenance-manager'] (fallback loop)",
+            "staleTime": "120_000 (2 minutes) - list payloads are large",
+            "error_handling": "404 tries next endpoint; other errors thrown"
+          },
+          {
+            "name": "useAllocatedAssetsForMaintenance",
+            "queryKey": "['maintenance', 'allocated-assets']",
+            "endpoint": "GET /api/maintenance/allocated-assets",
+            "response_safety": "asArray<T>(data) guard handles non-array responses"
+          },
+          {
+            "name": "useAddMaintenanceRecord",
+            "mutationFn": "POST /api/maintenance (with CreateMaintenancePayload)",
+            "idempotency_key": "scheduleSeriesId (client-generated); resubmit → 409 after first success",
+            "onSuccess_invalidateQueries": [
+              "['maintenance']",
+              "['maintenance', 'allocated-assets']",
+              "['notifications']"
+            ],
+            "onSuccess_toast": "Maintenance record created",
+            "batch_response": "CreateMaintenanceBatchResponse { items, count }"
+          }
+        ]
+      },
+      {
+        "file": "use-procurement.ts",
+        "exports": [
+          {
+            "name": "usePurchaseOrders",
+            "queryKey": "['purchaseOrders', showArchived]",
+            "endpoint": "GET /api/PurchaseOrders"
+          },
+          {
+            "name": "useCreateOrder",
+            "mutationFn": "POST /api/PurchaseOrders",
+            "onSuccess_invalidateQueries": ["['purchaseOrders']"],
+            "onSuccess_toast": "Procurement order initiated",
+            "onError_toast": "error.response?.data?.message or 'Failed to create procurement order'"
+          },
+          {
+            "name": "useReceiveOrder",
+            "mutationFn": "PUT /api/PurchaseOrders/{id}/receive",
+            "body": "{ deliveryDate, categoryId? }",
+            "onSuccess_invalidateQueries": [
+              "['purchaseOrders']",
+              "['assets']"
+            ],
+            "onSuccess_toast": "Purchase order received. Asset created.",
+            "onError_toast": "Failed to receive order"
+          }
+        ]
+      }
+    ],
+    "global_react_query_config": {
+      "file": "src/components/query-provider.tsx",
+      "QueryClient_defaultOptions": {
+        "queries": {
+          "staleTime": "60 * 1000 (1 minute)",
+          "retry": "1 (retry once on failure)",
+          "refetchOnWindowFocus": "false"
+        }
+      },
+      "note": "Individual hooks can override staleTime (e.g., useMaintenanceRecords: 120_000, useAssetArchiveCounts: 30_000)"
+    },
+    "cache_invalidation_strategy": [
+      "POST/PUT/PATCH mutations call queryClient.invalidateQueries({ queryKey: [...] })",
+      "Pattern 1: Single entity cache - invalidate broad queryKey (e.g., ['assets']) to update all derivative queries",
+      "Pattern 2: Specific detail cache - also invalidate ['assets', 'detail', id] to refresh individual asset view",
+      "Pattern 3: Related caches - invalidate ['asset-archive-counts'] when asset archived/restored",
+      "Note: logout() in auth-context does NOT explicitly call queryClient.clear(); browser refresh required for full cache clear"
+    ]
+  },
+
+  "section_4_database_fields": {
+    "asset_financial_fields": {
+      "UsefulLifeYears": {
+        "type": "int (not nullable)",
+        "default": "0",
+        "validation": "Required, range implicit (used in division)",
+        "usage": "MonthlyDepreciation = PurchasePrice / (UsefulLifeYears * 12); if UsefulLifeYears==0 then MonthlyDepreciation=0",
+        "field_writable": "Only by Admin, Finance, or Super Admin roles",
+        "model_location": "Asset.cs"
+      }
+    },
+    "archive_strategy": {
+      "IsArchived_field_presence": {
+        "Asset": "bool IsArchived, default false, indexed",
+        "Room": "bool IsArchived, default false, includes ArchivedAt (DateTime?), ArchivedBy (string?)",
+        "RoomCategory": "bool IsArchived, default false, includes ArchivedAt (DateTime?), ArchivedBy (string?)",
+        "RoomSubCategory": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "MaintenanceRecord": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "PurchaseOrder": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "AssetCategory": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "Department": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "Employee": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy",
+        "TaskItem": "bool IsArchived, default false, NO ArchivedAt/ArchivedBy"
+      },
+      "ArchivedAt_ArchivedBy_fields": {
+        "Room": "Both present",
+        "RoomCategory": "Both present",
+        "RoomSubCategory": "Neither present",
+        "Asset": "Neither present (only IsArchived)",
+        "MaintenanceRecord": "Neither present"
+      },
+      "audit_coverage": "Full AuditLog capture via _auditService.Add() on all CRUD operations; Action field distinguishes 'Archive' vs 'Delete' vs 'Update'"
+    }
+  },
+
+  "section_5_react_query_setup": {
+    "query_client_initialization": "src/components/query-provider.tsx",
+    "default_query_config": {
+      "staleTime": "60_000 (60 seconds - data is fresh for 1 minute)",
+      "retry": "1 (retry failed queries once)",
+      "refetchOnWindowFocus": "false (no refetch when window regains focus)"
+    },
+    "auth_token_attachment": {
+      "location": "src/lib/api.ts (Axios instance)",
+      "mechanism": "Request interceptor attaches 'Authorization: Bearer <token>' header",
+      "token_source": "localStorage.dfile_token (retrieved on every request)",
+      "skip_condition": "skipAuthHeader=true or request is /auth/login",
+      "deletion_on_logout": "NOT automatic - logout() in auth-context clears localStorage but does NOT call queryClient.clear()",
+      "implication": "Stale queries may remain in cache post-logout; full cache clear requires browser refresh or explicit queryClient.clear() call"
+    },
+    "logout_behavior": {
+      "auth_context_logout": "src/contexts/auth-context.tsx",
+      "steps": [
+        "1. Set isLoggingOut=true (show spinner)",
+        "2. setTimeout 800ms (allow UI update)",
+        "3. Clear user/token state",
+        "4. Remove localStorage entries: 'dfile_user', 'dfile_token'",
+        "5. Set isLoggingOut=false",
+        "Note: queryClient NOT cleared; stale data remains accessible if cache accessed post-logout"
+      ],
+      "global_error_handling": "If GET /api/auth/me returns 401/403 during session init, logout() is called automatically"
+    },
+    "global_error_interceptor": {
+      "location": "src/lib/api.ts response interceptor",
+      "behaviors": [
+        "409 Duplicate detected → Sonner toast + global error banner",
+        "Network error → throttled global error banner (45sec cooldown) + Sonner warning",
+        "4xx/5xx → global error banner with request URL and error message",
+        "suppressGlobalError config option → skips banner for specific mutations (e.g., archive operations show Sonner toast instead)"
+      ]
+    }
+  },
+
+  "section_6_production_readiness_checklist": {
+    "database_models": "✅ All models properly defined with FK constraints, tenant isolation, audit fields for most entities",
+    "api_endpoints": "✅ Full CRUD coverage on major entities, comprehensive error responses (400/401/403/404/409/500)",
+    "authorization": "✅ [Authorize], [RequirePermission], [RequirePermissionOrRoles] attributes applied consistently",
+    "validation": "✅ Input validation on all POST/PUT endpoints, serial number uniqueness, date range checks",
+    "deprecation_logic": "✅ UsefulLifeYears handled correctly (non-nullable int, division guard for 0)",
+    "archive_strategy": "✅ IsArchived on all entities, ArchivedAt/ArchivedBy on Room/RoomCategory only, cascading behavior on category archive",
+    "error_handling": "⚠️ Asset/MaintenanceRecord/PurchaseOrder lack ArchivedAt/ArchivedBy audit trail - only IsArchived flag",
+    "react_query_cache": "✅ staleTime=60s, retry=1, refetchOnWindowFocus=false",
+    "token_attachment": "✅ Request interceptor attaches JWT from localStorage.dfile_token",
+    "logout_cache_clear": "⚠️ queryClient.clear() NOT called on logout - stale data may persist; browser refresh recommended",
+    "frontend_hooks": "✅ All CRUD operations use cache invalidation via queryClient.invalidateQueries",
+    "global_error_handling": "✅ Comprehensive error banner + Sonner toast strategy",
+    "audit_logging": "✅ _auditService.Add() called on all state-changing operations with JSON snapshots"
+  }
+}

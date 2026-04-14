@@ -46,8 +46,8 @@ export interface Asset {
 }
 
 export interface CreateAssetPayload {
-    tagNumber: string;
-    desc: string;
+    desc?: string;
+    assetName?: string;
     categoryId: string;
     status?: string;
     room?: string;
@@ -60,11 +60,20 @@ export interface CreateAssetPayload {
     value?: number;
     usefulLifeYears?: number;
     purchasePrice?: number;
+    acquisitionCost?: number;
     salvagePercentage?: number;
     isSalvageOverride?: boolean;
     warrantyExpiry?: string;
     notes?: string;
     documents?: string;
+    lifecycleStatus?: number;
+    currentCondition?: number;
+    residualValue?: number | null;
+    currentBookValue?: number;
+    monthlyDepreciation?: number;
+    rowVersion?: string | null;
+    /** Completes finance maintenance replacement workflow when registering via POST /api/assets. */
+    replacementMaintenanceRecordId?: string;
 }
 
 export interface UpdateAssetPayload extends CreateAssetPayload {
@@ -132,6 +141,8 @@ export interface Room {
     status: "Available" | "Occupied" | "Maintenance" | "Deactivated";
     archived?: boolean;
     isArchived?: boolean;
+    /** Active allocations in this room; archive is blocked when greater than zero. */
+    activeAllocationCount?: number;
 }
 
 export interface MaintenanceRecord {
@@ -178,6 +189,72 @@ export interface MaintenanceRecord {
     linkedPurchaseOrderId?: string | null;
     replacementRegisteredAssetId?: string | null;
     scheduleSeriesId?: string | null;
+}
+
+/** Matches GET /api/maintenance/{id}/schedule-summary — no execution/finance/quotation fields. */
+export interface MaintenanceScheduleSummary {
+    id: string;
+    requestId?: string | null;
+    assetId: string;
+    assetName?: string | null;
+    assetCode?: string | null;
+    roomId?: string | null;
+    roomCode?: string | null;
+    roomName?: string | null;
+    roomFloor?: string | null;
+    type: string;
+    priority: string;
+    frequency?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    nextDueDate?: string | null;
+    status: string;
+    scheduleSeriesId?: string | null;
+}
+
+/** GET /api/finance/maintenance-requests and .../awaiting-parts — triage row only (no description, notes, or timeline fields). */
+export interface FinanceMaintenanceQueueRow {
+    id: string;
+    requestId?: string | null;
+    assetId: string;
+    assetName?: string | null;
+    assetCode?: string | null;
+    status: string;
+    financeRequestType?: string | null;
+    financeWorkflowStatus?: string | null;
+    diagnosisOutcome?: string | null;
+    linkedPurchaseOrderId?: string | null;
+    cost?: number | null;
+}
+
+/** Record shape accepted by MaintenanceDetailsModal (full maintenance row or finance queue shell). */
+export type MaintenanceDetailsShellRecord = MaintenanceRecord | FinanceMaintenanceQueueRow;
+
+/** GET /api/finance/maintenance-requests/{id}/submission-detail — scoped to Maintenance-submitted fields only. */
+export interface FinanceMaintenanceSubmissionDetail {
+    id: string;
+    requestId?: string | null;
+    financeRequestType: "Repair" | "Replacement" | string;
+    assetId: string;
+    assetName?: string | null;
+    assetCode?: string | null;
+    categoryName?: string | null;
+    roomId?: string | null;
+    roomCode?: string | null;
+    roomName?: string | null;
+    repairDescription?: string | null;
+    estimatedRepairCost?: number | null;
+    damagedPartImageUrls?: string[];
+    notRepairableExplanation?: string | null;
+}
+
+/** Context when registering a replacement asset from Finance maintenance workflow. */
+export interface ReplacementRegistrationContext {
+    maintenanceRecordId: string;
+    requestLabel?: string | null;
+    originalAssetId: string;
+    originalAssetName?: string | null;
+    originalAssetCode?: string | null;
 }
 
 export interface PurchaseOrder {
@@ -328,9 +405,25 @@ export interface RiskIndicators {
     fullyDepreciated: number;
     suspendedTenants: number;
 }
-export type NotificationType = "Info" | "Warning" | "Success" | "Error"; export interface Notification { id: number; type: NotificationType; message: string; isRead: boolean; createdAt: string; link?: string; module?: string; }
+export type NotificationType = "Info" | "Warning" | "Success" | "Error";
+
+export interface Notification {
+    id: number;
+    type: NotificationType;
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+    /** Optional explicit link provided by backend — used for direct navigation */
+    link?: string;
+    /** Module name (Asset, Maintenance, Procurement, etc.) */
+    module?: string;
+    /** Entity type for dynamic routing (MaintenanceRecord, Room, Asset, Category, etc.) */
+    entityType?: string;
+    /** Entity ID for dynamic routing — combined with entityType to build URL */
+    entityId?: string;
+}
 export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }
-export interface AllocatedAssetForMaintenance { assetId: string; assetCode?: string; assetName?: string; tagNumber?: string; categoryName?: string; roomId: string; roomCode?: string; roomName?: string; allocatedAt: string; tenantId?: number; }
+export interface AllocatedAssetForMaintenance { assetId: string; assetCode?: string; assetName?: string; categoryName?: string; roomId: string; roomCode?: string; roomName?: string; allocatedAt: string; tenantId?: number; }
 
 export interface ModulePermission { moduleId?: string; moduleName: string; accessLevel?: string; canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canApprove?: boolean; canArchive?: boolean; canRestore?: boolean; }
 

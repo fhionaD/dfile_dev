@@ -73,7 +73,6 @@ namespace DFile.backend.Controllers
                     r.AssetId,
                     r.Asset != null ? r.Asset.AssetName : null,
                     r.Asset != null ? r.Asset.AssetCode : null,
-                    r.Asset != null ? r.Asset.TagNumber : null,
                     r.Asset != null && r.Asset.Category != null ? r.Asset.Category.CategoryName : null,
                     r.Description,
                     r.Status,
@@ -165,7 +164,7 @@ namespace DFile.backend.Controllers
                 AssetId = a.AssetId,
                 AssetCode = a.Asset?.AssetCode,
                 AssetName = a.Asset?.AssetName,
-                TagNumber = a.Asset?.TagNumber,
+                TagNumber = null,
                 CategoryName = a.Asset?.Category?.CategoryName,
                 RoomId = a.RoomId,
                 RoomCode = a.Room?.RoomCode,
@@ -175,6 +174,76 @@ namespace DFile.backend.Controllers
             }).ToList();
 
             return Ok(result);
+        }
+
+        /// <summary>Completed on-site repairs (persisted via AssetConditionLogs with MaintenanceRecordId).</summary>
+        [HttpGet("repair-history")]
+        [RequirePermission("Maintenance", "CanView")]
+        public async Task<ActionResult<IEnumerable<object>>> GetRepairHistory([FromQuery] string? assetId = null)
+        {
+            var tenantId = GetCurrentTenantId();
+            var q =
+                from log in _context.AssetConditionLogs.AsNoTracking()
+                join asset in _context.Assets.AsNoTracking() on log.AssetId equals asset.Id
+                join maint in _context.MaintenanceRecords.AsNoTracking() on log.MaintenanceRecordId equals maint.Id into maintJoin
+                from maint in maintJoin.DefaultIfEmpty()
+                where log.MaintenanceRecordId != null
+                select new { log, asset, maint };
+
+            if (!IsSuperAdmin() && tenantId.HasValue)
+                q = q.Where(x => x.asset.TenantId == tenantId);
+
+            if (!string.IsNullOrWhiteSpace(assetId))
+            {
+                var aid = assetId.Trim();
+                q = q.Where(x => x.log.AssetId == aid);
+            }
+
+            var rows = await q
+                .OrderByDescending(x => x.log.CreatedAt)
+                .Take(200)
+                .Select(x => new
+                {
+                    x.log.Id,
+                    maintenanceRecordId = x.log.MaintenanceRecordId,
+                    requestId = x.maint != null ? x.maint.RequestId : null,
+                    x.log.AssetId,
+                    assetName = x.asset.AssetName,
+                    assetCode = x.asset.AssetCode,
+                    x.log.Notes,
+                    previousCondition = x.log.PreviousCondition.ToString(),
+                    newCondition = x.log.NewCondition.ToString(),
+                    x.log.ChangedBy,
+                    x.log.CreatedAt,
+                })
+                .ToListAsync();
+
+            return Ok(rows);
+        }
+
+        /// <summary>Schedule-only fields for calendar / schedule UI (excludes execution, finance, quotation, attachments).</summary>
+        [HttpGet("{id:guid}/schedule-summary")]
+        [RequirePermission("Maintenance", "CanView")]
+        public async Task<ActionResult<MaintenanceScheduleSummaryDto>> GetMaintenanceScheduleSummary(Guid id)
+        {
+            var idStr = id.ToString();
+            var tenantId = GetCurrentTenantId();
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                    .ThenInclude(a => a!.Category)
+                .FirstOrDefaultAsync(r => r.Id == idStr);
+
+            if (record == null) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
+
+            var activeAllocation = await _context.AssetAllocations
+                .Include(aa => aa.Room)
+                .FirstOrDefaultAsync(aa => aa.AssetId == record.AssetId && aa.Status == "Active");
+
+            var allocDict = new Dictionary<string, AssetAllocation>();
+            if (activeAllocation != null) allocDict[record.AssetId] = activeAllocation;
+
+            return Ok(MapToScheduleSummaryDto(record, allocDict, DateTime.UtcNow));
         }
 
         // Guid constraint so paths like "allocated-assets" are never captured as an id.
@@ -237,8 +306,9 @@ namespace DFile.backend.Controllers
 
             dto.Description = (dto.Description ?? "").Trim();
             dto.AssetId = (dto.AssetId ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(dto.Description))
-                return BadRequest(new { message = "Description is required." });
+            var hasScheduleFrequency = !string.IsNullOrWhiteSpace(dto.Frequency);
+            if (!hasScheduleFrequency && string.IsNullOrWhiteSpace(dto.Description))
+                return BadRequest(new { message = "Description is required when no schedule frequency is set." });
             if (string.IsNullOrWhiteSpace(dto.AssetId))
                 return BadRequest(new { message = "AssetId is required." });
             if (!dto.StartDate.HasValue)
@@ -283,6 +353,25 @@ namespace DFile.backend.Controllers
             if (occurrenceDates.Count > maxBatch)
                 return BadRequest(new { message = $"Too many occurrences ({occurrenceDates.Count}). Maximum is {maxBatch}." });
 
+            // Check for duplicate inspection dates: if any occurrence date already has a maintenance record for this asset
+            var dateSet = occurrenceDates.Select(d => d.Date).ToHashSet();
+            var existingRecordsForAsset = await _context.MaintenanceRecords.AsNoTracking()
+                .Where(m => m.AssetId == dto.AssetId && !m.IsArchived)
+                .Select(m => m.StartDate)
+                .ToListAsync();
+            
+            var duplicateDates = existingRecordsForAsset
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .Where(d => dateSet.Contains(d.Date))
+                .ToList();
+            
+            if (duplicateDates.Any())
+            {
+                var duplicateDateStr = duplicateDates.First().ToString("yyyy-MM-dd");
+                return Conflict(new { message = $"Maintenance is already scheduled for this asset on {duplicateDateStr}. Please select different dates." });
+            }
+
             // Recurring: series id groups occurrences. One-off: still persist client scheduleSeriesId when supplied
             // so duplicate-batch detection (conflict above) matches stored rows.
             string? persistedSeriesId = MaintenanceSchedulingService.IsRecurring(dto.Frequency)
@@ -324,6 +413,8 @@ namespace DFile.backend.Controllers
 
             if (IsAdminOrSuperAdminCreator(User))
                 await _notificationService.NotifyMaintenanceNewTicketFromAdminAsync(created[0]);
+            else if (string.Equals((dto.Type ?? "").Trim(), "Corrective", StringComparison.OrdinalIgnoreCase))
+                await _notificationService.NotifyFinanceMaintenanceCorrectiveLoggedAsync(created[0]);
 
             await _context.SaveChangesAsync();
 
@@ -371,8 +462,6 @@ namespace DFile.backend.Controllers
             if (!IsMaintenanceVisibleToTenant(existing, tenantId)) return NotFound();
 
             dto.Description = (dto.Description ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(dto.Description))
-                return BadRequest(new { message = "Description is required." });
             dto.AssetId = (dto.AssetId ?? "").Trim();
 
             if (string.Equals(dto.Status, "Inspection", StringComparison.OrdinalIgnoreCase)
@@ -390,8 +479,20 @@ namespace DFile.backend.Controllers
                     return BadRequest(new { message = "Finance Review is only valid after inspection or quotation." });
             }
 
+            var partsReadyToScheduled =
+                string.Equals(existing.Status, "In Progress", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(dto.Status, "Scheduled", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.FinanceRequestType ?? "", "Repair", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.FinanceWorkflowStatus ?? "", "Parts Ready", StringComparison.OrdinalIgnoreCase);
+
+            if (partsReadyToScheduled && !dto.StartDate.HasValue)
+                return BadRequest(new { message = "A scheduled date is required." });
+
+            if (partsReadyToScheduled && string.IsNullOrWhiteSpace(dto.Frequency))
+                dto.Frequency = string.IsNullOrWhiteSpace(existing.Frequency) ? "One-time" : existing.Frequency;
+
             // Validate status transition
-            if (!IsValidTransition(existing.Status, dto.Status))
+            if (!IsValidTransition(existing.Status, dto.Status) && !partsReadyToScheduled)
                 return BadRequest(new { message = $"Cannot transition from '{existing.Status}' to '{dto.Status}'." });
 
             // Validate AssetId exists and belongs to same tenant
@@ -451,6 +552,9 @@ namespace DFile.backend.Controllers
 
             if (record == null) return NotFound();
             if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
+
+            if (string.Equals(record.FinanceWorkflowStatus, "Pending Approval", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Cannot archive this maintenance schedule while it is awaiting Finance approval. Please wait for approval or rejection before archiving." });
 
             record.IsArchived = true;
             record.UpdatedAt = DateTime.UtcNow;
@@ -527,7 +631,11 @@ namespace DFile.backend.Controllers
             if (!allowedFrom.Contains(record.Status))
                 return BadRequest(new { message = $"Inspection workflow cannot be submitted from status '{record.Status}'." });
 
-            if (record.StartDate.HasValue && record.StartDate.Value.Date > DateTime.UtcNow.Date)
+            // Only block when the record is already in Inspection (field work) before the scheduled day.
+            // Scheduled / Open / Pending may still submit diagnosis (e.g. Not Repairable → Finance) without waiting for the visit date.
+            if (string.Equals(record.Status, "Inspection", StringComparison.OrdinalIgnoreCase)
+                && record.StartDate.HasValue
+                && record.StartDate.Value.Date > DateTime.UtcNow.Date)
                 return BadRequest(new { message = "Inspection cannot begin before the scheduled start date." });
 
             var outcome = (dto.Outcome ?? "").Trim();
@@ -566,23 +674,8 @@ namespace DFile.backend.Controllers
                 if (string.IsNullOrWhiteSpace(notes))
                     return BadRequest(new { message = "Description explaining why the asset is not repairable is required." });
 
-                var poId = (dto.LinkedPurchaseOrderId ?? "").Trim();
-                if (!string.IsNullOrWhiteSpace(poId))
-                {
-                    var po = await _context.PurchaseOrders.FirstOrDefaultAsync(p => p.Id == poId);
-                    if (po == null) return BadRequest(new { message = "Purchase order not found." });
-                    if (!IsSuperAdmin() && tenantId.HasValue && po.TenantId != tenantId)
-                        return BadRequest(new { message = "Purchase order does not belong to your organization." });
-
-                    record.LinkedPurchaseOrderId = poId;
-                    if (string.IsNullOrWhiteSpace(po.MaintenanceRecordId))
-                        po.MaintenanceRecordId = record.Id;
-                    po.UpdatedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    record.LinkedPurchaseOrderId = null;
-                }
+                // Maintenance inspection no longer links a replacement PO; Procurement/Finance handle POs separately.
+                record.LinkedPurchaseOrderId = null;
 
                 record.DiagnosisOutcome = "Not Repairable";
                 record.QuotationNotes = notes;
@@ -618,6 +711,83 @@ namespace DFile.backend.Controllers
 
             record.Asset ??= await _context.Assets.Include(a => a.Category).FirstAsync(a => a.Id == record.AssetId);
             return Ok(MapToDto(record, allocDict, DateTime.UtcNow));
+        }
+
+        /// <summary>Maintenance marks a finance-approved repair visit as completed and writes asset repair history.</summary>
+        [HttpPost("{id}/complete-repair")]
+        [RequirePermission("Maintenance", "CanEdit")]
+        public async Task<IActionResult> CompleteRepair(string id, [FromBody] CompleteRepairDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors.Count > 0)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
+                return BadRequest(new { message = "Validation failed.", errors });
+            }
+
+            var tenantId = GetCurrentTenantId();
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (record == null) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
+
+            var asset = record.Asset;
+            if (asset == null) return BadRequest(new { message = "Associated asset not found." });
+
+            if (!string.Equals(record.FinanceRequestType, "Repair", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "This action is only for finance repair requests." });
+
+            var wf = (record.FinanceWorkflowStatus ?? "").Trim();
+            if (!string.Equals(wf, "Parts Ready", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(wf, "Approved", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Repair can only be completed after finance has approved the repair workflow." });
+
+            if (!string.Equals(record.Status, "Scheduled", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(record.Status, "In Progress", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = $"Repair completion is not valid from status '{record.Status}'." });
+
+            var desc = (dto.RepairDescription ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(desc))
+                return BadRequest(new { message = "Repair description is required." });
+
+            var prev = asset.CurrentCondition;
+            asset.CurrentCondition = AssetCondition.Good;
+            asset.UpdatedAt = DateTime.UtcNow;
+
+            record.Status = "Completed";
+            record.FinanceWorkflowStatus = null;
+            record.InspectionNotes = string.IsNullOrWhiteSpace(record.InspectionNotes)
+                ? desc
+                : $"{record.InspectionNotes}\n[Repair completed] {desc}";
+            record.UpdatedAt = DateTime.UtcNow;
+
+            var reqLabel = !string.IsNullOrEmpty(record.RequestId) ? record.RequestId : record.Id;
+            _context.AssetConditionLogs.Add(new AssetConditionLog
+            {
+                AssetId = asset.Id,
+                PreviousCondition = prev,
+                NewCondition = asset.CurrentCondition,
+                Notes = desc,
+                MaintenanceRecordId = record.Id,
+                ChangedBy = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name ?? "Maintenance",
+                TenantId = tenantId ?? asset.TenantId,
+            });
+
+            _auditService.AddEntry(HttpContext,
+                tenantId,
+                GetCurrentUserId(),
+                null,
+                "Maintenance",
+                "Update",
+                "MaintenanceRecord",
+                record.Id,
+                $"Repair marked completed for {reqLabel}.");
+
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
@@ -698,6 +868,7 @@ namespace DFile.backend.Controllers
                 PreviousCondition = asset.CurrentCondition,
                 NewCondition = AssetCondition.Critical,
                 Notes = $"Marked as beyond repair from maintenance ticket {record.Id}",
+                MaintenanceRecordId = maintenanceId,
                 ChangedBy = User.Identity?.Name ?? "System",
                 TenantId = tenantId,
             });
@@ -748,6 +919,7 @@ namespace DFile.backend.Controllers
                     PreviousCondition = l.PreviousCondition.ToString(),
                     NewCondition = l.NewCondition.ToString(),
                     l.Notes,
+                    l.MaintenanceRecordId,
                     l.ChangedBy,
                     l.CreatedAt
                 })
@@ -782,7 +954,6 @@ namespace DFile.backend.Controllers
             string AssetId,
             string? AssetName,
             string? AssetCode,
-            string? TagNumber,
             string? CategoryName,
             string Description,
             string Status,
@@ -820,7 +991,7 @@ namespace DFile.backend.Controllers
                 AssetId = r.AssetId,
                 AssetName = r.AssetName,
                 AssetCode = r.AssetCode,
-                TagNumber = r.TagNumber,
+                TagNumber = null,
                 CategoryName = r.CategoryName,
                 RoomId = room.RoomId,
                 RoomCode = room.RoomCode,
@@ -853,6 +1024,32 @@ namespace DFile.backend.Controllers
             };
         }
 
+        private static MaintenanceScheduleSummaryDto MapToScheduleSummaryDto(MaintenanceRecord r, Dictionary<string, AssetAllocation> activeAllocations, DateTime utcNow)
+        {
+            activeAllocations.TryGetValue(r.AssetId, out var alloc);
+
+            return new MaintenanceScheduleSummaryDto
+            {
+                Id = r.Id,
+                RequestId = r.RequestId,
+                AssetId = r.AssetId,
+                AssetName = r.Asset?.AssetName,
+                AssetCode = r.Asset?.AssetCode,
+                RoomId = alloc?.Room?.Id,
+                RoomCode = alloc?.Room?.RoomCode,
+                RoomName = alloc?.Room?.Name,
+                RoomFloor = alloc?.Room != null && !string.IsNullOrWhiteSpace(alloc.Room.Floor) ? alloc.Room.Floor.Trim() : null,
+                Type = r.Type,
+                Priority = r.Priority,
+                Frequency = r.Frequency,
+                StartDate = r.StartDate,
+                EndDate = r.EndDate,
+                NextDueDate = MaintenanceSchedulingService.ComputeNextDueDate(r, utcNow),
+                Status = r.Status,
+                ScheduleSeriesId = r.ScheduleSeriesId,
+            };
+        }
+
         private static MaintenanceRecordResponseDto MapToDto(MaintenanceRecord r, Dictionary<string, AssetAllocation> activeAllocations, DateTime utcNow)
         {
             activeAllocations.TryGetValue(r.AssetId, out var alloc);
@@ -864,7 +1061,7 @@ namespace DFile.backend.Controllers
                 AssetId = r.AssetId,
                 AssetName = r.Asset?.AssetName,
                 AssetCode = r.Asset?.AssetCode,
-                TagNumber = r.Asset?.TagNumber,
+                TagNumber = null,
                 CategoryName = r.Asset?.Category?.CategoryName,
                 RoomId = alloc?.Room?.Id,
                 RoomCode = alloc?.Room?.RoomCode,

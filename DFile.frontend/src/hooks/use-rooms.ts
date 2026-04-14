@@ -1,10 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { mapRoomFromApi } from '@/lib/normalize-room-from-api';
 import { Room, RoomCategory, RoomSubCategory } from '@/types/asset';
 import { toast } from 'sonner';
 import axios from 'axios';
 
-type PairCounts = { active: number; archived: number };
+type PairCounts = {
+    active: number;
+    archived: number;
+    archivedRoomCategories?: number;
+    archivedStandaloneSubCategories?: number;
+};
 
 // ── Room hooks ───────────────────────────────────────────────
 
@@ -12,10 +18,10 @@ export function useRooms(showArchived: boolean = false) {
     return useQuery({
         queryKey: ['rooms', showArchived],
         queryFn: async () => {
-            const { data } = await api.get<Room[]>('/api/rooms', {
+            const { data } = await api.get<Record<string, unknown>[]>('/api/rooms', {
                 params: { showArchived }
             });
-            return data;
+            return (data ?? []).map((row) => mapRoomFromApi(row)) as Room[];
         },
     });
 }
@@ -25,8 +31,8 @@ export function useAddRoom() {
 
     return useMutation({
         mutationFn: async (room: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number }) => {
-            const { data } = await api.post<Room>('/api/rooms', room);
-            return data;
+            const { data } = await api.post<Record<string, unknown>>('/api/rooms', room);
+            return mapRoomFromApi(data) as Room;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -34,7 +40,8 @@ export function useAddRoom() {
         },
         onError: (error) => {
             if (axios.isAxiosError(error) && error.response?.status === 409) {
-                toast.error(error.response.data?.message || 'This room already exists.');
+                // Silently handle duplicate room conflict
+                throw error;
             } else {
                 toast.error('Failed to add room');
             }
@@ -47,8 +54,8 @@ export function useUpdateRoom() {
 
     return useMutation({
         mutationFn: async ({ id, payload }: { id: string; payload: { unitId: string; name: string; floor: string; categoryId?: string; subCategoryId?: string; status?: string; maxOccupancy?: number; archived?: boolean } }) => {
-            const { data } = await api.put<Room>(`/api/rooms/${id}`, payload);
-            return data;
+            const { data } = await api.put<Record<string, unknown>>(`/api/rooms/${id}`, payload);
+            return mapRoomFromApi(data) as Room;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -111,7 +118,7 @@ export function useRoomCategoryCounts() {
             const { data } = await api.get<PairCounts>('/api/roomcategories/counts');
             return data;
         },
-        staleTime: 30_000,
+        staleTime: 0,
     });
 }
 
@@ -142,7 +149,8 @@ export function useAddRoomCategory() {
         },
         onError: (error) => {
             if (axios.isAxiosError(error) && error.response?.status === 409) {
-                toast.error(error.response.data?.message || 'This category already exists.');
+                // Silently handle duplicate category conflict
+                throw error;
             } else {
                 toast.error('Failed to add room category');
             }
@@ -155,7 +163,7 @@ export function useUpdateRoomCategory() {
 
     return useMutation({
         mutationFn: async ({ id, payload }: { id: string; payload: { name: string; description: string; rowVersion?: string } }) => {
-            const { data } = await api.put<RoomCategory>(`/api/roomcategories/${id}`, payload);
+            const { data } = await api.put<RoomCategory>(`/api/roomcategories/${id}`, payload, { suppressGlobalError: true });
             return data;
         },
         onSuccess: () => {
@@ -166,7 +174,8 @@ export function useUpdateRoomCategory() {
         },
         onError: (error) => {
             if (axios.isAxiosError(error) && error.response?.status === 409) {
-                toast.error(error.response.data?.message || 'This category already exists.');
+                const message = (error.response?.data as { message?: string })?.message || 'This category name already exists.';
+                toast.error(message);
             } else {
                 toast.error('Failed to update room category');
             }
@@ -295,6 +304,7 @@ export function useAddRoomSubCategory() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             toast.success('Sub-category added');
         },
         onError: (error) => {
@@ -318,6 +328,7 @@ export function useUpdateRoomSubCategory() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
             queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Sub-category updated');
         },
@@ -341,10 +352,12 @@ export function useArchiveRoomSubCategory() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Sub-category archived');
         },
         onError: (error) => {
-            if (axios.isAxiosError(error) && error.response?.status === 409) {
+            if (axios.isAxiosError(error) && (error.response?.status === 409 || error.response?.status === 400)) {
                 toast.error(error.response.data?.message || 'Failed to archive sub-category.');
             } else {
                 toast.error('Failed to archive sub-category');
@@ -363,6 +376,8 @@ export function useRestoreRoomSubCategory() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['room-subcategories'] });
             queryClient.invalidateQueries({ queryKey: ['room-categories'] });
+            queryClient.invalidateQueries({ queryKey: ['room-category-counts'] });
+            queryClient.invalidateQueries({ queryKey: ['rooms'] });
             toast.success('Sub-category restored');
         },
         onError: (error) => {

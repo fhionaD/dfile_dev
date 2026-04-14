@@ -149,6 +149,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = () => {
         setIsLoggingOut(true);
+        // Clear all cached queries immediately to prevent stale data being used after logout
+        try {
+            // Get the global query client from the window object if available
+            const queryClient = (window as any).__queryClient;
+            if (queryClient?.clear) {
+                queryClient.clear();
+            }
+        } catch (e) {
+            // Fallback: clear localStorage caches manually
+            if (typeof window !== "undefined") {
+                Object.keys(localStorage).forEach((key) => {
+                    if (key.startsWith("dfile_")) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            }
+        }
+        
         // Brief delay so the loading screen is visible before state wipes
         setTimeout(() => {
             setUser(null);

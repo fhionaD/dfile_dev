@@ -269,7 +269,7 @@ namespace DFile.backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                TagNumber = await RecordCodeGenerator.GenerateTagNumberAsync(_context),
+                TagNumber = null,
                 AssetName = order.AssetName,
                 CategoryId = categoryId,
                 LifecycleStatus = LifecycleStatus.Registered,

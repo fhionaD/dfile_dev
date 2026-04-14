@@ -11,7 +11,7 @@ const navSections: NavSection[] = [
     {
         label: "Finance",
         items: [
-            { href: "/finance/dashboard", label: "Dashboard", icon: PieChart },
+            { href: "/finance/dashboard", label: "Dashboard", icon: PieChart, allowedRoles: ["Finance"] },
             { href: "/finance/assets", label: "Assets", icon: Package },
             { href: "/finance/disposals", label: "Disposals", icon: Trash2 },
         ],
@@ -27,7 +27,7 @@ const navSections: NavSection[] = [
     {
         label: "Cross-Module",
         items: [
-            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ClipboardList },
+            { href: "/finance/maintenance-requests", label: "Maintenance requests", icon: ClipboardList, allowedRoles: ["Finance"] },
             { href: "/finance/maintenance", label: "Maintenance overview", icon: Wrench },
         ],
     },

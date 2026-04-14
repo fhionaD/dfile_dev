@@ -27,6 +27,7 @@ import {
     useAddRoom, useUpdateRoom, useArchiveRoom, useRestoreRoom,
     useAddRoomCategory, useUpdateRoomCategory, useArchiveRoomCategory, useRestoreRoomCategory,
     useAddRoomSubCategory, useUpdateRoomSubCategory,
+    useArchiveRoomSubCategory, useRestoreRoomSubCategory,
     useRoomCategoryCounts,
 } from "@/hooks/use-rooms";
 import { Room, RoomCategory, RoomSubCategory } from "@/types/asset";
@@ -112,16 +113,21 @@ export default function LocationsPage() {
     const { data: allCategories = [] } = useRoomCategories(false);
     const { data: roomCategoryCounts } = useRoomCategoryCounts();
     const { data: allSubCategories = [] } = useRoomSubCategories(undefined, false);
+    const { data: subCategoriesForTab = [], isLoading: subsTabLoading } = useRoomSubCategories(undefined, catShowArchived);
     const addCategory = useAddRoomCategory();
     const updateCategory = useUpdateRoomCategory();
     const archiveCategory = useArchiveRoomCategory();
     const restoreCategory = useRestoreRoomCategory();
+    const archiveSubCategory = useArchiveRoomSubCategory();
+    const restoreSubCategory = useRestoreRoomSubCategory();
     const addSubCategory = useAddRoomSubCategory();
     const updateSubCategory = useUpdateRoomSubCategory();
     const [catSearch, setCatSearch] = useState("");
     const [catCategoryNameFilter, setCatCategoryNameFilter] = useState("All");
     const [archiveCatTarget, setArchiveCatTarget] = useState<string | null>(null);
+    const [archiveSubTarget, setArchiveSubTarget] = useState<string | null>(null);
     const [restoreCatTarget, setRestoreCatTarget] = useState<string | null>(null);
+    const [restoreSubTarget, setRestoreSubTarget] = useState<string | null>(null);
     const [catPageIndex, setCatPageIndex] = useState(0);
     const [catPageSize, setCatPageSize] = useState(10);
 
@@ -154,10 +160,21 @@ export default function LocationsPage() {
     // ── Filtered categories ──
     const filteredCategories = useMemo(() => categories, [categories]);
 
+    const activeRoomsBySubCategoryId = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const r of roomsActiveForCount) {
+            const sid = r.subCategoryId;
+            if (!sid || r.isArchived) continue;
+            map.set(sid, (map.get(sid) ?? 0) + 1);
+        }
+        return map;
+    }, [roomsActiveForCount]);
+
     const uniqueRoomCategoryNames = useMemo(() => {
-        const names = filteredCategories.map((c) => c.name).filter(Boolean);
-        return [...new Set(names)].sort((a, b) => a.localeCompare(b));
-    }, [filteredCategories]);
+        const fromTab = filteredCategories.map((c) => c.name).filter(Boolean);
+        const fromActiveParents = allCategories.map((c) => c.name).filter(Boolean);
+        return [...new Set([...fromTab, ...fromActiveParents])].sort((a, b) => a.localeCompare(b));
+    }, [filteredCategories, allCategories]);
 
     useEffect(() => {
         setCatPageIndex(0);
@@ -165,22 +182,43 @@ export default function LocationsPage() {
 
     const categorySubCategoryRows = useMemo(() => {
         const q = catSearch.trim().toLowerCase();
-        const rows = filteredCategories.flatMap((cat): CategorySubCategoryRow[] => {
-            const subs = allSubCategories.filter(sc => sc.roomCategoryId === cat.id);
-            if (subs.length === 0) {
-                return [{
-                    key: `${cat.id}__none__`,
-                    category: cat,
-                    subCategory: null,
-                }];
-            }
+        let rows: CategorySubCategoryRow[] = [];
 
-            return subs.map(sc => ({
-                key: `${cat.id}_${sc.id}`,
-                category: cat,
-                subCategory: sc,
-            }));
-        });
+        if (!catShowArchived) {
+            rows = filteredCategories.flatMap((cat): CategorySubCategoryRow[] => {
+                const subs = subCategoriesForTab.filter((sc) => sc.roomCategoryId === cat.id);
+                if (subs.length === 0) {
+                    return [{ key: `${cat.id}__none__`, category: cat, subCategory: null }];
+                }
+                return subs.map((sc) => ({
+                    key: `${cat.id}_${sc.id}`,
+                    category: cat,
+                    subCategory: sc,
+                }));
+            });
+        } else {
+            const archivedCats = filteredCategories;
+            const archivedSubs = subCategoriesForTab;
+            const archivedParentIds = new Set(archivedCats.map((c) => c.id));
+
+            archivedCats.forEach((cat) => {
+                const subs = archivedSubs.filter((sc) => sc.roomCategoryId === cat.id);
+                if (subs.length === 0) {
+                    rows.push({ key: `${cat.id}__none__`, category: cat, subCategory: null });
+                } else {
+                    subs.forEach((sc) => {
+                        rows.push({ key: `${cat.id}_${sc.id}`, category: cat, subCategory: sc });
+                    });
+                }
+            });
+
+            archivedSubs.forEach((sc) => {
+                if (archivedParentIds.has(sc.roomCategoryId)) return;
+                const parent = allCategories.find((c) => c.id === sc.roomCategoryId);
+                if (!parent) return;
+                rows.push({ key: `${parent.id}_${sc.id}__orphanSub`, category: parent, subCategory: sc });
+            });
+        }
 
         const byCategory =
             catCategoryNameFilter === "All"
@@ -189,12 +227,14 @@ export default function LocationsPage() {
 
         if (!q) return byCategory;
 
-        return byCategory.filter(r =>
-            r.category.name.toLowerCase().includes(q) ||
-            (r.category.description || "").toLowerCase().includes(q) ||
-            (r.subCategory?.name || "").toLowerCase().includes(q)
+        return byCategory.filter(
+            (r) =>
+                r.category.name.toLowerCase().includes(q) ||
+                (r.category.description || "").toLowerCase().includes(q) ||
+                (r.subCategory?.name || "").toLowerCase().includes(q) ||
+                (r.subCategory?.description || "").toLowerCase().includes(q),
         );
-    }, [filteredCategories, allSubCategories, catSearch, catCategoryNameFilter]);
+    }, [filteredCategories, subCategoriesForTab, catSearch, catCategoryNameFilter, catShowArchived, allCategories]);
 
     // ── Category create handlers ──
     const openCatCreate = () => {
@@ -392,7 +432,7 @@ export default function LocationsPage() {
                             }
                         />
 
-                        {catsLoading ? (
+                        {catsLoading || subsTabLoading ? (
                             <div className="space-y-3 p-6">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
                         ) : categorySubCategoryRows.length === 0 ? (
                             <div className="flex min-h-[520px] flex-col items-center justify-center py-12 text-center text-muted-foreground">
@@ -426,20 +466,55 @@ export default function LocationsPage() {
                                                         <span className="block truncate">{row.subCategory?.description || "—"}</span>
                                                     </TableCell>
                                                     <TableCell className="max-w-0 text-xs text-muted-foreground">
-                                                        <span className="block truncate">{new Date(row.category.updatedAt || row.category.createdAt || "").toLocaleDateString()}</span>
+                                                        <span className="block truncate">
+                                                            {new Date(
+                                                                row.subCategory?.updatedAt ||
+                                                                    row.subCategory?.createdAt ||
+                                                                    row.category.updatedAt ||
+                                                                    row.category.createdAt ||
+                                                                    "",
+                                                            ).toLocaleDateString()}
+                                                        </span>
                                                     </TableCell>
                                                     <TableCell className="w-[120px] text-center" onClick={(e) => e.stopPropagation()}>
                                                 {catShowArchived ? (
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10" title="Restore" onClick={() => setRestoreCatTarget(row.category.id)}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-emerald-600 hover:bg-emerald-500/10"
+                                                        title="Restore"
+                                                        onClick={() =>
+                                                            row.subCategory
+                                                                ? setRestoreSubTarget(row.subCategory.id)
+                                                                : setRestoreCatTarget(row.category.id)
+                                                        }
+                                                    >
                                                         <RotateCcw className="h-4 w-4" />
                                                     </Button>
                                                 ) : (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                                        title="Archive"
-                                                        onClick={() => setArchiveCatTarget(row.category.id)}
+                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                                                        title={
+                                                            row.subCategory
+                                                                ? (activeRoomsBySubCategoryId.get(row.subCategory.id) ?? 0) > 0
+                                                                    ? "Cannot archive: room units are still assigned to this sub-category."
+                                                                    : "Archive this sub-category only"
+                                                                : row.category.roomCount > 0
+                                                                  ? "Cannot archive: room units are still assigned to this category. Reassign or archive those units first."
+                                                                  : "Archive category (and all active sub-categories if any)"
+                                                        }
+                                                        disabled={
+                                                            row.subCategory
+                                                                ? (activeRoomsBySubCategoryId.get(row.subCategory.id) ?? 0) > 0
+                                                                : row.category.roomCount > 0
+                                                        }
+                                                        onClick={() =>
+                                                            row.subCategory
+                                                                ? setArchiveSubTarget(row.subCategory.id)
+                                                                : setArchiveCatTarget(row.category.id)
+                                                        }
                                                     >
                                                         <Archive className="h-4 w-4" />
                                                     </Button>
@@ -589,20 +664,27 @@ export default function LocationsPage() {
 
             {/* ════════════  CONFIRM DIALOGS  ════════════ */}
             {(() => {
-                const targetCat = archiveCatTarget ? allCategories.find(c => c.id === archiveCatTarget) : null;
+                // Use categories (displayed in table) if catShowArchived=false, otherwise use allCategories
+                const categorySource = !catShowArchived ? categories : allCategories;
+                const targetCat = archiveCatTarget ? categorySource.find(c => c.id === archiveCatTarget) : null;
                 const cascadeRooms = targetCat?.roomCount ?? 0;
                 const cascadeSubs = targetCat?.subCategoryCount ?? 0;
-                const cascadeNote = cascadeRooms > 0
-                    ? ` This will also archive ${cascadeRooms} room unit${cascadeRooms !== 1 ? "s" : ""}${cascadeSubs > 0 ? ` and ${cascadeSubs} sub-categor${cascadeSubs !== 1 ? "ies" : "y"}` : ""} assigned to it.`
-                    : cascadeSubs > 0
-                        ? ` This will also archive ${cascadeSubs} sub-categor${cascadeSubs !== 1 ? "ies" : "y"} under it.`
-                        : "";
+                const cascadeNote =
+                    cascadeRooms > 0
+                        ? " This category still has room units assigned to it, so it cannot be archived until those units are updated or archived."
+                        : cascadeSubs > 0
+                          ? ` All ${cascadeSubs} active sub-categor${cascadeSubs === 1 ? "y" : "ies"} under this category will be archived with the parent.`
+                          : "";
                 return (
                     <ConfirmDialog
                         open={archiveCatTarget !== null}
                         onOpenChange={(open) => { if (!open) setArchiveCatTarget(null); }}
                         title="Archive Room Category"
-                        description={`Are you sure you want to archive this room category?${cascadeNote}`}
+                        description={
+                            cascadeRooms > 0
+                                ? "This room category cannot be archived while one or more room units are assigned to it. Update those room units to use another category (or archive the units) first."
+                                : `Are you sure you want to archive this room category?${cascadeNote}`
+                        }
                         confirmLabel="Archive"
                         confirmVariant="destructive"
                         onConfirm={async () => {
@@ -625,6 +707,39 @@ export default function LocationsPage() {
                     if (restoreCatTarget) {
                         restoreCategory.mutate(restoreCatTarget);
                         setRestoreCatTarget(null);
+                    }
+                }}
+            />
+
+            <ConfirmDialog
+                open={archiveSubTarget !== null}
+                onOpenChange={(open) => { if (!open) setArchiveSubTarget(null); }}
+                title="Archive Sub-category"
+                description={
+                    archiveSubTarget
+                        ? `Archive only this sub-category ("${(!catShowArchived ? subCategoriesForTab : allSubCategories).find((s) => s.id === archiveSubTarget)?.name ?? archiveSubTarget}")? Other sub-categories under the same category will stay active.`
+                        : ""
+                }
+                confirmLabel="Archive"
+                confirmVariant="destructive"
+                onConfirm={async () => {
+                    if (archiveSubTarget) {
+                        archiveSubCategory.mutate(archiveSubTarget);
+                        setArchiveSubTarget(null);
+                    }
+                }}
+            />
+
+            <ConfirmDialog
+                open={restoreSubTarget !== null}
+                onOpenChange={(open) => { if (!open) setRestoreSubTarget(null); }}
+                title="Restore Sub-category"
+                description="Are you sure you want to restore this sub-category? It will become active again under its room category."
+                confirmLabel="Restore"
+                onConfirm={async () => {
+                    if (restoreSubTarget) {
+                        restoreSubCategory.mutate(restoreSubTarget);
+                        setRestoreSubTarget(null);
                     }
                 }}
             />

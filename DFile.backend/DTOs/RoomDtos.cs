@@ -46,6 +46,9 @@ namespace DFile.backend.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public byte[]? RowVersion { get; set; }
+
+        /// <summary>Count of active asset allocations in this room (archiving is blocked when &gt; 0).</summary>
+        public int ActiveAllocationCount { get; set; }
     }
 
     public class CreateRoomCategoryDto

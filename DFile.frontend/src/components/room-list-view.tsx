@@ -52,7 +52,7 @@ export function RoomListView({
 
     const [selectedRoomForDetails, setSelectedRoomForDetails] = useState<Room | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-    const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+    const [archiveTarget, setArchiveTarget] = useState<Room | null>(null);
     const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
     const sortedRoomCategories = useMemo(
@@ -237,9 +237,17 @@ export function RoomListView({
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="h-8 w-8 text-destructive/70 hover:bg-destructive/10 hover:text-destructive"
-                                                            title="Archive"
-                                                            onClick={(e) => { e.stopPropagation(); setArchiveTarget(room.id); }}
+                                                            className="h-8 w-8 text-destructive/70 hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                                                            title={
+                                                                (room.activeAllocationCount ?? 0) > 0
+                                                                    ? "Cannot archive: this room unit has allocated assets. Deallocate them first."
+                                                                    : "Archive"
+                                                            }
+                                                            disabled={(room.activeAllocationCount ?? 0) > 0}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setArchiveTarget(room);
+                                                            }}
                                                         >
                                                             <Archive className="h-4 w-4" />
                                                         </Button>
@@ -269,14 +277,16 @@ export function RoomListView({
 
             <ConfirmDialog
                 open={archiveTarget !== null}
-                onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+                onOpenChange={(open) => {
+                    if (!open) setArchiveTarget(null);
+                }}
                 title="Archive Room"
-                description="Are you sure you want to archive this room? It can be restored later from the archive view."
+                description="Are you sure you want to archive this room unit? You can restore it later from the archive view."
                 confirmLabel="Archive"
                 confirmVariant="destructive"
                 onConfirm={() => {
                     if (archiveTarget) {
-                        onArchiveRoom?.(archiveTarget);
+                        onArchiveRoom?.(archiveTarget.id);
                         setArchiveTarget(null);
                     }
                 }}
