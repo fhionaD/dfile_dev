@@ -103,7 +103,9 @@ export function CreateMaintenanceModal({
                     endDate: initialData.endDate || "",
                 });
             } else {
-                const today = new Date().toISOString().split("T")[0];
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const defaultDate = tomorrow.toISOString().split("T")[0];
                 const defAid = defaultAssetId || "";
                 setFormData({
                     assetId: defAid,
@@ -113,7 +115,7 @@ export function CreateMaintenanceModal({
                     type: "Corrective",
                     frequency: "One-time",
                     status: "Open",
-                    startDate: today,
+                    startDate: defaultDate,
                     endDate: "",
                 });
             }

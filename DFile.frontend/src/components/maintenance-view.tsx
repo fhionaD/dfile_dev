@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Wrench, Plus, AlertTriangle, CheckCircle2, Clock, Archive, RotateCcw, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
+import { Wrench, AlertTriangle, CheckCircle2, Clock, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusText } from "@/components/ui/status-text";
@@ -15,7 +15,7 @@ import { useMaintenanceRecords, useArchiveMaintenanceRecord, useSubmitInspection
 import { useMaintenanceContext } from "@/contexts/maintenance-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/stat-card";
-import { CreateMaintenanceModal } from "@/components/modals/create-maintenance-modal";
+import { ScheduleDetailsModal } from "@/components/modals/schedule-details-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { InspectionDiagnosisModal } from "@/components/modals/inspection-diagnosis-modal";
 interface MaintenanceViewProps {
@@ -31,9 +31,9 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
     const archiveRecordMutation = useArchiveMaintenanceRecord();
     const submitInspectionMutation = useSubmitInspectionWorkflow();
 
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
     const [inspectionTarget, setInspectionTarget] = useState<MaintenanceRecord | null>(null);
 
     // Request Filters
@@ -296,20 +296,6 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                 </div>
 
                 <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
-                    <Button 
-                        onClick={() => setIsCreateModalOpen(true)} 
-                        className="h-10 px-4 gap-2"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create Request
-                    </Button>
-                    <Button 
-                        variant={showArchived ? "default" : "outline"} 
-                        className="h-10 px-4 gap-2" 
-                        onClick={() => setShowArchived(!showArchived)}
-                    >
-                        {showArchived ? <><RotateCcw className="h-4 w-4" />Active View</> : <><Archive className="h-4 w-4" />Archived</>}
-                    </Button>
                 </div>
             </div>
 
@@ -383,25 +369,28 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                 </Table>
             </div>
 
-            {/* Mount only when open: CreateMaintenanceModal and MaintenanceDetailsModal each call
-                useAssets() (GET /api/assets full list) and the create modal also calls useMaintenanceRecords.
-                Keeping them mounted while closed duplicated heavy requests on every dashboard load. */}
-            {isCreateModalOpen && (
-                <CreateMaintenanceModal
-                    open={isCreateModalOpen}
-                    onOpenChange={setIsCreateModalOpen}
-                />
-            )}
+            {/* ScheduleDetailsModal opens first on row click; "Open workflow details" escalates to full modal */}
+            <ScheduleDetailsModal
+                open={isDetailsModalOpen}
+                onOpenChange={setIsDetailsModalOpen}
+                record={selectedRecord}
+                enableGlassmorphism={enableGlassmorphism}
+                onOpenWorkflowDetails={(record) => {
+                    setIsDetailsModalOpen(false);
+                    setIsWorkflowModalOpen(true);
+                }}
+            />
 
-            {isDetailsModalOpen && selectedRecord && (
+            {isWorkflowModalOpen && selectedRecord && (
                 <MaintenanceDetailsModal
-                    open={isDetailsModalOpen}
-                    onOpenChange={setIsDetailsModalOpen}
+                    open={isWorkflowModalOpen}
+                    onOpenChange={setIsWorkflowModalOpen}
                     record={selectedRecord}
                     enableGlassmorphism={enableGlassmorphism}
+                    detailView="schedulePeek"
                     onOpenInspectionModal={(record) => setInspectionTarget(record)}
                     onEdit={() => {
-                        setIsDetailsModalOpen(false);
+                        setIsWorkflowModalOpen(false);
                     }}
                 />
             )}

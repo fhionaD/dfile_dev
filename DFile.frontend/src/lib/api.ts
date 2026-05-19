@@ -75,11 +75,15 @@ function isAxiosNetworkError(error: unknown): boolean {
  * Covers `suppressGlobalError` plus PATCH archive/restore on room entities — `use-rooms` mutations use Sonner toasts.
  */
 function shouldSkipGlobalErrorBanner(error: unknown): boolean {
-    const cfg = (error as { config?: { suppressGlobalError?: boolean; url?: string; method?: string } })?.config;
+    const cfg = (error as { config?: { suppressGlobalError?: boolean; url?: string; method?: string }; response?: { status?: number } })?.config;
+    const status = (error as { response?: { status?: number } })?.response?.status;
     if (!cfg) return false;
     if (cfg.suppressGlobalError === true) return true;
     const path = (cfg.url || '').split('?')[0].toLowerCase();
     const method = (cfg.method || 'get').toLowerCase();
+    // Background session re-validation: 401 is expected when no valid token exists.
+    // The auth context already handles it by calling logout() — no banner needed.
+    if (method === 'get' && path.endsWith('/api/auth/me') && (status === 401 || status === 403)) return true;
     /** Business-rule failures: mutations show Sonner toasts; avoid duplicate global banner. */
     if (method === 'put' && (
         /\/api\/assetcategories\/archive\//.test(path) ||

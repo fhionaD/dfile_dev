@@ -87,17 +87,18 @@ function getNotificationRoute(notification: Notification, userRole?: string): st
             return `/maintenance/dashboard`;
         }
 
-        if (userRole === 'Admin' || userRole === 'Super Admin') {
+        if (userRole === 'Super Admin') {
+            return `/superadmin/dashboard`;
+        }
+
+        if (userRole === 'Admin' || userRole === 'Procurement' || userRole === 'Employee') {
             if (module === 'Maintenance' || module === 'MaintenanceRecord') {
-                return `/tenantadmin/dashboard`;
+                return `/tenant/dashboard`;
             }
             if (module === 'Asset') {
-                return `/tenantadmin/inventory`;
+                return `/tenant/inventory`;
             }
-            if (module === 'Admin' || userRole === 'Super Admin') {
-                return `/superadmin/dashboard`;
-            }
-            return `/tenantadmin/dashboard`;
+            return `/tenant/dashboard`;
         }
     }
 
@@ -111,11 +112,11 @@ function getNotificationRoute(notification: Notification, userRole?: string): st
     if (userRole === 'Super Admin') {
         return `/superadmin/dashboard`;
     }
-    if (userRole === 'Admin') {
-        return `/tenantadmin/dashboard`;
+    if (userRole === 'Admin' || userRole === 'Procurement' || userRole === 'Employee') {
+        return `/tenant/dashboard`;
     }
 
-    return `/tenantadmin/dashboard`;
+    return `/tenant/dashboard`;
 }
 
 export function NotificationBell() {

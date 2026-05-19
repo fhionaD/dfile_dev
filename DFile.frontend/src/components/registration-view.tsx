@@ -138,7 +138,7 @@ export function RegistrationView({ onRegister, onAssetClick }: RegistrationViewP
                         purchaseDate: asNullableDate(asset.purchaseDate),
                         vendor: asset.vendor || null,
                         acquisitionCost: Number(asset.purchasePrice ?? 0),
-                        usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
+                        totalLifeMonths: Number((asset.usefulLifeYears ?? 0) * 12),
                         purchasePrice: Number(asset.purchasePrice ?? 0),
                         residualValue: null,
                         salvagePercentage:

@@ -65,12 +65,14 @@ export function InspectionDiagnosisModal({
         enabled: open && !!assetId,
     });
     const [outcome, setOutcome] = useState<"" | "Repairable" | "Not Repairable" | "No Fix Needed">("");
+    const [repairType, setRepairType] = useState<"Minor" | "Major" | "">("");
     const [detailNotes, setDetailNotes] = useState("");
     const [estimatedRepairCost, setEstimatedRepairCost] = useState<string>("");
     const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
 
     const reset = () => {
         setOutcome("");
+        setRepairType("");
         setDetailNotes("");
         setEstimatedRepairCost("");
         setUploadedUrls([]);
@@ -105,7 +107,7 @@ export function InspectionDiagnosisModal({
         outcome === "No Fix Needed"
             ? detailNotes.trim().length > 0
             : outcome === "Repairable"
-              ? detailNotes.trim().length > 0 && parseFloat(estimatedRepairCost) > 0
+              ? detailNotes.trim().length > 0 && parseFloat(estimatedRepairCost) > 0 && repairType !== ""
               : outcome === "Not Repairable"
                 ? detailNotes.trim().length > 0
                 : false;
@@ -118,6 +120,7 @@ export function InspectionDiagnosisModal({
         } else if (outcome === "Repairable") {
             payload.detailNotes = detailNotes.trim();
             payload.estimatedRepairCost = parseFloat(estimatedRepairCost);
+            payload.repairType = repairType as "Minor" | "Major";
             if (uploadedUrls.length) payload.attachments = uploadedUrls.join(",");
         } else {
             payload.detailNotes = detailNotes.trim();
@@ -334,6 +337,18 @@ export function InspectionDiagnosisModal({
                                     onChange={(e) => setEstimatedRepairCost(e.target.value)}
                                     placeholder="0.00"
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Repair type</Label>
+                                <select
+                                    value={repairType}
+                                    onChange={(e) => setRepairType(e.target.value as "Minor" | "Major" | "")}
+                                    className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                >
+                                    <option value="">Select repair type...</option>
+                                    <option value="Minor">Minor Repair</option>
+                                    <option value="Major">Major Repair</option>
+                                </select>
                             </div>
                             <div className="space-y-2">
                                 <Label>Damaged-part images (optional)</Label>

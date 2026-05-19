@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Building2, Download, Package, RefreshCw, Search, Filter } from "lucide-react";
+import { Download, Package, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { useAssets } from "@/hooks/use-assets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -63,9 +62,7 @@ function calculateAssetDepreciation(asset: Asset) {
 
 export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
     const { data: assets = [], isLoading } = useAssets();
-    const [viewMode, setViewMode] = useState<"assets" | "rooms">("assets");
     const [searchQuery, setSearchQuery] = useState("");
-    const [roomFilter, setRoomFilter] = useState("All");
     const [categoryFilter, setCategoryFilter] = useState("All");
     const [statusFilter, setStatusFilter] = useState("Active");
 
@@ -83,7 +80,6 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
             if (statusFilter === "Fully Depreciated" && !asset.isFullyDepreciated) return false;
             if (statusFilter === "Near End-of-Life" && !asset.isNearEndOfLife) return false;
 
-            if (roomFilter !== "All" && (asset.room || "Unassigned") !== roomFilter) return false;
             if (categoryFilter !== "All" && asset.categoryName !== categoryFilter) return false;
 
             if (searchQuery) {
@@ -97,47 +93,8 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
 
             return true;
         });
-    }, [processedAssets, statusFilter, roomFilter, categoryFilter, searchQuery]);
+    }, [processedAssets, statusFilter, categoryFilter, searchQuery]);
 
-    const roomDepreciationData = useMemo(() => {
-        const rooms: Record<string, {
-            name: string;
-            totalAssets: number;
-            totalCost: number;
-            totalBookValue: number;
-            monthlyDepreciation: number;
-            fullyDepreciatedCount: number;
-        }> = {};
-
-        processedAssets.forEach((asset) => {
-            if (asset.status === "Archived" || asset.status === "Disposed") return;
-
-            const roomName = asset.room || "Unassigned";
-            if (!rooms[roomName]) {
-                rooms[roomName] = {
-                    name: roomName,
-                    totalAssets: 0,
-                    totalCost: 0,
-                    totalBookValue: 0,
-                    monthlyDepreciation: 0,
-                    fullyDepreciatedCount: 0,
-                };
-            }
-
-            rooms[roomName].totalAssets++;
-            rooms[roomName].totalCost += asset.cost;
-            rooms[roomName].totalBookValue += asset.currentBookValue;
-            rooms[roomName].monthlyDepreciation += asset.monthlyDepreciation;
-            if (asset.isFullyDepreciated) rooms[roomName].fullyDepreciatedCount++;
-        });
-
-        return Object.values(rooms).sort((a, b) => b.totalBookValue - a.totalBookValue);
-    }, [processedAssets]);
-
-    const uniqueRooms = useMemo(
-        () => Array.from(new Set(assets.map((a) => a.room || "Unassigned").filter(Boolean))).sort(),
-        [assets],
-    );
     const uniqueCategories = useMemo(
         () => Array.from(new Set(assets.map((a) => a.categoryName).filter((v): v is string => Boolean(v)))),
         [assets],
@@ -200,22 +157,6 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                             <SelectItem value="Archived">Archived / Retired</SelectItem>
                         </SelectContent>
                     </Select>
-                    {viewMode === "assets" && (
-                        <Select value={roomFilter} onValueChange={setRoomFilter}>
-                            <SelectTrigger className="w-[170px] h-10">
-                                <div className="flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-muted-foreground" />
-                                    <SelectValue placeholder="Room" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Rooms</SelectItem>
-                                {uniqueRooms.map((r) => (
-                                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                         <SelectTrigger className="w-[170px] h-10">
                             <div className="flex items-center gap-2">
@@ -233,26 +174,6 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                 </div>
 
                 <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
-                    <div className="bg-muted/50 p-1 rounded-xl flex items-center h-11">
-                        <Button
-                            type="button"
-                            variant={viewMode === "assets" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setViewMode("assets")}
-                            className={cn("h-9 px-3 text-sm gap-1.5", viewMode === "assets" && "shadow-sm")}
-                        >
-                            <Package className="w-4 h-4" /> Assets
-                        </Button>
-                        <Button
-                            type="button"
-                            variant={viewMode === "rooms" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setViewMode("rooms")}
-                            className={cn("h-9 px-3 text-sm gap-1.5", viewMode === "rooms" && "shadow-sm")}
-                        >
-                            <Building2 className="w-4 h-4" /> Rooms
-                        </Button>
-                    </div>
                     <Button variant="outline" size="sm" className="h-10 px-4 gap-2" type="button">
                         <Download className="w-4 h-4" /> Export
                     </Button>
@@ -260,131 +181,82 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
             </div>
 
             <div className="rounded-md border overflow-hidden">
-                {viewMode === "assets" ? (
-                    <div className="overflow-x-auto">
-                        <Table className="w-full table-fixed">
-                            <TableHeader>
-                                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-left w-[20%]">Asset Details</TableHead>
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">Purchased</TableHead>
-                                    <CurrencyHeader className="w-[100px]">Cost Basis</CurrencyHeader>
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Life (Yrs)</TableHead>
-                                    <CurrencyHeader className="w-[120px]">Monthly Depr.</CurrencyHeader>
-                                    <CurrencyHeader className="w-[120px]">Accum. Depr.</CurrencyHeader>
-                                    <CurrencyHeader className="w-[120px]">Book Value</CurrencyHeader>
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Remaining</TableHead>
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">End Date</TableHead>
-                                    <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[140px]">Status</TableHead>
+                <div className="overflow-x-auto">
+                    <Table className="w-full table-fixed">
+                        <TableHeader>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-left w-[20%]">Asset Details</TableHead>
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">Purchased</TableHead>
+                                <CurrencyHeader className="w-[100px]">Cost Basis</CurrencyHeader>
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Life (Yrs)</TableHead>
+                                <CurrencyHeader className="w-[120px]">Monthly Depr.</CurrencyHeader>
+                                <CurrencyHeader className="w-[120px]">Accum. Depr.</CurrencyHeader>
+                                <CurrencyHeader className="w-[120px]">Book Value</CurrencyHeader>
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[80px]">Remaining</TableHead>
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[100px]">End Date</TableHead>
+                                <TableHead className="px-4 py-3 align-middle text-xs font-medium text-muted-foreground text-center w-[140px]">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredAssets.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                                        No assets found matching filters.
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredAssets.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
-                                            No assets found matching filters.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredAssets.map((asset) => (
-                                        <TableRow key={asset.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => onAssetClick?.(asset)}>
-                                            <TableCell className="px-4 py-3 align-middle text-left">
-                                                <div className="font-normal text-sm text-foreground truncate max-w-[200px]" title={asset.desc}>{asset.desc}</div>
-                                                <div className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
-                                                    <span className="font-mono">{asset.assetCode || asset.id}</span>
-                                                    <span className="text-muted-foreground/60">•</span>
-                                                    <span>{asset.room || "Unassigned"}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-center whitespace-nowrap">{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "—"}</TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal">
-                                                <CurrencyCell value={asset.cost} />
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground">{asset.usefulLifeYears}</TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-right text-sm">
-                                                <CurrencyCell value={asset.monthlyDepreciation} />
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-right text-sm text-muted-foreground">
-                                                <CurrencyCell value={asset.accumulatedDepreciation} className="text-muted-foreground" />
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal text-foreground">
-                                                <CurrencyCell value={asset.currentBookValue} />
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-center text-sm">
-                                                <span className={cn("font-mono font-normal text-xs inline-flex", asset.isNearEndOfLife ? "text-red-600" : "text-muted-foreground")}>
-                                                    {asset.remainingYears}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground whitespace-nowrap">
-                                                {asset.endDate.toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell className="px-4 py-3 align-middle text-center">
-                                                {asset.isFullyDepreciated ? (
-                                                    <span className="text-muted-foreground text-sm whitespace-nowrap inline-flex">Fully Depreciated</span>
-                                                ) : asset.isNearEndOfLife ? (
-                                                    <span className="text-sm text-destructive whitespace-nowrap inline-flex">Expiring Soon</span>
-                                                ) : (
-                                                    <span className="text-emerald-600 text-sm whitespace-nowrap inline-flex">Depreciating</span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                        <div className="px-6 py-4 border-t border-border/40 flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Showing {filteredAssets.length} assets
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[20%] text-left">Room / Location</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Total Assets</TableHead>
-                                    <CurrencyHeader className="w-[15%]">Total Initial Cost</CurrencyHeader>
-                                    <CurrencyHeader className="w-[15%]">Current Book Value</CurrencyHeader>
-                                    <CurrencyHeader className="w-[15%]">Monthly Exposure</CurrencyHeader>
-                                    <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[10%] text-center">Fully Depreciated</TableHead>
-                                    <TableHead className="h-10 px-4 align-middle text-xs font-medium text-muted-foreground w-[15%] text-left">Value Retention</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {roomDepreciationData.map((room) => (
-                                    <TableRow key={room.name} className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="p-4 align-middle text-left">
-                                            <div className="flex items-center gap-2">
-                                                <Building2 className="w-4 h-4 text-muted-foreground" />
-                                                <span className="truncate max-w-[150px] font-normal text-sm text-foreground" title={room.name}>{room.name}</span>
+                            ) : (
+                                filteredAssets.map((asset) => (
+                                    <TableRow key={asset.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => onAssetClick?.(asset)}>
+                                        <TableCell className="px-4 py-3 align-middle text-left">
+                                            <div className="font-normal text-sm text-foreground truncate max-w-[200px]" title={asset.desc}>{asset.desc}</div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+                                                <span className="font-mono">{asset.assetCode || asset.id}</span>
+                                                <span className="text-muted-foreground/60">•</span>
+                                                <span>{asset.room || "Unassigned"}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="p-4 align-middle text-center text-sm font-normal">{room.totalAssets}</TableCell>
-                                        <TableCell className="p-4 align-middle text-right text-sm font-normal"><CurrencyCell value={room.totalCost} /></TableCell>
-                                        <TableCell className="p-4 align-middle text-right text-sm font-normal text-foreground"><CurrencyCell value={room.totalBookValue} /></TableCell>
-                                        <TableCell className="p-4 align-middle text-right text-sm text-red-600 font-normal"><CurrencyCell value={-room.monthlyDepreciation} className="text-red-600" /></TableCell>
-                                        <TableCell className="p-4 align-middle text-center text-sm">
-                                            {room.fullyDepreciatedCount > 0 ? (
-                                                <span className="text-sm font-normal text-foreground">{room.fullyDepreciatedCount}</span>
+                                        <TableCell className="px-4 py-3 align-middle text-sm text-muted-foreground text-center whitespace-nowrap">{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "—"}</TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal">
+                                            <CurrencyCell value={asset.cost} />
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground">{asset.usefulLifeYears}</TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-right text-sm">
+                                            <CurrencyCell value={asset.monthlyDepreciation} />
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-right text-sm text-muted-foreground">
+                                            <CurrencyCell value={asset.accumulatedDepreciation} className="text-muted-foreground" />
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-right text-sm font-normal text-foreground">
+                                            <CurrencyCell value={asset.currentBookValue} />
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-center text-sm">
+                                            <span className={cn("font-mono font-normal text-xs inline-flex", asset.isNearEndOfLife ? "text-red-600" : "text-muted-foreground")}>
+                                                {asset.remainingYears}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-center text-sm text-muted-foreground whitespace-nowrap">
+                                            {asset.endDate.toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 align-middle text-center">
+                                            {asset.isFullyDepreciated ? (
+                                                <span className="text-muted-foreground text-sm whitespace-nowrap inline-flex">Fully Depreciated</span>
+                                            ) : asset.isNearEndOfLife ? (
+                                                <span className="text-sm text-destructive whitespace-nowrap inline-flex">Expiring Soon</span>
                                             ) : (
-                                                <span className="text-muted-foreground">-</span>
+                                                <span className="text-emerald-600 text-sm whitespace-nowrap inline-flex">Depreciating</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="p-4 align-middle text-left text-sm">
-                                            <div className="flex items-center justify-start gap-3">
-                                                <span className="text-xs text-muted-foreground w-12 text-left">
-                                                    {room.totalCost > 0 ? ((room.totalBookValue / room.totalCost) * 100).toFixed(1) : "0.0"}%
-                                                </span>
-                                                <Progress value={room.totalCost > 0 ? (room.totalBookValue / room.totalCost) * 100 : 0} className="w-20 h-2" />
-                                            </div>
-                                        </TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                    <div className="px-6 py-4 border-t border-border/40 flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                            Showing {filteredAssets.length} assets
+                        </div>
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );

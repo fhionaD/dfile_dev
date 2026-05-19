@@ -1,6 +1,5 @@
 export interface Asset {
     id: string;
-    tagNumber?: string;
     desc: string;
     categoryId?: string;
     categoryName?: string;
@@ -50,7 +49,6 @@ export interface CreateAssetPayload {
     assetName?: string;
     categoryId: string;
     status?: string;
-    room?: string;
     image?: string;
     manufacturer?: string;
     model?: string;
@@ -58,7 +56,7 @@ export interface CreateAssetPayload {
     purchaseDate?: string;
     vendor?: string;
     value?: number;
-    usefulLifeYears?: number;
+    totalLifeMonths?: number;
     purchasePrice?: number;
     acquisitionCost?: number;
     salvagePercentage?: number;
@@ -84,7 +82,7 @@ export interface UpdateAssetPayload extends CreateAssetPayload {
 export interface UpdateAssetFinancialPayload {
     purchasePrice: number;
     value: number;
-    usefulLifeYears: number;
+    totalLifeMonths: number;
     currentBookValue?: number;
 }
 
@@ -95,7 +93,6 @@ export interface User {
     email: string;
     role: UserRole;
     roleLabel: string;
-    avatar?: string;
     status: string;
     tenantId?: number;
     permissions?: ModulePermission[];
@@ -151,7 +148,6 @@ export interface MaintenanceRecord {
     assetId: string;
     assetName?: string;
     assetCode?: string;
-    tagNumber?: string;
     categoryName?: string;
     roomId?: string;
     roomCode?: string;
@@ -188,6 +184,12 @@ export interface MaintenanceRecord {
     financeWorkflowStatus?: string | null;
     linkedPurchaseOrderId?: string | null;
     replacementRegisteredAssetId?: string | null;
+    repairType?: "Minor" | "Major" | null;
+    financeDecision?: "Expense" | "IncreaseValue" | "ExtendLife" | "Both" | null;
+    addedLifeMonths?: number | null;
+    adjustmentValue?: number | null;
+    approvedBy?: string | null;
+    approvedAt?: string | null;
     scheduleSeriesId?: string | null;
 }
 
@@ -283,6 +285,7 @@ export interface Employee {
     lastName: string;
     email: string;
     contactNumber: string;
+    address?: string;
     department: string;
     role: string;
     hireDate: string;
@@ -374,16 +377,6 @@ export interface RolePermissionEntry {
     canDelete: boolean;
     canApprove: boolean;
     canArchive: boolean;
-}
-
-export interface RoleTemplate {
-    id: number;
-    name: string;
-    description?: string;
-    isSystem: boolean;
-    createdAt: string;
-    permissions: RolePermissionEntry[];
-    tenantCount: number;
 }
 
 export interface PlatformMetrics {

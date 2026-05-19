@@ -103,7 +103,6 @@ export function mapAssetFromApi(a: Record<string, unknown>): Asset {
     return {
         ...base,
         id,
-        tagNumber: undefined,
         assetCode,
         purchaseDate,
         allocationState,

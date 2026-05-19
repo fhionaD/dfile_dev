@@ -230,6 +230,7 @@ export interface InspectionWorkflowPayload {
     estimatedRepairCost?: number;
     attachments?: string;
     linkedPurchaseOrderId?: string;
+    repairType?: "Minor" | "Major";
 }
 
 export function useSubmitInspectionWorkflow() {
@@ -259,6 +260,7 @@ export type RepairHistoryRow = {
     assetId: string;
     assetName?: string | null;
     assetCode?: string | null;
+    categoryName?: string | null;
     notes?: string | null;
     previousCondition: string;
     newCondition: string;
@@ -266,12 +268,15 @@ export type RepairHistoryRow = {
     createdAt: string;
 };
 
-export function useRepairHistory(assetId?: string) {
+export function useRepairHistory(assetId?: string, search?: string) {
     return useQuery({
-        queryKey: ['maintenance-repair-history', assetId ?? 'all'],
+        queryKey: ['maintenance-repair-history', assetId ?? 'all', search ?? ''],
         queryFn: async () => {
             const { data } = await api.get<RepairHistoryRow[]>('/api/maintenance/repair-history', {
-                params: assetId ? { assetId } : undefined,
+                params: {
+                    ...(assetId ? { assetId } : {}),
+                    ...(search ? { search } : {}),
+                },
             });
             return data ?? [];
         },
@@ -350,6 +355,49 @@ export function useFinanceApproveRepair() {
         },
         onError: (error: unknown) => {
             toast.error(maintenanceErrorMessage(error, 'Failed to approve repair'));
+        },
+    });
+}
+
+export interface ApproveRepairFinancialImpactPayload {
+    maintenanceRecordId: string;
+    financeDecision: "Expense" | "IncreaseValue" | "ExtendLife" | "Both";
+    adjustmentValue?: number;
+    addedLifeMonths?: number;
+}
+
+export function useFinanceApproveRepairFinancialImpact() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (payload: ApproveRepairFinancialImpactPayload) => {
+            const response = await api.post(
+                `/api/finance/maintenance-requests/${payload.maintenanceRecordId}/approve-repair-financial-impact`,
+                {
+                    financeDecision: payload.financeDecision,
+                    adjustmentValue: payload.adjustmentValue,
+                    addedLifeMonths: payload.addedLifeMonths,
+                }
+            );
+            return response.data; // Return the response data with updated asset info
+        },
+        onSuccess: (data) => {
+            // Invalidate related queries to force refetch
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-maintenance-submission'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            // This should match all assets queries (e.g., ['assets', false, false])
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            
+            // Also specifically invalidate the exact query key used by depreciation view
+            queryClient.invalidateQueries({ 
+                queryKey: ['assets', false, false],
+                exact: false // Allow partial matches
+            });
+            
+            toast.success('Repair financial impact approved');
+        },
+        onError: (error: unknown) => {
+            toast.error(maintenanceErrorMessage(error, 'Failed to approve repair financial impact'));
         },
     });
 }

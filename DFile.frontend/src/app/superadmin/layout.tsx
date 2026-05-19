@@ -1,7 +1,7 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { LayoutDashboard, Building2, ShieldCheck, AlertTriangle, BarChart3, KeyRound, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Building2, ShieldCheck, AlertTriangle, BarChart3, CreditCard, ShieldAlert } from "lucide-react";
 import { UserRole } from "@/types/asset";
 
 const REQUIRED_ROLES: UserRole[] = ["Super Admin"];
@@ -18,9 +18,9 @@ const navSections: NavSection[] = [
         ],
     },
     {
-        label: "Governance",
+        label: "Billing & Configuration",
         items: [
-            { href: "/superadmin/role-templates",     label: "Role Templates",      icon: KeyRound },
+            { href: "/superadmin/billing",            label: "Billing & Plans",     icon: CreditCard },
             { href: "/superadmin/emergency-controls", label: "Emergency Controls",  icon: ShieldAlert },
         ],
     },

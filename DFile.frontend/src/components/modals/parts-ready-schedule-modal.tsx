@@ -42,6 +42,14 @@ export type PartsReadyScheduleModalProps = {
     enableGlassmorphism?: boolean;
 };
 
+function getTodayDateString(): string {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
 export function PartsReadyScheduleModal({
     record,
     open,
@@ -50,6 +58,7 @@ export function PartsReadyScheduleModal({
 }: PartsReadyScheduleModalProps) {
     const updateRecord = useUpdateMaintenanceRecord();
     const [scheduledDate, setScheduledDate] = useState("");
+    const [minDate] = useState(getTodayDateString());
 
     useEffect(() => {
         if (!open || !record) return;
@@ -57,8 +66,10 @@ export function PartsReadyScheduleModal({
         setScheduledDate(base.slice(0, 10));
     }, [open, record]);
 
+    const isValidDate = scheduledDate >= minDate;
+
     const handleSubmit = async () => {
-        if (!record || !scheduledDate.trim()) return;
+        if (!record || !scheduledDate.trim() || !isValidDate) return;
         await updateRecord.mutateAsync({
             id: record.id,
             payload: buildUpdatePayload(record, scheduledDate.trim()),
@@ -102,14 +113,18 @@ export function PartsReadyScheduleModal({
                             type="date"
                             value={scheduledDate}
                             onChange={(e) => setScheduledDate(e.target.value)}
+                            min={minDate}
                         />
+                        {!isValidDate && scheduledDate && (
+                            <p className="text-xs text-destructive mt-1">Scheduled date must be today or in the future.</p>
+                        )}
                     </div>
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={() => void handleSubmit()} disabled={!scheduledDate || updateRecord.isPending}>
+                    <Button type="button" onClick={() => void handleSubmit()} disabled={!scheduledDate || !isValidDate || updateRecord.isPending}>
                         {updateRecord.isPending ? "Saving…" : "Create schedule"}
                     </Button>
                 </DialogFooter>

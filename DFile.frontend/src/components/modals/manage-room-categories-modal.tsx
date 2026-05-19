@@ -14,7 +14,6 @@ const AMENITY_TIERS = ["Standard", "Premium", "Luxury"];
 interface RoomCategory {
     id: string;
     name: string;
-    subCategory: string; // Added subCategory
     description: string;
     baseRate: number;
     maxOccupancy?: number;
@@ -26,7 +25,7 @@ interface ManageRoomCategoriesModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     roomCategories: RoomCategory[];
-    onAddCategory: (data: { name: string; subCategory: string; description: string; baseRate: number; maxOccupancy?: number }) => void;
+    onAddCategory: (data: { name: string; description: string; baseRate: number; maxOccupancy?: number }) => void;
     onUpdateCategory: (id: string, data: Partial<RoomCategory>) => void;
     onArchiveCategory: (id: string) => void;
 }
@@ -35,14 +34,14 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
     const [mode, setMode] = useState<"list" | "add" | "edit">("list");
     const [view, setView] = useState<"active" | "archived">("active");
     const [editId, setEditId] = useState<string | null>(null);
-    const [formData, setFormData] = useState({ name: "", subCategory: "", description: "" });
+    const [formData, setFormData] = useState({ name: "", description: "" });
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const resetForm = () => { setFormData({ name: "", subCategory: "", description: "" }); setMode("list"); setEditId(null); };
+    const resetForm = () => { setFormData({ name: "", description: "" }); setMode("list"); setEditId(null); };
 
     const handleAdd = (e: React.FormEvent) => { e.preventDefault(); onAddCategory({ ...formData, baseRate: 0, maxOccupancy: 0 }); resetForm(); };
     const handleEdit = (cat: RoomCategory) => { 
-        setFormData({ name: cat.name, subCategory: cat.subCategory || "", description: cat.description }); 
+        setFormData({ name: cat.name, description: cat.description }); 
         setEditId(cat.id); 
         setMode("edit"); 
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -55,10 +54,6 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                 <div className="space-y-2">
                     <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><DoorOpen size={12} /> Category Name</Label>
                     <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Deluxe Suite" className="border-input bg-background" />
-                </div>
-                <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2"><Layers size={12} /> Sub-Category</Label>
-                    <Input required value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="e.g. Double Bed / Ocean View" className="border-input bg-background" />
                 </div>
             </div>
             
@@ -109,7 +104,6 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                                         <div>
                                             <h4 className="text-sm font-bold text-foreground">
                                                 {cat.name}
-                                                {cat.subCategory && <span className="text-muted-foreground font-normal ml-1">• {cat.subCategory}</span>}
                                             </h4>
                                             <p className="text-xs font-medium text-muted-foreground">{cat.description || "No description"}</p>
                                         </div>
@@ -143,7 +137,6 @@ export function ManageRoomCategoriesModal({ open, onOpenChange, roomCategories, 
                                         <div>
                                             <h4 className="text-sm font-bold text-foreground">
                                                 {cat.name}
-                                                {cat.subCategory && <span className="text-muted-foreground font-normal ml-1">• {cat.subCategory}</span>}
                                             </h4>
                                             <p className="text-xs font-medium text-muted-foreground">{cat.description || "No description"}</p>
                                         </div>

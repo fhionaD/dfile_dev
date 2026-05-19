@@ -1,7 +1,7 @@
 "use client";
 
 import { AppShell, NavSection } from "@/components/app-shell";
-import { PieChart, Package, Trash2, FileBarChart, ShoppingCart, Wrench, TrendingDown, ClipboardList } from "lucide-react";
+import { PieChart, Package, Trash2, FileBarChart, Wrench, TrendingDown, ClipboardList } from "lucide-react";
 import { UserRole } from "@/types/asset";
 
 /** Tenant Admins use the same finance module URLs as Finance users (full dashboard + subpages). */
@@ -17,11 +17,10 @@ const navSections: NavSection[] = [
         ],
     },
     {
-        label: "Reporting & Procurement",
+        label: "Reporting",
         items: [
             { href: "/finance/reports", label: "Reports", icon: FileBarChart },
             { href: "/finance/depreciation", label: "Depreciation", icon: TrendingDown },
-            { href: "/finance/procurement-approvals", label: "Procurement Approvals", icon: ShoppingCart },
         ],
     },
     {

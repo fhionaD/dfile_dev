@@ -39,6 +39,68 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    # Inject production secrets into appsettings.Production.json before publish.
+    # Values come from GitHub repository secrets (Settings → Secrets and variables → Actions).
+    - name: Write production appsettings
+      shell: bash
+      env:
+        DB_CONNECTION: ${{ secrets.CONNECTIONSTRINGS__DEFAULTCONNECTION }}
+        JWT_KEY: ${{ secrets.JWT__KEY }}
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE__CLIENTID }}
+        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE__CLIENTSECRET }}
+        GOOGLE_BACKEND_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        PAYMONGO_SECRET_KEY: ${{ secrets.PAYMONGO__SECRETKEY }}
+        PAYMONGO_PUBLIC_KEY: ${{ secrets.PAYMONGO__PUBLICKEY }}
+        PAYMONGO_WEBHOOK_SECRET: ${{ secrets.PAYMONGO__WEBHOOKSECRET }}
+        PAYMENT_APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        SMTP_HOST: ${{ secrets.SMTPSETTINGS__HOST }}
+        SMTP_PORT: ${{ secrets.SMTPSETTINGS__PORT }}
+        SMTP_EMAIL: ${{ secrets.SMTPSETTINGS__EMAIL }}
+        SMTP_PASSWORD: ${{ secrets.SMTPSETTINGS__PASSWORD }}
+        FRONTEND_ORIGIN: ${{ secrets.APP_BASE_URL }}
+      run: |
+        cat > DFile.backend/appsettings.Production.json << EOF
+        {
+          "Logging": {
+            "LogLevel": {
+              "Default": "Warning",
+              "Microsoft.AspNetCore": "Warning"
+            }
+          },
+          "ConnectionStrings": {
+            "DefaultConnection": "$DB_CONNECTION"
+          },
+          "Jwt": {
+            "Key": "$JWT_KEY",
+            "ExpirationMinutes": 30,
+            "Issuer": "DFile",
+            "Audience": "DFile"
+          },
+          "Google": {
+            "ClientId": "$GOOGLE_CLIENT_ID",
+            "ClientSecret": "$GOOGLE_CLIENT_SECRET",
+            "BackendBaseUrl": "$GOOGLE_BACKEND_BASE_URL"
+          },
+          "PayMongo": {
+            "SecretKey": "$PAYMONGO_SECRET_KEY",
+            "PublicKey": "$PAYMONGO_PUBLIC_KEY",
+            "WebhookSecret": "$PAYMONGO_WEBHOOK_SECRET"
+          },
+          "Payment": {
+            "AppBaseUrl": "$PAYMENT_APP_BASE_URL"
+          },
+          "SmtpSettings": {
+            "Host": "$SMTP_HOST",
+            "Port": $SMTP_PORT,
+            "Email": "$SMTP_EMAIL",
+            "Password": "$SMTP_PASSWORD"
+          },
+          "AllowedOrigins": {
+            "Frontend": "$FRONTEND_ORIGIN"
+          }
+        }
+        EOF
+
     - name: Publish Backend
       # Framework-dependent publish — relies on the server's installed .NET 8 runtime.
       # MonsterASP.NET FreeSite plan has .NET 8 LTS installed.

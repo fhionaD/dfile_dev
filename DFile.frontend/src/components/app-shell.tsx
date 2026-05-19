@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
     LogOut, Menu, ChevronRight, Settings,
-    PanelLeftClose, PanelLeft
+    PanelLeftClose, PanelLeft, KeyRound
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MaintenanceSettingsModal } from "@/components/modals/maintenance-settings-modal";
+import { ChangePasswordModal } from "@/components/modals/change-password-modal";
 import { MaintenanceSettingsProvider } from "@/contexts/maintenance-context";
 import { useAuth } from "@/contexts/auth-context";
 import { UserRole } from "@/types/asset";
@@ -227,7 +228,7 @@ function SidebarContent({
             <div className={`flex items-center shrink-0 border-b border-border/60 ${isCollapsed ? "h-16 justify-center px-2" : "h-16 px-5"}`}>
                 {!isCollapsed ? (
                     <Link href={homePath} prefetch={false} className="flex items-center">
-                        <Image src="/d_file.svg" alt="DFile" width={110} height={36} className="h-8 w-auto object-contain" priority />
+                        <Image src="/d_file.svg" alt="DFile" width={130} height={44} className="h-10 w-auto object-contain" priority />
                     </Link>
                 ) : (
                     <Link href={homePath} prefetch={false} className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
@@ -251,25 +252,7 @@ function SidebarContent({
                 ))}
             </nav>
 
-            {/* User Profile — bottom of sidebar, border-top separator */}
-            <div className={`shrink-0 border-t border-border/60 ${isCollapsed ? "p-2" : "p-3"}`}>
-                <div
-                    className={`flex items-center gap-3 w-full rounded-xl p-2.5
-                        ${isCollapsed ? "justify-center" : ""}`}
-                >
-                    <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                            {((user.firstName?.[0] ?? '') + (user.lastName?.[0] ?? '')).toUpperCase() || '?'}
-                        </AvatarFallback>
-                    </Avatar>
-                    {!isCollapsed && (
-                        <div className="flex-1 text-left min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{user.firstName ?? ''} {user.lastName ?? ''}</p>
-                            <p className="text-xs text-muted-foreground truncate">{user.roleLabel}</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+
         </div>
     );
 }
@@ -281,6 +264,7 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
     const pathname = usePathname();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isLogoutOpen, setIsLogoutOpen] = useState(false);
     // Prevent double-navigation in race conditions.
@@ -431,6 +415,14 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
+                                        onClick={() => setIsChangePasswordOpen(true)}
+                                        className="cursor-pointer mx-1 rounded-lg"
+                                    >
+                                        <KeyRound size={15} className="mr-2" />
+                                        Change Password
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
                                         onClick={() => setIsLogoutOpen(true)}
                                         className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer mx-1 rounded-lg"
                                     >
@@ -478,6 +470,11 @@ export function AppShell({ children, navSections, requiredRoles, homePath }: App
             <MaintenanceSettingsModal 
                 open={isSettingsModalOpen} 
                 onOpenChange={setIsSettingsModalOpen} 
+            />
+            {/* ── Change Password Modal ── */}
+            <ChangePasswordModal
+                open={isChangePasswordOpen}
+                onOpenChange={setIsChangePasswordOpen}
             />
         </TooltipProvider>
         </MaintenanceSettingsProvider>

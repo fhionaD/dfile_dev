@@ -3,7 +3,7 @@
 import { LoginForm } from "@/components/login-form";
 
 interface LoginPageProps {
-    onLogin: (email: string, password: string) => Promise<void>;
+    onLogin: (email: string, password: string) => Promise<void | { attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean }>;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types/asset";
 import axios from "axios";
 import api from "@/lib/api"; // Centralized API client
+import { globalQueryClient } from "@/components/query-provider";
 
 interface AuthContextType {
     user: User | null;
@@ -11,7 +12,7 @@ interface AuthContextType {
     isLoggedIn: boolean;
     isLoading: boolean;
     isLoggingOut: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<{ attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean } | void>;
     logout: () => void;
 }
 
@@ -97,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         initAuth();
     }, []);
 
-    const login = async (email: string, password: string) => {
+    const login = async (email: string, password: string): Promise<{ attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean } | void> => {
         try {
             const response = await api.post(
                 "/api/auth/login",
@@ -117,6 +118,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoggedIn(true);
             localStorage.setItem("dfile_user", JSON.stringify(userData));
             localStorage.setItem("dfile_token", token);
+            return {
+                newDeviceDetected: data.newDeviceDetected,
+                emailNotificationSent: data.emailNotificationSent,
+            } as { attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean };
         } catch (error: unknown) {
             // Thrown above (e.g. invalid role) is a normal Error — not an Axios failure; do not map to "cannot reach API".
             if (!axios.isAxiosError(error)) {
@@ -132,50 +137,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const status: number | undefined = error.response?.status;
             if (!error.response) {
                 // No response at all — wrong API URL, backend down, mixed content (https page → http API), or firewall
-                throw new Error(
-                    "Could not reach the API. Run `dotnet run` in DFile.backend (listening on http://127.0.0.1:5090). " +
-                    "With `npm run dev`, /api is proxied to that address. Check DevTools → Network for /api/auth/login."
-                );
+                const devHint = process.env.NODE_ENV === 'development'
+                    ? " Run `dotnet run` in DFile.backend (listening on http://127.0.0.1:5090). " +
+                      "With `npm run dev`, /api is proxied to that address. Check DevTools → Network for /api/auth/login."
+                    : "";
+                throw new Error(`Service temporarily unavailable.${devHint}`);
             } else if (status !== undefined && status >= 500) {
                 throw new Error("Internal server error — the server is currently unavailable. Please try again later.");
             } else {
                 // 400 / 401 / 403 — invalid credentials or tenant issue
-                const data = error.response?.data as { message?: string } | undefined;
-                const message = (typeof data?.message === "string" && data.message) || "Invalid email or password. Please try again.";
-                throw new Error(message);
+                const respData = error.response?.data as { message?: string; attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean } | undefined;
+                const message = (typeof respData?.message === "string" && respData.message) || "Invalid email or password. Please try again.";
+                const extendedErr = Object.assign(new Error(message), {
+                    attemptsLeft: respData?.attemptsLeft,
+                    cooldownSeconds: respData?.cooldownSeconds,
+                    isSuspicious: respData?.isSuspicious,
+                    securityAlertSent: respData?.securityAlertSent,
+                });
+                throw extendedErr;
             }
         }
     };
 
     const logout = () => {
         setIsLoggingOut(true);
-        // Clear all cached queries immediately to prevent stale data being used after logout
-        try {
-            // Get the global query client from the window object if available
-            const queryClient = (window as any).__queryClient;
-            if (queryClient?.clear) {
-                queryClient.clear();
-            }
-        } catch (e) {
-            // Fallback: clear localStorage caches manually
-            if (typeof window !== "undefined") {
-                Object.keys(localStorage).forEach((key) => {
-                    if (key.startsWith("dfile_")) {
-                        localStorage.removeItem(key);
-                    }
-                });
-            }
-        }
-        
-        // Brief delay so the loading screen is visible before state wipes
-        setTimeout(() => {
-            setUser(null);
-            setToken(null);
-            setIsLoggedIn(false);
-            setIsLoggingOut(false);
-            localStorage.removeItem("dfile_user");
-            localStorage.removeItem("dfile_token");
-        }, 800);
+        // Clear all cached queries to prevent stale data being used after logout
+        globalQueryClient?.clear();
+        setUser(null);
+        setToken(null);
+        setIsLoggedIn(false);
+        setIsLoggingOut(false);
+        localStorage.removeItem("dfile_user");
+        localStorage.removeItem("dfile_token");
     };
 
     return (

@@ -10,53 +10,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardTitle, CardHeader, CardDescription } from "@/components/ui/card";
 
-enum SubscriptionPlanType {
-    Starter = 0,
-    Basic = 1,
-    Pro = 2,
+interface BillingPlanOption {
+    plan: number;
+    code: string;
+    displayName: string;
+    pricePesos: number;
+    amountCents: number;
+    summary: string;
+    yearlyCost: number;
+    maxRooms: number;
+    maxPersonnel: number;
+    canCreateFinanceManager: boolean;
+    canCreateMaintenanceManager: boolean;
 }
 
-const plans = [
-    {
-        id: SubscriptionPlanType.Starter,
-        name: "Starter",
-        price: "Free",
-        features: [
-            "Max Rooms: 20",
-            "Max Personnel: 10",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: No",
-            "Reports: Standard",
-        ],
-    },
-    {
-        id: SubscriptionPlanType.Basic,
-        name: "Basic",
-        price: "₱1,499/mo",
-        features: [
-            "Max Rooms: 100",
-            "Max Personnel: 30",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: Able",
-            "Reports: Standard",
-        ],
-    },
-    {
-        id: SubscriptionPlanType.Pro,
-        name: "Pro",
-        price: "₱4,999/mo",
-        features: [
-            "Max Rooms: 200",
-            "Max Personnel: 200",
-            "Asset Tracking: Full",
-            "Depreciation: Able",
-            "Maintenance Module: Able",
-            "Reports: Able (Advanced)",
-        ],
-    },
-];
+interface PublicPlanDto {
+    id: number;
+    name: string;
+    description?: string;
+    monthlyCost: number;
+    yearlyCost: number;
+    maxRooms: number;
+    maxPersonnel: number;
+    canCreateFinanceManager: boolean;
+    canCreateMaintenanceManager: boolean;
+}
 
 const STEPS = ["Account", "Organization", "Plan"] as const;
 
@@ -100,7 +78,9 @@ function FieldError({ message }: { message?: string }) {
 export function TenantRegistrationWizard() {
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanType>(SubscriptionPlanType.Starter);
+    const [plansLoading, setPlansLoading] = useState(true);
+    const [plans, setPlans] = useState<BillingPlanOption[]>([]);
+    const [selectedPlan, setSelectedPlan] = useState<string>("");
 
     const [tenantName, setTenantName] = useState("");
     const [firstName, setFirstName] = useState("");
@@ -117,6 +97,49 @@ export function TenantRegistrationWizard() {
     const [success, setSuccess] = useState(false);
     const [checkingAvailability, setCheckingAvailability] = useState(false);
     const [emailHint, setEmailHint] = useState<"idle" | "checking" | "available" | "taken">("idle");
+
+    // Fetch plans on mount
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                setPlansLoading(true);
+                const { data } = await api.get<PublicPlanDto[]>("/api/plans/public");
+                const fetched: BillingPlanOption[] = data.map((p) => ({
+                    plan: p.id,
+                    code: p.name,
+                    displayName: p.name,
+                    pricePesos: p.monthlyCost,
+                    amountCents: Math.round(p.monthlyCost * 100),
+                    summary: p.description ?? "",
+                    yearlyCost: p.yearlyCost,
+                    maxRooms: p.maxRooms,
+                    maxPersonnel: p.maxPersonnel,
+                    canCreateFinanceManager: p.canCreateFinanceManager,
+                    canCreateMaintenanceManager: p.canCreateMaintenanceManager,
+                }));
+                if (!ignore) {
+                    setPlans(fetched);
+                    setSelectedPlan(fetched[0]?.code ?? "");
+                }
+            } catch {
+                const fallback: BillingPlanOption[] = [
+                    { plan: 0, code: "Starter", displayName: "Starter", pricePesos: 0, amountCents: 0, summary: "Essential features for small teams", yearlyCost: 0, maxRooms: 3, maxPersonnel: 10, canCreateFinanceManager: false, canCreateMaintenanceManager: false },
+                    { plan: 1, code: "Basic", displayName: "Basic", pricePesos: 1200, amountCents: 120000, summary: "Growing organizations", yearlyCost: 12000, maxRooms: 20, maxPersonnel: 50, canCreateFinanceManager: true, canCreateMaintenanceManager: false },
+                    { plan: 2, code: "Pro", displayName: "Pro", pricePesos: 2000, amountCents: 200000, summary: "Enterprise-grade features", yearlyCost: 20000, maxRooms: 0, maxPersonnel: 0, canCreateFinanceManager: true, canCreateMaintenanceManager: true },
+                ];
+                if (!ignore) {
+                    setPlans(fallback);
+                    setSelectedPlan(fallback[0]?.code ?? "");
+                }
+            } finally {
+                if (!ignore) setPlansLoading(false);
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     const passwordMet = PASSWORD_REQUIREMENTS.map((req) => req.test.test(initialPassword));
     const allPasswordMet = passwordMet.every(Boolean);
@@ -291,7 +314,7 @@ export function TenantRegistrationWizard() {
                 adminLastName: lastName,
                 adminEmail: workEmail,
                 adminPassword: initialPassword,
-                subscriptionPlan: selectedPlan,
+                subscriptionPlan: ({ Starter: 0, Basic: 1, Pro: 2 } as Record<string, number>)[selectedPlan] ?? 0,
             });
             setIsLoading(false);
             setSuccess(true);
@@ -595,53 +618,94 @@ export function TenantRegistrationWizard() {
                         <h3 className="text-lg font-semibold text-foreground">Plan</h3>
                         <p className="text-sm text-muted-foreground">Choose a subscription. You can change this later.</p>
                     </div>
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                        {plans.map((plan) => (
-                            <Card
-                                key={plan.id}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        setSelectedPlan(plan.id);
-                                    }
-                                }}
-                                className={cn(
-                                    "relative cursor-pointer overflow-hidden border-2 transition-all",
-                                    selectedPlan === plan.id
-                                        ? "scale-[1.01] border-primary bg-primary/5 shadow-md"
-                                        : "border-muted hover:border-primary/50 hover:shadow-sm",
-                                )}
-                                onClick={() => setSelectedPlan(plan.id)}
-                            >
-                                {selectedPlan === plan.id && (
-                                    <div className="absolute right-0 top-0 z-10 rounded-bl-md bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">
-                                        SELECTED
-                                    </div>
-                                )}
-                                <CardHeader className="px-5 pb-3 pt-5">
-                                    <CardTitle className="text-left text-xl font-semibold">{plan.name}</CardTitle>
-                                    <CardDescription className="mt-1 text-left text-3xl font-bold text-primary">
-                                        {plan.price}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="px-5 pb-5 pt-0">
-                                    <ul className="space-y-2.5">
-                                        {plan.features.map((feature, i) => (
-                                            <li
-                                                key={i}
-                                                className="flex items-start gap-2 text-left text-sm font-normal text-muted-foreground"
-                                            >
-                                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
-                                                <span>{feature}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                    {plansLoading && (
+                        <div className="flex items-center justify-center gap-2 py-8">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span className="text-sm text-muted-foreground">Loading plans…</span>
+                        </div>
+                    )}
+                    {!plansLoading && (
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                            {plans.map((plan) => (
+                                <Card
+                                    key={plan.code}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedPlan(plan.code);
+                                        }
+                                    }}
+                                    className={cn(
+                                        "relative flex cursor-pointer flex-col border-2 transition-all",
+                                        selectedPlan === plan.code
+                                            ? "border-primary bg-primary/5 shadow-md"
+                                            : "border-muted hover:border-primary/50 hover:shadow-sm",
+                                    )}
+                                    onClick={() => setSelectedPlan(plan.code)}
+                                >
+                                    {selectedPlan === plan.code && (
+                                        <div className="absolute right-0 top-0 z-10 rounded-bl-md bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">
+                                            SELECTED
+                                        </div>
+                                    )}
+                                    <CardHeader className="px-6 pb-4 pt-8">
+                                        <CardTitle className="text-left text-xl font-bold">{plan.displayName}</CardTitle>
+                                        <div className="mt-3">
+                                            <span className="text-3xl font-bold text-primary">
+                                                {plan.pricePesos === 0 ? "Free" : `₱${plan.pricePesos.toLocaleString()}/mo`}
+                                            </span>
+                                            {plan.pricePesos > 0 && plan.yearlyCost > 0 && (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    ₱{plan.yearlyCost.toLocaleString()}/yr
+                                                </p>
+                                            )}
+                                        </div>
+                                        {plan.summary && (
+                                            <CardDescription className="mt-2 text-left text-sm leading-relaxed">
+                                                {plan.summary}
+                                            </CardDescription>
+                                        )}
+                                    </CardHeader>
+                                    <CardContent className="flex-1 px-6 pb-8 pt-0">
+                                        <div className="space-y-4 border-t pt-5">
+                                            <div>
+                                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Max Rooms</p>
+                                                <p className="mt-1 text-sm font-semibold">
+                                                    {plan.maxRooms === 0 ? "Unlimited" : plan.maxRooms}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Max Personnel</p>
+                                                <p className="mt-1 text-sm font-semibold">
+                                                    {plan.maxPersonnel === 0 ? "Unlimited" : plan.maxPersonnel}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Finance Manager</p>
+                                                <p className={cn(
+                                                    "mt-1 text-sm font-semibold",
+                                                    plan.canCreateFinanceManager ? "text-green-600 dark:text-green-400" : "text-muted-foreground",
+                                                )}>
+                                                    {plan.canCreateFinanceManager ? "Yes" : "No"}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Maintenance Manager</p>
+                                                <p className={cn(
+                                                    "mt-1 text-sm font-semibold",
+                                                    plan.canCreateMaintenanceManager ? "text-green-600 dark:text-green-400" : "text-muted-foreground",
+                                                )}>
+                                                    {plan.canCreateMaintenanceManager ? "Yes" : "No"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -695,6 +759,31 @@ export function TenantRegistrationWizard() {
                 </div>
 
                 {/* Sign-in link — centered below button */}
+                <div className="relative flex items-center gap-3 my-1">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">or</span>
+                    <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <a
+                    href={
+                        process.env.NODE_ENV === "development"
+                            ? "http://localhost:5090/api/auth/google"
+                            : "/api/auth/google"
+                    }
+                    className="block w-full"
+                >
+                    <Button type="button" variant="outline" className="w-full h-11 font-medium gap-3">
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                        Continue with Google
+                    </Button>
+                </a>
+
                 <p className="text-center text-sm text-muted-foreground">
                     Already have an account?{" "}
                     <Link href="/login" className="font-semibold text-primary hover:underline">

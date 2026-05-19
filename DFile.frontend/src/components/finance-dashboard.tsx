@@ -59,6 +59,11 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         const monthlyCosts: Record<string, number> = {};
 
         records.forEach(r => {
+            // Only count approved requests - pending and rejected should not be included
+            if (r.financeWorkflowStatus !== "Approved") {
+                return;
+            }
+
             const cost = r.cost || 0;
             totalMaintenanceCost += cost;
             if (r.status === "Completed") completedCost += cost;

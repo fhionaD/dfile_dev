@@ -59,7 +59,7 @@ export default function RegisterOrganizationPage() {
 
             <div className="flex min-h-svh flex-col bg-background lg:h-svh lg:min-h-0">
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-                    <div className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-6 sm:px-10 sm:py-8 lg:px-16 lg:py-10">
+                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-6 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
                         <div className="flex justify-center lg:justify-start lg:hidden">
                             <img src="/AMS.svg" alt="DFile Logo" className="h-14 w-auto dark:hidden" />
                             <img src="/AMS_dark.svg" alt="DFile Logo" className="hidden h-14 w-auto dark:block" />

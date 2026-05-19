@@ -25,7 +25,9 @@ export default function ReportsPage() {
     const approvedOrders = useMemo(() => orders.filter(o => o.status === "Approved" || o.status === "Delivered"), [orders]);
     const totalProcurementSpend = useMemo(() => approvedOrders.reduce((sum, o) => sum + o.purchasePrice, 0), [approvedOrders]);
 
-    const totalMaintenanceCost = useMemo(() => records.reduce((sum, r) => sum + (r.cost ?? 0), 0), [records]);
+    const totalMaintenanceCost = useMemo(() => records
+        .filter(r => r.financeWorkflowStatus === "Approved")
+        .reduce((sum, r) => sum + (r.cost ?? 0), 0), [records]);
 
     // Category breakdown
     const categoryBreakdown = useMemo(() => {

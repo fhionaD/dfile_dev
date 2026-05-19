@@ -143,6 +143,13 @@ function canStartInspection(record: MaintenanceRecord): boolean {
     return start <= today;
 }
 
+function canPerformRepair(record: MaintenanceRecord): boolean {
+    if (!record.startDate) return false;
+    const start = record.startDate.slice(0, 10);
+    const today = localDateString(new Date());
+    return start <= today;
+}
+
 export default function SchedulesPage() {
     const searchParams = useSearchParams();
     const highlightId = searchParams.get("highlight");
@@ -571,7 +578,7 @@ export default function SchedulesPage() {
                                     <TableHead className="font-bold text-foreground min-w-[200px] px-3 py-3 whitespace-normal">Asset & task</TableHead>
                                     <TableHead className="font-bold text-foreground min-w-[200px] px-3 py-3 hidden md:table-cell whitespace-normal">Room</TableHead>
                                     <TableHead className="font-bold text-foreground w-[112px] px-3 py-3 whitespace-normal">Schedule Date</TableHead>
-                                    <TableHead className="font-bold text-foreground w-[80px] px-3 py-3 whitespace-normal">Pri.</TableHead>
+                                    <TableHead className="font-bold text-foreground w-[80px] px-3 py-3 whitespace-normal">Priority</TableHead>
                                     <TableHead className="text-right font-bold text-foreground w-[104px] px-3 py-3 whitespace-normal">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -700,11 +707,14 @@ export default function SchedulesPage() {
                                                     }
 
                                                     if (scheduleTabView === "active" && isFinanceRepairVisit(record)) {
+                                                        const canRepair = canPerformRepair(record);
                                                         return (
                                                             <Button
                                                                 size="sm"
                                                                 variant="default"
                                                                 className="bg-sky-600 hover:bg-sky-700 text-white"
+                                                                disabled={!canRepair}
+                                                                title={!canRepair ? "Repair is available on or after the scheduled start date" : undefined}
                                                                 onClick={() => setRepairTarget(record)}
                                                             >
                                                                 Repair

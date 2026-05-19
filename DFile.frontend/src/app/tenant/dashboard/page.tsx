@@ -3,29 +3,23 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Users, ShieldCheck, Building2, MapPin, Tag } from "lucide-react";
-import { useEmployees, useRoles, useDepartments } from "@/hooks/use-organization";
+import { Users, MapPin, Tag } from "lucide-react";
+import { useEmployees } from "@/hooks/use-organization";
 import { useRooms } from "@/hooks/use-rooms";
 import { useCategories } from "@/hooks/use-categories";
 
 export default function TenantDashboardPage() {
     const { data: employees = [], isLoading: empLoading } = useEmployees();
-    const { data: roles = [], isLoading: rolesLoading } = useRoles();
-    const { data: departments = [], isLoading: deptLoading } = useDepartments();
     const { data: rooms = [], isLoading: roomsLoading } = useRooms();
     const { data: categories = [], isLoading: catLoading } = useCategories();
 
     const activeEmployees = employees.filter(e => e.status === "Active");
-    const activeRoles = roles.filter(r => r.status === "Active");
-    const activeDepts = departments.filter(d => d.status === "Active");
     // archived rooms are excluded by the API (showArchived=false default), status filter removes Deactivated
     const activeRooms = rooms.filter(r => !r.archived && r.status !== "Deactivated");
     const activeCategories = categories.filter(c => c.status === "Active");
 
     const stats = [
         { label: "Active Users", value: activeEmployees.length, total: employees.length, icon: Users, color: "text-blue-600", bg: "bg-blue-500/10", isLoading: empLoading },
-        { label: "Roles Defined", value: activeRoles.length, total: roles.length, icon: ShieldCheck, color: "text-violet-600", bg: "bg-violet-500/10", isLoading: rolesLoading },
-        { label: "Departments", value: activeDepts.length, total: departments.length, icon: Building2, color: "text-emerald-600", bg: "bg-emerald-500/10", isLoading: deptLoading },
         { label: "Locations", value: activeRooms.length, total: rooms.length, icon: MapPin, color: "text-teal-600", bg: "bg-teal-500/10", isLoading: roomsLoading },
         { label: "Asset Categories", value: activeCategories.length, total: categories.length, icon: Tag, color: "text-amber-600", bg: "bg-amber-500/10", isLoading: catLoading },
     ];

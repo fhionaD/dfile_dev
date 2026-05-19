@@ -1,19 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Role, Employee, Department } from '@/types/asset';
+import { Employee } from '@/types/asset';
 import { toast } from 'sonner';
-
-interface CreateRolePayload {
-    designation: string;
-    department: string;
-    scope: string;
-}
-
-interface CreateDepartmentPayload {
-    name: string;
-    description: string;
-    head: string;
-}
 
 interface CreateEmployeePayload {
     firstName: string;
@@ -21,25 +9,13 @@ interface CreateEmployeePayload {
     lastName: string;
     email: string;
     contactNumber: string;
-    department: string;
+    address?: string;
     role: string;
     hireDate: string;
 }
 
 interface UpdateEmployeePayload extends CreateEmployeePayload {
     status: string;
-}
-
-export function useRoles(showArchived: boolean = false) {
-    return useQuery({
-        queryKey: ['roles', showArchived],
-        queryFn: async () => {
-            const { data } = await api.get<Role[]>('/api/Roles', {
-                params: { showArchived }
-            });
-            return data;
-        },
-    });
 }
 
 export function useEmployees(showArchived: boolean = false) {
@@ -54,88 +30,6 @@ export function useEmployees(showArchived: boolean = false) {
     });
 }
 
-export function useDepartments(showArchived: boolean = false) {
-    return useQuery({
-        queryKey: ['departments', showArchived],
-        queryFn: async () => {
-            const { data } = await api.get<Department[]>('/api/Departments', {
-                params: { showArchived }
-            });
-            return data;
-        },
-    });
-}
-
-export function useAddRole() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (payload: CreateRolePayload) => {
-            const { data } = await api.post<Role>('/api/Roles', payload);
-            return data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['roles'] });
-            toast.success('Role added successfully');
-        },
-        onError: () => {
-            toast.error('Failed to add role');
-        },
-    });
-}
-
-export function useUpdateRole() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: CreateRolePayload }) => {
-            const { data } = await api.put<Role>(`/api/Roles/${id}`, payload);
-            return data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['roles'] });
-            toast.success('Role updated successfully');
-        },
-        onError: () => {
-            toast.error('Failed to update role');
-        },
-    });
-}
-
-export function useArchiveRole() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id: string) => {
-            await api.put(`/api/Roles/archive/${id}`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['roles'] });
-            toast.success('Role archived');
-        },
-        onError: () => {
-            toast.error('Failed to archive role');
-        },
-    });
-}
-
-export function useRestoreRole() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id: string) => {
-            await api.put(`/api/Roles/restore/${id}`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['roles'] });
-            toast.success('Role restored');
-        },
-        onError: () => {
-            toast.error('Failed to restore role');
-        },
-    });
-}
-
 export function useAddEmployee() {
     const queryClient = useQueryClient();
 
@@ -146,10 +40,18 @@ export function useAddEmployee() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
-            toast.success('Employee added successfully');
+            toast.success('Activation email has been sent');
         },
-        onError: () => {
-            toast.error('Failed to add employee');
+        onError: (error: unknown) => {
+            const data = (error as { response?: { data?: { message?: string; title?: string; errors?: Record<string, string[]> } } })?.response?.data;
+            if (data?.message) {
+                toast.error(data.message);
+            } else if (data?.errors) {
+                const first = Object.values(data.errors).flat()[0];
+                toast.error(first ?? data.title ?? 'Failed to add employee');
+            } else {
+                toast.error(data?.title ?? 'Failed to add employee');
+            }
         },
     });
 }
@@ -166,8 +68,16 @@ export function useUpdateEmployee() {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
             toast.success('Employee updated successfully');
         },
-        onError: () => {
-            toast.error('Failed to update employee');
+        onError: (error: unknown) => {
+            const data = (error as { response?: { data?: { message?: string; title?: string; errors?: Record<string, string[]> } } })?.response?.data;
+            if (data?.message) {
+                toast.error(data.message);
+            } else if (data?.errors) {
+                const first = Object.values(data.errors).flat()[0];
+                toast.error(first ?? data.title ?? 'Failed to update employee');
+            } else {
+                toast.error(data?.title ?? 'Failed to update employee');
+            }
         },
     });
 }
@@ -202,76 +112,6 @@ export function useRestoreEmployee() {
         },
         onError: () => {
             toast.error('Failed to restore employee');
-        },
-    });
-}
-
-export function useAddDepartment() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (payload: CreateDepartmentPayload) => {
-            const { data } = await api.post<Department>('/api/Departments', payload);
-            return data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['departments'] });
-            toast.success('Department added successfully');
-        },
-        onError: () => {
-            toast.error('Failed to add department');
-        },
-    });
-}
-
-export function useUpdateDepartment() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ id, payload }: { id: string; payload: CreateDepartmentPayload }) => {
-            const { data } = await api.put<Department>(`/api/Departments/${id}`, payload);
-            return data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['departments'] });
-            toast.success('Department updated successfully');
-        },
-        onError: () => {
-            toast.error('Failed to update department');
-        },
-    });
-}
-
-export function useArchiveDepartment() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id: string) => {
-            await api.put(`/api/Departments/archive/${id}`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['departments'] });
-            toast.success('Department archived');
-        },
-        onError: () => {
-            toast.error('Failed to archive department');
-        },
-    });
-}
-
-export function useRestoreDepartment() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id: string) => {
-            await api.put(`/api/Departments/restore/${id}`);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['departments'] });
-            toast.success('Department restored');
-        },
-        onError: () => {
-            toast.error('Failed to restore department');
         },
     });
 }

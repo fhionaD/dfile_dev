@@ -18,7 +18,7 @@ import {
 
 interface RoomListViewProps {
     rooms: Room[];
-    roomCategories: { id: string; name: string; subCategory?: string }[];
+    roomCategories: { id: string; name: string }[];
     showArchived: boolean;
     onToggleArchived: () => void;
     onCreateRoom?: () => void;

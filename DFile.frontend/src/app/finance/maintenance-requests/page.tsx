@@ -19,12 +19,14 @@ import {
     useFinanceRejectMaintenance,
     useFinanceApproveReplacement,
     useFinanceMarkPartsReady,
+    useFinanceApproveRepairFinancialImpact,
 } from "@/hooks/use-maintenance";
 import { useCategories } from "@/hooks/use-categories";
 import { useAddAsset, useAssets } from "@/hooks/use-assets";
 import { AddAssetModal } from "@/components/modals/add-asset-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
-import { Asset, CreateAssetPayload, FinanceMaintenanceQueueRow, ReplacementRegistrationContext } from "@/types/asset";
+import { FinanceRepairApprovalModal } from "@/components/modals/finance-repair-approval-modal";
+import { Asset, CreateAssetPayload, FinanceMaintenanceQueueRow, MaintenanceRecord, ReplacementRegistrationContext } from "@/types/asset";
 
 function displayFinanceStatus(r: FinanceMaintenanceQueueRow): string {
     if (r.financeWorkflowStatus) return r.financeWorkflowStatus;
@@ -52,7 +54,7 @@ function buildCreateAssetPayload(asset: Asset, replacementMaintenanceRecordId?: 
         purchaseDate: asNullableDate(asset.purchaseDate),
         vendor: asset.vendor || undefined,
         acquisitionCost: Number(asset.purchasePrice ?? 0),
-        usefulLifeYears: Number(asset.usefulLifeYears ?? 0),
+        totalLifeMonths: Number((asset.usefulLifeYears ?? 0) * 12),
         purchasePrice: Number(asset.purchasePrice ?? 0),
         residualValue: null,
         salvagePercentage: asset.salvagePercentage ?? undefined,
@@ -90,11 +92,14 @@ export default function FinanceMaintenanceRequestsPage() {
     const rejectReq = useFinanceRejectMaintenance();
     const approveReplacement = useFinanceApproveReplacement();
     const markPartsReady = useFinanceMarkPartsReady();
+    const approveFinancialImpact = useFinanceApproveRepairFinancialImpact();
 
     const [replacementTarget, setReplacementTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
     const [detailRecord, setDetailRecord] = useState<FinanceMaintenanceQueueRow | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [rejectionTarget, setRejectionTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [financialDecisionTarget, setFinancialDecisionTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [financialDecisionOpen, setFinancialDecisionOpen] = useState(false);
     const {
         data: financeSubmissionDetail,
         isLoading: financeSubmissionLoading,
@@ -129,6 +134,7 @@ export default function FinanceMaintenanceRequestsPage() {
         rejectReq.isPending ||
         approveReplacement.isPending ||
         markPartsReady.isPending ||
+        approveFinancialImpact.isPending ||
         addAsset.isPending;
 
     if (!authLoading && user?.role === "Admin") {
@@ -324,7 +330,10 @@ export default function FinanceMaintenanceRequestsPage() {
                                             <Button
                                                 size="sm"
                                                 className="gap-1"
-                                                onClick={() => markPartsReady.mutate(r.id)}
+                                                onClick={() => {
+                                                    setFinancialDecisionTarget(r);
+                                                    setFinancialDecisionOpen(true);
+                                                }}
                                                 disabled={busy}
                                             >
                                                 <CheckCircle2 className="h-3.5 w-3.5" /> Parts ready
@@ -337,6 +346,40 @@ export default function FinanceMaintenanceRequestsPage() {
                     </div>
                 )}
             </Card>
+
+            {financialDecisionOpen && financialDecisionTarget && (
+                <FinanceRepairApprovalModal
+                    open={financialDecisionOpen}
+                    onOpenChange={(open) => {
+                        setFinancialDecisionOpen(open);
+                        if (!open) {
+                            setFinancialDecisionTarget(null);
+                        }
+                    }}
+                    maintenanceRecord={{
+                        id: financialDecisionTarget.id,
+                        requestId: financialDecisionTarget.requestId,
+                        assetId: financialDecisionTarget.assetId,
+                        assetName: financialDecisionTarget.assetName,
+                        assetCode: financialDecisionTarget.assetCode,
+                        cost: financialDecisionTarget.cost,
+                        repairType: undefined,
+                        quotationNotes: undefined,
+                    } as MaintenanceRecord}
+                    onApproveWithDecision={async (payload) => {
+                        try {
+                            // Apply the financial decision
+                            await approveFinancialImpact.mutateAsync(payload);
+                            // Then mark parts as ready
+                            await markPartsReady.mutateAsync(financialDecisionTarget.id);
+                            setFinancialDecisionOpen(false);
+                            setFinancialDecisionTarget(null);
+                        } catch {
+                            // Error handled by mutation
+                        }
+                    }}
+                />
+            )}
 
             {detailOpen && detailRecord && (
                 <MaintenanceDetailsModal
