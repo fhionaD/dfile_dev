@@ -33,26 +33,6 @@ namespace DFile.backend.Data
             GenerateUniqueCodeAsync(context, "AST",
                 async (ctx, code) => await ctx.Assets.AnyAsync(a => a.AssetCode == code));
 
-        /// <summary>
-        /// Generates a unique Tag Number in format TAG-#### with random 4 digits.
-        /// Ensures uniqueness across all tenants.
-        /// </summary>
-        public static async Task<string> GenerateTagNumberAsync(AppDbContext context)
-        {
-            for (int attempt = 0; attempt < 20; attempt++)
-            {
-                var digits = RandomNumberGenerator.GetInt32(1000, 10000);
-                var tag = $"TAG-{digits}";
-
-                if (!await context.Assets.AnyAsync(a => a.TagNumber == tag))
-                    return tag;
-            }
-
-            // Fallback to 5 digits if collision after 20 attempts
-            var fallback = RandomNumberGenerator.GetInt32(10000, 100000);
-            return $"TAG-{fallback}";
-        }
-
         public static Task<string> GenerateCategoryCodeAsync(AppDbContext context) =>
             GenerateUniqueCodeAsync(context, "ASTC",
                 async (ctx, code) => await ctx.AssetCategories.AnyAsync(c => c.AssetCategoryCode == code));
@@ -84,14 +64,6 @@ namespace DFile.backend.Data
         public static Task<string> GenerateRoomSubCategoryIdAsync(AppDbContext context) =>
             GenerateUniqueCodeAsync(context, "RSC",
                 async (ctx, code) => await ctx.RoomSubCategories.AnyAsync(r => r.Id == code));
-
-        public static Task<string> GenerateDepartmentCodeAsync(AppDbContext context) =>
-            GenerateUniqueCodeAsync(context, "DPT",
-                async (ctx, code) => await ctx.Departments.AnyAsync(d => d.DepartmentCode == code));
-
-        public static Task<string> GenerateRoleCodeAsync(AppDbContext context) =>
-            GenerateUniqueCodeAsync(context, "ROL",
-                async (ctx, code) => await ctx.Roles.AnyAsync(r => r.RoleCode == code));
 
         public static Task<string> GenerateAllocationIdAsync(AppDbContext context) =>
             GenerateUniqueCodeAsync(context, "AL",

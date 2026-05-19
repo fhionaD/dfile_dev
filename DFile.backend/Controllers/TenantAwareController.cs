@@ -30,7 +30,7 @@ namespace DFile.backend.Controllers
         public int? GetCurrentTenantId()
         {
             var tenantClaim = User.FindFirst("TenantId")?.Value;
-            return string.IsNullOrEmpty(tenantClaim) ? null : int.Parse(tenantClaim);
+            return string.IsNullOrEmpty(tenantClaim) ? null : int.Parse(tenantClaim, CultureInfo.InvariantCulture);
         }
 
         [NonAction]

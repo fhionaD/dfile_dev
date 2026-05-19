@@ -18,6 +18,8 @@ namespace DFile.backend.DTOs
         [Required]
         public string FirstName { get; set; } = string.Empty;
 
+        public string? MiddleName { get; set; }
+
         [Required]
         public string LastName { get; set; } = string.Empty;
 
@@ -26,27 +28,46 @@ namespace DFile.backend.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [MinLength(6)]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
         public string Password { get; set; } = string.Empty;
 
+        // Role: "Finance Manager" or "Maintenance Manager" (for tenant users)
         [Required]
-        public int RoleTemplateId { get; set; }
+        public string Role { get; set; } = "Admin";
+
+        public string? ContactNumber { get; set; }
+        public string? Address { get; set; }
 
         public int? TenantId { get; set; }
+    }
+
+    public class SetupPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Token { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        public string NewPassword { get; set; } = string.Empty;
     }
 
     public class UserResponseDto
     {
         public int Id { get; set; }
         public string FirstName { get; set; } = string.Empty;
+        public string? MiddleName { get; set; }
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public string RoleLabel { get; set; } = string.Empty;
-        public string? Avatar { get; set; }
+        public string? ContactNumber { get; set; }
+        public string? Address { get; set; }
         public string Status { get; set; } = string.Empty;
         public int? TenantId { get; set; }
-        public List<ModulePermissionDto>? Permissions { get; set; }
     }
 
     public class ModulePermissionDto
@@ -57,5 +78,34 @@ namespace DFile.backend.DTOs
         public bool CanEdit { get; set; }
         public bool CanApprove { get; set; }
         public bool CanArchive { get; set; }
+    }
+
+    public class ForgotPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ResetPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Token { get; set; } = string.Empty;
+
+        [Required]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
+    public class ChangePasswordDto
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

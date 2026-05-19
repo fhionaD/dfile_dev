@@ -15,7 +15,7 @@ namespace DFile.backend.Models
         public string? AssignedTo { get; set; } // Employee ID
         public DateTime? DueDate { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]

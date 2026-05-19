@@ -1,6 +1,8 @@
-using DFile.backend.Configuration;
+﻿using DFile.backend.Configuration;
 using DFile.backend.Data;
 using DFile.backend.Serialization;
+using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -45,16 +47,23 @@ builder.Services.AddHttpClient<DFile.backend.Services.IPayMongoPaymentService, D
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 builder.Services.AddScoped<DFile.backend.Controllers.RequireTenantFilter>();
-builder.Services.AddScoped<DFile.backend.Services.PermissionService>();
 builder.Services.AddScoped<DFile.backend.Services.IAuditService, DFile.backend.Services.AuditService>();
 builder.Services.AddScoped<DFile.backend.Services.INotificationService, DFile.backend.Services.NotificationService>();
 builder.Services.AddScoped<DFile.backend.Services.IMaintenanceReplacementRegistrationService, DFile.backend.Services.MaintenanceReplacementRegistrationService>();
 builder.Services.AddHostedService<DFile.backend.Services.DepreciationReconciliationService>();
 builder.Services.AddHostedService<DFile.backend.Services.MaintenanceDueReminderService>();
+builder.Services.AddHostedService<DFile.backend.Services.SubscriptionExpirationService>();
 builder.Services.AddScoped<DFile.backend.Authorization.PermissionAuthorizationFilter>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddMemoryCache();
+
+// SMTP EMAIL CONFIGURATION
+builder.Services.Configure<SmtpSettings>(
+    builder.Configuration.GetSection("SmtpSettings"));
+
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ILoginAuditService, LoginAuditService>();
 
 // Database Context
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -82,14 +91,16 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = true;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false
+        ValidateIssuer = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"]
     };
 });
 
@@ -146,8 +157,122 @@ else
         "DFILE_SKIP_MIGRATIONS=1: skipping EF Core Migrate() at startup.");
 }
 
+// Seed initial test data (non-critical, errors are caught)
+_ = Task.Run(async () =>
+{
+    try
+    {
+        await Task.Delay(2000); // Wait for app to fully initialize
+        using var seedScope = app.Services.CreateScope();
+        var db = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var seedLogger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        // Create Super Admin user if it doesn't exist
+        var superAdminExists = await db.Users.AnyAsync(u => u.Email == "admin@dfile.local");
+        if (!superAdminExists)
+        {
+            var superAdminPassword = BCrypt.Net.BCrypt.HashPassword("Admin@123");
+            var superAdmin = new User
+            {
+                FirstName = "Super",
+                LastName = "Administrator",
+                Email = "admin@dfile.local",
+                PasswordHash = superAdminPassword,
+                Role = "Super Admin",
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(superAdmin);
+            await db.SaveChangesAsync();
+            seedLogger.LogInformation("✓ Created test Super Admin user: admin@dfile.local");
+        }
+
+        // Create test Tenant if it doesn't exist
+        var tenantExists = await db.Tenants.AnyAsync(t => t.Name == "Test Tenant");
+        if (!tenantExists)
+        {
+            var tenant = Tenant.Create("Test Tenant", SubscriptionPlanType.Pro);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+            seedLogger.LogInformation("✓ Created test Tenant: Test Tenant (ID: {TenantId})", tenant.Id);
+
+            // Create Admin user for test tenant
+            var adminPassword = BCrypt.Net.BCrypt.HashPassword("Admin@123");
+            var admin = new User
+            {
+                FirstName = "Tenant",
+                LastName = "Administrator",
+                Email = "tenantadmin@dfile.local",
+                PasswordHash = adminPassword,
+                Role = "Admin",
+                Status = "Active",
+                TenantId = tenant.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(admin);
+            await db.SaveChangesAsync();
+            seedLogger.LogInformation("✓ Created test Admin user: tenantadmin@dfile.local");
+        }
+    }
+    catch (Exception ex)
+    {
+        var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
+        var log = loggerFactory.CreateLogger("Program");
+        log.LogWarning(ex, "Warning: Test data seeding encountered an issue (this is non-critical and the app will continue)");
+    }
+});
+
 // Configure the HTTP request pipeline
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/problem+json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = "https://tools.ietf.org/html/rfc7807",
+            title = "An unexpected error occurred.",
+            status = 500
+        });
+    });
+});
 app.UseDefaultFiles();
+
+// Rewrite Next.js RSC payload dot-notation URLs to their directory equivalents.
+// The static export generates: /login/__next.!KGF1dGgp/login.txt
+// The client router requests: /login/__next.!KGF1dGgp.login.txt
+// This middleware translates dot-notation back to directory paths before UseStaticFiles serves them.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? "";
+    var lastSlash = path.LastIndexOf('/');
+    if (lastSlash >= 0)
+    {
+        var filename = path[(lastSlash + 1)..];
+        if (filename.StartsWith("__next.", StringComparison.Ordinal) && filename.EndsWith(".txt", StringComparison.Ordinal))
+        {
+            // Strip "__next." prefix (7 chars) and ".txt" suffix (4 chars)
+            var middle = filename[7..^4];
+            var firstDot = middle.IndexOf('.');
+            if (firstDot > 0)
+            {
+                var segment = middle[..firstDot];
+                var rest = middle[(firstDot + 1)..].Replace('.', '/');
+                var dir = path[..lastSlash];
+                var rewritten = $"{dir}/__next.{segment}/{rest}.txt";
+                var webRoot = app.Environment.WebRootPath
+                    ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+                var physicalPath = Path.Combine(webRoot, rewritten.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(physicalPath))
+                {
+                    context.Request.Path = rewritten;
+                }
+            }
+        }
+    }
+    await next(context);
+});
 
 // In Development, do not let browsers cache wwwroot (stale JS after `npm run build` + copy-wwwroot).
 var staticFileOptions = new StaticFileOptions();
@@ -161,6 +286,8 @@ if (app.Environment.IsDevelopment())
     };
 }
 app.UseStaticFiles(staticFileOptions);
+
+app.UseHttpsRedirection();
 
 if (app.Environment.IsDevelopment())
 {
@@ -180,7 +307,19 @@ app.MapControllers();
 // Health endpoint
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 
-// DB test endpoint
+// SMTP test endpoint — Super Admin only
+app.MapGet("/api/test-email", async (IEmailService email) =>
+{
+    await email.SendEmailAsync(
+        "fhionadominic.escurzon@email.com",
+        "SMTP Test",
+        "<h1>Email Working</h1>"
+    );
+
+    return Results.Ok("Email sent");
+}).RequireAuthorization(policy => policy.RequireRole("Super Admin"));
+
+// DB test endpoint — Super Admin only, error message sanitized
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/api/db-test", (AppDbContext db) =>
@@ -189,13 +328,13 @@ if (app.Environment.IsDevelopment())
         {
             return db.Database.CanConnect()
                 ? Results.Ok("Database connection successful.")
-                : Results.Problem("Database connection failed (CanConnect returned false). Check logs for details.");
+                : Results.Problem("Database connection failed.");
         }
-        catch (Exception ex)
+        catch
         {
-            return Results.Problem($"Database connection error: {ex.Message}");
+            return Results.Problem("Database connection error.");
         }
-    });
+    }).RequireAuthorization(policy => policy.RequireRole("Super Admin"));
 }
 
 // Explicit 404 for unmatched /api/* routes

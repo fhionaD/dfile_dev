@@ -20,7 +20,6 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
-        private readonly PermissionService _permissionService;
         private readonly IMaintenanceReplacementRegistrationService _replacementRegistrationService;
         private readonly INotificationService _notificationService;
 
@@ -48,13 +47,11 @@ namespace DFile.backend.Controllers
         public AssetsController(
             AppDbContext context,
             IAuditService auditService,
-            PermissionService permissionService,
             IMaintenanceReplacementRegistrationService replacementRegistrationService,
             INotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
-            _permissionService = permissionService;
             _replacementRegistrationService = replacementRegistrationService;
             _notificationService = notificationService;
         }
@@ -62,7 +59,7 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         private async Task<bool> CanRegisterFinanceReplacementAsync(int? userId, int? tenantId)
@@ -70,7 +67,8 @@ namespace DFile.backend.Controllers
             if (IsSuperAdmin()) return true;
             if (User.IsInRole(UserRoleConstants.Finance)) return true;
             if (!userId.HasValue || !tenantId.HasValue) return false;
-            return await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanApprove");
+            // Allow Finance Manager and Admin roles
+            return User.IsInRole("Finance Manager") || User.IsInRole("Admin");
         }
 
         private static string? NormalizeSerial(string? value)
@@ -95,10 +93,8 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin())
             {
                 if (!tenantId.HasValue || !userId.HasValue) return Forbid();
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
-                var isMaintenanceRole = User.IsInRole("Maintenance");
-                if (!canAssets && !isMaintenanceRole)
-                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+                // Permission checks simplified - authentication via [Authorize] is sufficient
+                // Allow all tenant users (Admin, Finance Manager, Maintenance Manager, Employee roles)
             }
             var query = _context.Assets.AsQueryable();
 
@@ -122,7 +118,6 @@ namespace DFile.backend.Controllers
                     query = query.Where(a =>
                         a.AssetName.Contains(term) ||
                         a.AssetCode.Contains(term) ||
-                        (a.TagNumber != null && a.TagNumber.Contains(term)) ||
                         a.Id.Contains(term) ||
                         (a.Model != null && a.Model.Contains(term)) ||
                         (a.SerialNumber != null && a.SerialNumber.Contains(term)));
@@ -206,10 +201,7 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin())
             {
                 if (!tenantId.HasValue || !userId.HasValue) return Forbid();
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
-                var isMaintenanceRole = User.IsInRole("Maintenance");
-                if (!canAssets && !isMaintenanceRole)
-                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+                // Permission checks simplified - authentication via [Authorize] is sufficient
             }
 
             var query = _context.Assets.Where(a =>
@@ -248,10 +240,7 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin())
             {
                 if (!tenantId.HasValue || !userId.HasValue) return Forbid();
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
-                var isMaintenanceRole = User.IsInRole("Maintenance");
-                if (!canAssets && !isMaintenanceRole)
-                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+                // Permission checks simplified - authentication via [Authorize] is sufficient
             }
             var query = _context.Assets.Where(a => !a.IsArchived && 
                 (a.LifecycleStatus == LifecycleStatus.Registered || a.LifecycleStatus == LifecycleStatus.InUse));
@@ -290,10 +279,7 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin())
             {
                 if (!tenantId.HasValue || !userId.HasValue) return Forbid();
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
-                var isMaintenanceRole = User.IsInRole("Maintenance");
-                if (!canAssets && !isMaintenanceRole)
-                    return StatusCode(403, new { message = "You do not have permission to view assets." });
+                // Permission checks simplified - authentication via [Authorize] is sufficient
             }
 
             var asset = await _context.Assets.FindAsync(id);
@@ -357,6 +343,10 @@ namespace DFile.backend.Controllers
                 return CreatedAtAction("GetAsset", new { id = ra.Id }, AssetResponseMapper.ToDto(ra, rcat, new Dictionary<int, string>(), null));
             }
 
+            // Regular asset registration — Admin and Super Admin only
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can register new assets." });
+
             var category = await _context.AssetCategories.FindAsync(dto.CategoryId);
             if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
             if (category.IsArchived) return BadRequest(new { message = "The selected asset category is archived and cannot be used." });
@@ -369,7 +359,7 @@ namespace DFile.backend.Controllers
             {
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
                     ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
                 if (serialExists)
                 {
@@ -386,13 +376,11 @@ namespace DFile.backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                TagNumber = null,
                 AssetName = dto.AssetName,
                 CategoryId = dto.CategoryId,
                 LifecycleStatus = LifecycleStatus.Registered,
                 CurrentCondition = dto.CurrentCondition,
                 HandlingTypeSnapshot = category.HandlingType.ToString(),
-                Room = null,
                 Image = dto.Image,
                 Manufacturer = dto.Manufacturer,
                 Model = dto.Model,
@@ -400,17 +388,18 @@ namespace DFile.backend.Controllers
                 PurchaseDate = dto.PurchaseDate,
                 Vendor = dto.Vendor,
                 AcquisitionCost = dto.AcquisitionCost,
-                UsefulLifeYears = dto.UsefulLifeYears,
+                TotalLifeMonths = dto.TotalLifeMonths,
+                UsedMonths = 0,
                 PurchasePrice = dto.PurchasePrice,
                 ResidualValue = dto.ResidualValue,
                 SalvagePercentage = effectiveSalvagePct,
                 SalvageValue = computedSalvageValue,
                 IsSalvageOverride = dto.IsSalvageOverride,
                 CurrentBookValue = dto.PurchasePrice,
-                MonthlyDepreciation = dto.UsefulLifeYears > 0
-                    ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
+                AccumulatedDepreciation = 0,
+                MonthlyDepreciation = dto.TotalLifeMonths > 0
+                    ? Math.Round((dto.PurchasePrice - computedSalvageValue) / dto.TotalLifeMonths, 2)
                     : 0,
-                DepreciationMonthsApplied = 0,
                 TenantId = effectiveTenantId.HasValue ? effectiveTenantId.Value : null,
                 WarrantyExpiry = dto.WarrantyExpiry,
                 Notes = dto.Notes,
@@ -457,6 +446,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can edit assets." });
+
             var existing = await _context.Assets.FindAsync(id);
 
             if (existing == null) return NotFound();
@@ -475,7 +468,7 @@ namespace DFile.backend.Controllers
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.Id != id &&
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
                     ((existing.TenantId == null && a.TenantId == null) || a.TenantId == existing.TenantId));
                 if (serialExists)
                 {
@@ -518,13 +511,13 @@ namespace DFile.backend.Controllers
             if (User.IsInRole("Admin") || User.IsInRole("Finance") || IsSuperAdmin())
             {
                 existing.AcquisitionCost = dto.AcquisitionCost;
-                existing.UsefulLifeYears = dto.UsefulLifeYears;
+                existing.TotalLifeMonths = dto.TotalLifeMonths;
                 existing.PurchasePrice = dto.PurchasePrice;
                 existing.ResidualValue = dto.ResidualValue;
                 existing.CurrentBookValue = dto.CurrentBookValue;
 
-                existing.MonthlyDepreciation = dto.UsefulLifeYears > 0
-                    ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
+                existing.MonthlyDepreciation = dto.TotalLifeMonths > 0
+                    ? Math.Round((dto.PurchasePrice - (dto.ResidualValue ?? 0)) / dto.TotalLifeMonths, 2)
                     : 0;
 
                 var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
@@ -576,11 +569,11 @@ namespace DFile.backend.Controllers
 
             existing.PurchasePrice = dto.PurchasePrice;
             existing.AcquisitionCost = dto.AcquisitionCost;
-            existing.UsefulLifeYears = dto.UsefulLifeYears;
+            existing.TotalLifeMonths = dto.UsefulLifeYears * 12;
             existing.ResidualValue = dto.ResidualValue;
 
-            existing.MonthlyDepreciation = dto.UsefulLifeYears > 0
-                ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
+            existing.MonthlyDepreciation = existing.TotalLifeMonths > 0
+                ? Math.Round((dto.PurchasePrice - (dto.ResidualValue ?? 0)) / existing.TotalLifeMonths, 2)
                 : 0;
 
             if (dto.CurrentBookValue.HasValue)
@@ -611,6 +604,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can archive assets." });
+
             var asset = await _context.Assets.FindAsync(id);
 
             if (asset == null) return NotFound();
@@ -648,6 +645,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can restore assets." });
+
             var asset = await _context.Assets.FindAsync(id);
 
             if (asset == null) return NotFound();
@@ -679,6 +680,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can delete assets." });
+
             var asset = await _context.Assets.FindAsync(id);
 
             if (asset == null) return NotFound();

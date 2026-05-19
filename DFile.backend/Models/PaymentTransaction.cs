@@ -38,9 +38,20 @@ namespace DFile.backend.Models
         [MaxLength(128)]
         public string ReferenceNumber { get; set; } = string.Empty;
 
-        /// <summary>Subscription tier charged (Starter, Basic, Pro).</summary>
-        [MaxLength(32)]
-        public string? SubscriptionPlanCode { get; set; }
+        /// <summary>FK to Plan.Id — which plan is being paid for.</summary>
+        public int PlanId { get; set; }
+
+        [ForeignKey(nameof(PlanId))]
+        public Plan? Plan { get; set; }
+
+        /// <summary>Subscription plan name (Starter, Basic, Pro) — NOT NULL, denormalized from Plan.Name.</summary>
+        [Required]
+        [MaxLength(100)]
+        public string SubscriptionPlanCode { get; set; } = string.Empty;
+
+        /// <summary>"Monthly" or "Yearly" — billing cycle selected at checkout.</summary>
+        [MaxLength(20)]
+        public string BillingCycle { get; set; } = "Monthly";
 
         [MaxLength(2000)]
         public string? LastError { get; set; }

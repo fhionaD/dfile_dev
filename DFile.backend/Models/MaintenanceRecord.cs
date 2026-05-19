@@ -40,11 +40,30 @@ namespace DFile.backend.Models
         /// <summary>Pending Approval | Approved | Rejected | Waiting for Replacement | Replacement Completed</summary>
         public string? FinanceWorkflowStatus { get; set; }
 
+        /// <summary>Minor | Major — classification of repair type; only set when DiagnosisOutcome is "Repairable".</summary>
+        public string? RepairType { get; set; }
+
+        /// <summary>Finance decision for major repairs: Expense | IncreaseValue | ExtendLife | Both.</summary>
+        public string? FinanceDecision { get; set; }
+
+        /// <summary>Additional months/years to extend useful life (when FinanceDecision includes extension).</summary>
+        public int? AddedLifeMonths { get; set; }
+
+        /// <summary>Dollar amount to adjust asset value (when FinanceDecision includes value increase).</summary>
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? AdjustmentValue { get; set; }
+
+        /// <summary>User ID who approved the repair (Finance user).</summary>
+        public string? ApprovedBy { get; set; }
+
+        /// <summary>Timestamp when repair was approved by Finance.</summary>
+        public DateTime? ApprovedAt { get; set; }
+
         public string? LinkedPurchaseOrderId { get; set; }
 
         public string? ReplacementRegisteredAssetId { get; set; }
 
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public int? TenantId { get; set; }

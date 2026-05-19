@@ -14,7 +14,12 @@ namespace DFile.backend.DTOs
         public string? SerialNumber { get; set; }
         public decimal PurchasePrice { get; set; }
         public DateTime? PurchaseDate { get; set; }
-        public int UsefulLifeYears { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (not years). E.g., 60 months = 5 years.</summary>
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 month.")]
+        public int UsefulLifeMonths { get; set; }
+        
         public string? RequestedBy { get; set; }
         public string? MaintenanceRecordId { get; set; }
         public List<PurchaseOrderItemDto>? Items { get; set; }
@@ -32,7 +37,11 @@ namespace DFile.backend.DTOs
         public string? SerialNumber { get; set; }
         public decimal PurchasePrice { get; set; }
         public DateTime? PurchaseDate { get; set; }
-        public int UsefulLifeYears { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (not years). E.g., 60 months = 5 years.</summary>
+        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 month.")]
+        public int UsefulLifeMonths { get; set; }
+        
         public string Status { get; set; } = "Pending";
         public string? RequestedBy { get; set; }
         public string? AssetId { get; set; }
@@ -64,7 +73,13 @@ namespace DFile.backend.DTOs
         public string? SerialNumber { get; set; }
         public decimal PurchasePrice { get; set; }
         public DateTime? PurchaseDate { get; set; }
-        public int UsefulLifeYears { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (primary storage).</summary>
+        public int UsefulLifeMonths { get; set; }
+        
+        /// <summary>UsefulLifeMonths / 12, for backward compatibility and display.</summary>
+        public decimal UsefulLifeYears => Math.Round((decimal)UsefulLifeMonths / 12M, 2);
+        
         public string Status { get; set; } = string.Empty;
         public string? RequestedBy { get; set; }
         public string? AssetId { get; set; }

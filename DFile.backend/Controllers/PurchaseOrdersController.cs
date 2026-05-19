@@ -30,7 +30,7 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         private static string? NormalizeSerial(string? value)
@@ -57,7 +57,7 @@ namespace DFile.backend.Controllers
 
             // Gather approver names
             var approverIds = orders.Where(o => o.ApprovedBy.HasValue).Select(o => o.ApprovedBy!.Value).Distinct().ToList();
-            var approverNames = approverIds.Any()
+            var approverNames = approverIds.Count > 0
                 ? await _context.Users.Where(u => approverIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FirstName + " " + u.LastName)
                 : new Dictionary<int, string>();
 
@@ -105,7 +105,7 @@ namespace DFile.backend.Controllers
                 SerialNumber = dto.SerialNumber,
                 PurchasePrice = dto.PurchasePrice,
                 PurchaseDate = dto.PurchaseDate,
-                UsefulLifeYears = dto.UsefulLifeYears,
+                UsefulLifeMonths = dto.UsefulLifeMonths, // Convert from DTO months to model months
                 Status = "Pending",
                 RequestedBy = dto.RequestedBy,
                 MaintenanceRecordId = string.IsNullOrWhiteSpace(dto.MaintenanceRecordId) ? null : dto.MaintenanceRecordId.Trim(),
@@ -172,7 +172,7 @@ namespace DFile.backend.Controllers
             existing.SerialNumber = dto.SerialNumber;
             existing.PurchasePrice = dto.PurchasePrice;
             existing.PurchaseDate = dto.PurchaseDate;
-            existing.UsefulLifeYears = dto.UsefulLifeYears;
+            existing.UsefulLifeMonths = dto.UsefulLifeMonths; // Convert from DTO months to model months
             existing.Status = dto.Status;
             existing.RequestedBy = dto.RequestedBy;
             existing.AssetId = dto.AssetId;
@@ -259,7 +259,7 @@ namespace DFile.backend.Controllers
             {
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
                     ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
                 if (serialExists)
                     return Conflict(new { message = "Serial Number already exists for an asset in this tenant." });
@@ -269,7 +269,6 @@ namespace DFile.backend.Controllers
             {
                 Id = Guid.NewGuid().ToString(),
                 AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                TagNumber = null,
                 AssetName = order.AssetName,
                 CategoryId = categoryId,
                 LifecycleStatus = LifecycleStatus.Registered,
@@ -281,16 +280,20 @@ namespace DFile.backend.Controllers
                 PurchaseDate = dto.DeliveryDate,
                 Vendor = order.Vendor,
                 AcquisitionCost = order.PurchasePrice,
-                UsefulLifeYears = order.UsefulLifeYears,
+                
+                // ── MONTH-BASED SYSTEM ──
+                TotalLifeMonths = order.UsefulLifeMonths, // Monthly storage (from PurchaseOrder)
+                UsedMonths = 0, // Just created, no depreciation yet
+                
                 PurchasePrice = order.PurchasePrice,
                 ResidualValue = null,
                 SalvagePercentage = category.SalvagePercentage,
                 SalvageValue = Math.Round(order.PurchasePrice * category.SalvagePercentage / 100m, 2),
-                CurrentBookValue = order.PurchasePrice,
-                MonthlyDepreciation = order.UsefulLifeYears > 0
-                    ? Math.Round(order.PurchasePrice / (order.UsefulLifeYears * 12), 2)
+                MonthlyDepreciation = order.UsefulLifeMonths > 0
+                    ? Math.Round((order.PurchasePrice - (Math.Round(order.PurchasePrice * category.SalvagePercentage / 100m, 2))) / order.UsefulLifeMonths, 2)
                     : 0,
-                DepreciationMonthsApplied = 0,
+                AccumulatedDepreciation = 0, // Just created
+                CurrentBookValue = order.PurchasePrice, // Full value initially
                 TenantId = effectiveTenantId,
                 PurchaseOrderId = order.Id,
                 CreatedAt = DateTime.UtcNow,
@@ -442,7 +445,7 @@ namespace DFile.backend.Controllers
             SerialNumber = o.SerialNumber,
             PurchasePrice = o.PurchasePrice,
             PurchaseDate = o.PurchaseDate,
-            UsefulLifeYears = o.UsefulLifeYears,
+            UsefulLifeMonths = o.UsefulLifeMonths, // No need to set UsefulLifeYears - it's computed
             Status = o.Status,
             RequestedBy = o.RequestedBy,
             AssetId = o.AssetId,

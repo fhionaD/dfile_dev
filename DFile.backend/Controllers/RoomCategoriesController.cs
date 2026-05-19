@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -90,7 +90,7 @@ namespace DFile.backend.Controllers
 
             if (!string.IsNullOrEmpty(search))
             {
-                search = search.ToLower();
+                search = search.ToLowerInvariant();
                 query = query.Where(c =>
                     c.Name.ToLower().Contains(search) ||
                     (c.Description != null && c.Description.ToLower().Contains(search)));
@@ -227,7 +227,7 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrWhiteSpace(trimmedName))
                 return BadRequest(new { message = "Category name is required." });
 
-            var nameLower = trimmedName.ToLower();
+            var nameLower = trimmedName.ToLowerInvariant();
 
             var nameExists = await _context.RoomCategories.AnyAsync(c =>
                 c.Name.ToLower() == nameLower &&
@@ -241,7 +241,6 @@ namespace DFile.backend.Controllers
                 Id = await RecordCodeGenerator.GenerateRoomCategoryIdAsync(_context),
                 RoomCategoryCode = await RecordCodeGenerator.GenerateRoomCategoryCodeAsync(_context),
                 Name = trimmedName,
-                SubCategory = string.Empty,
                 Description = dto.Description?.Trim() ?? string.Empty,
                 IsArchived = false,
                 TenantId = IsSuperAdmin() ? null : tenantId,
@@ -305,9 +304,9 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrWhiteSpace(trimmedName))
                 return BadRequest(new { message = "Category name is required." });
 
-            if (existing.Name.ToLower() != trimmedName.ToLower())
+            if (existing.Name.ToLowerInvariant() != trimmedName.ToLowerInvariant())
             {
-                var nameLower = trimmedName.ToLower();
+                var nameLower = trimmedName.ToLowerInvariant();
 
                 var nameExists = await _context.RoomCategories.AnyAsync(c =>
                     c.Id != id &&
@@ -326,7 +325,6 @@ namespace DFile.backend.Controllers
             var oldValues = JsonSerializer.Serialize(new { existing.Name, existing.Description });
 
             existing.Name = trimmedName;
-            existing.SubCategory = existing.SubCategory ?? string.Empty;
             existing.Description = dto.Description?.Trim() ?? string.Empty;
             existing.UpdatedAt = DateTime.UtcNow;
             existing.UpdatedBy = userId;
@@ -373,7 +371,7 @@ namespace DFile.backend.Controllers
             {
                 var tenantId = GetCurrentTenantId();
                 var userId = GetCurrentUserId();
-                var category = await _context.RoomCategories.FindAsync(id);
+                var category = await _context.RoomCategories.FindAsync([id], cancellationToken);
 
                 if (category == null)
                     return NotFound(new { message = notFoundMessage });
@@ -392,7 +390,7 @@ namespace DFile.backend.Controllers
                 }
 
                 var activeRoomsExist = await ActiveRoomsForCategory(_context, category, tenantId, IsSuperAdmin())
-                    .AnyAsync();
+                    .AnyAsync(cancellationToken);
 
                 if (activeRoomsExist)
                 {
@@ -410,7 +408,7 @@ namespace DFile.backend.Controllers
                     .Where(a => a.Status == "Active")
                     .AnyAsync(a =>
                         _context.Rooms.AsNoTracking().Any(r =>
-                            r.Id == a.RoomId && r.CategoryId == categoryId));
+                            r.Id == a.RoomId && r.CategoryId == categoryId), cancellationToken);
 
                 if (hasActiveAllocations)
                 {
@@ -418,7 +416,7 @@ namespace DFile.backend.Controllers
                 }
 
                 var now = DateTime.UtcNow;
-                var userIdStr = userId?.ToString();
+                var userIdStr = userId?.ToString(CultureInfo.InvariantCulture);
 
                 // SqlServerRetryingExecutionStrategy (EnableRetryOnFailure) requires user transactions to run inside CreateExecutionStrategy.
                 return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async (ct) =>
@@ -531,7 +529,7 @@ namespace DFile.backend.Controllers
 
             var nameExists = await _context.RoomCategories.AnyAsync(c =>
                 c.Id != id &&
-                c.Name.ToLower() == category.Name.ToLower() &&
+                c.Name.ToLower() == category.Name.ToLowerInvariant() &&
                 !c.IsArchived &&
                 (IsSuperAdmin() ? c.TenantId == null : c.TenantId == tenantId));
             if (nameExists)

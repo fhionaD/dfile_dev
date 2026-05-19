@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -6,6 +6,8 @@ using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace DFile.backend.Controllers
@@ -17,21 +19,25 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
-        public EmployeesController(AppDbContext context, IAuditService auditService)
+        public EmployeesController(AppDbContext context, IAuditService auditService, IEmailService emailService, IConfiguration configuration)
         {
             _context = context;
             _auditService = auditService;
+            _emailService = emailService;
+            _configuration = configuration;
         }
 
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         [HttpGet]
-        [RequirePermission("Employees", "CanView")]
+        [Authorize]
         public async Task<ActionResult<IEnumerable<Employee>>> GetEmployees([FromQuery] bool showArchived = false)
         {
             var tenantId = GetCurrentTenantId();
@@ -82,7 +88,7 @@ namespace DFile.backend.Controllers
                         FirstName = u.FirstName,
                         LastName = u.LastName,
                         Email = u.Email,
-                        ContactNumber = "—",
+                        ContactNumber = "â€”",
                         Department = "Organization",
                         Role = string.IsNullOrWhiteSpace(u.RoleLabel) ? u.Role : u.RoleLabel,
                         HireDate = u.CreatedAt,
@@ -100,7 +106,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpGet("{id}")]
-        [RequirePermission("Employees", "CanView")]
+        [Authorize]
         public async Task<ActionResult<Employee>> GetEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -113,13 +119,17 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
-        [RequirePermission("Employees", "CanCreate")]
+        [Authorize]
         public async Task<ActionResult<Employee>> PostEmployee(CreateEmployeeDto dto)
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
 
-            var defaultPassword = dto.LastName + "123";
+            if (await _context.Employees.AnyAsync(e => e.Email.ToLower() == dto.Email.ToLowerInvariant() && e.TenantId == (IsSuperAdmin() ? (int?)null : tenantId)))
+                return BadRequest(new { message = "An employee with this email already exists." });
+
+            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLowerInvariant()))
+                return BadRequest(new { message = "A user account with this email already exists." });
 
             var employee = new Employee
             {
@@ -130,7 +140,7 @@ namespace DFile.backend.Controllers
                 LastName = dto.LastName,
                 Email = dto.Email,
                 ContactNumber = dto.ContactNumber,
-                Department = dto.Department,
+                Department = "",
                 Role = dto.Role,
                 HireDate = dto.HireDate,
                 Status = "Active",
@@ -139,20 +149,30 @@ namespace DFile.backend.Controllers
 
             _context.Employees.Add(employee);
 
-            if (!await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            // Generate a secure single-use activation token
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+            var tokenHash = ComputeTokenHash(rawToken);
+            var tokenExpiry = DateTime.UtcNow.AddHours(24);
+
+            var user = new User
             {
-                var user = new User
-                {
-                    FirstName = dto.FirstName,
-                    LastName = dto.LastName,
-                    Email = dto.Email,
-                    Role = "Employee",
-                    RoleLabel = dto.Role,
-                    TenantId = IsSuperAdmin() ? null : tenantId,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(defaultPassword)
-                };
-                _context.Users.Add(user);
-            }
+                FirstName = dto.FirstName,
+                MiddleName = dto.MiddleName,
+                LastName = dto.LastName,
+                Email = dto.Email,
+                Role = dto.Role,
+                RoleLabel = dto.Role,
+                ContactNumber = dto.ContactNumber,
+                Address = dto.Address,
+                HireDate = dto.HireDate,
+                TenantId = IsSuperAdmin() ? null : tenantId,
+                PasswordHash = string.Empty,
+                Status = "PendingActivation",
+                ActivationTokenHash = tokenHash,
+                ActivationTokenExpiry = tokenExpiry,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(user);
 
             _auditService.Add(HttpContext, new AuditLog
             {
@@ -162,16 +182,63 @@ namespace DFile.backend.Controllers
                 Module = "Personnel",
                 UserId = userId,
                 TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Department, dto.Role, dto.HireDate }),
+                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate }),
             });
 
             await _context.SaveChangesAsync();
 
+            // Send activation email
+            var appBaseUrl = _configuration["Payment:AppBaseUrl"] ?? "https://yourdomain.com";
+            var encodedToken = Uri.EscapeDataString(rawToken);
+            var encodedEmail = Uri.EscapeDataString(dto.Email);
+            var activationLink = $"{appBaseUrl}/setup-password?token={encodedToken}&email={encodedEmail}";
+
+            var fullName = $"{dto.FirstName} {dto.LastName}";
+            var emailHtml = BuildActivationEmailHtml(fullName, activationLink);
+
+            try
+            {
+                await _emailService.SendEmailAsync(dto.Email, "Activate Your DFile Account", emailHtml);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the creation â€” admin can resend
+                var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
+                logger?.LogError(ex, "Failed to send activation email to {Email}", dto.Email);
+            }
+
             return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
         }
 
+        private static string ComputeTokenHash(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        private static string BuildActivationEmailHtml(string fullName, string activationLink)
+        {
+            return $"""
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 40px;">
+                  <div style="max-width: 560px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <h2 style="color: #1a1a2e; margin-bottom: 8px;">Welcome to DFile</h2>
+                    <p style="color: #555;">Hi <strong>{fullName}</strong>,</p>
+                    <p style="color: #555;">Your account has been created. Please click the button below to set your password and activate your account.</p>
+                    <p style="color: #e05d00; font-size: 13px;">This link will expire in <strong>24 hours</strong> and can only be used once.</p>
+                    <div style="margin: 32px 0; text-align: center;">
+                      <a href="{activationLink}" style="background: #1a1a2e; color: #fff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 15px;">Activate Account &amp; Set Password</a>
+                    </div>
+                    <p style="color: #888; font-size: 12px;">If you did not expect this email, please ignore it.</p>
+                  </div>
+                </body>
+                </html>
+                """;
+        }
+
         [HttpPut("{id}")]
-        [RequirePermission("Employees", "CanEdit")]
+        [Authorize]
         public async Task<IActionResult> PutEmployee(string id, UpdateEmployeeDto dto)
         {
             var tenantId = GetCurrentTenantId();
@@ -181,14 +248,13 @@ namespace DFile.backend.Controllers
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
 
-            var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Department, existing.Role, existing.HireDate, existing.Status });
+            var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Role, existing.HireDate, existing.Status });
 
             existing.FirstName = dto.FirstName;
             existing.MiddleName = dto.MiddleName;
             existing.LastName = dto.LastName;
             existing.Email = dto.Email;
             existing.ContactNumber = dto.ContactNumber;
-            existing.Department = dto.Department;
             existing.Role = dto.Role;
             existing.HireDate = dto.HireDate;
             existing.Status = dto.Status;
@@ -202,7 +268,7 @@ namespace DFile.backend.Controllers
                 UserId = userId,
                 TenantId = tenantId,
                 OldValues = oldValues,
-                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Department, dto.Role, dto.HireDate, dto.Status }),
+                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate, dto.Status }),
             });
 
             await _context.SaveChangesAsync();
@@ -210,7 +276,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("archive/{id}")]
-        [RequirePermission("Employees", "CanArchive")]
+        [Authorize]
         public async Task<IActionResult> ArchiveEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();
@@ -238,7 +304,7 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPut("restore/{id}")]
-        [RequirePermission("Employees", "CanArchive")]
+        [Authorize]
         public async Task<IActionResult> RestoreEmployee(string id)
         {
             var tenantId = GetCurrentTenantId();

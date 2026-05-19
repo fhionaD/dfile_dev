@@ -21,7 +21,7 @@ namespace DFile.backend.Models
         public string Role { get; set; } = string.Empty;
         public DateTime HireDate { get; set; }
         public string Status { get; set; } = "Active";
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DFile.backend.Models
 {
@@ -20,7 +21,16 @@ namespace DFile.backend.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public string Status { get; set; } = "Active";
         
-        // Limits based on plan (Could be stored or computed, storing allows custom overrides)
+        // Reference to the billing plan (can be null for backward compatibility)
+        public int? PlanId { get; set; }
+
+        /// <summary>True once the tenant has activated the free plan. Free plan cannot be re-used after this is set.</summary>
+        public bool HasUsedFreePlan { get; set; }
+
+        [ForeignKey("PlanId")]
+        public Plan? Plan { get; set; }
+
+        // Limits based on plan (stored for custom overrides by super admin)
         public int MaxRooms { get; set; }
         public int MaxPersonnel { get; set; }
         public bool AssetTracking { get; set; }

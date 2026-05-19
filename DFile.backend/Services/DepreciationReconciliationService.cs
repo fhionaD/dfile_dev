@@ -70,12 +70,12 @@ namespace DFile.backend.Services
                 .Where(a => !a.IsArchived
                     && a.LifecycleStatus != LifecycleStatus.Disposed
                     && a.MonthlyDepreciation > 0
-                    && a.UsefulLifeYears > 0)
+                    && a.TotalLifeMonths > 0)
                 .ToListAsync(cancellationToken);
 
             foreach (var asset in assets)
             {
-                var lifeMonths = asset.UsefulLifeYears * 12;
+                var lifeMonths = asset.TotalLifeMonths;
                 var created = asset.CreatedAt;
                 var monthsSinceCreation =
                     (now.Year - created.Year) * 12 + now.Month - created.Month;
@@ -83,7 +83,7 @@ namespace DFile.backend.Services
                     continue;
 
                 var targetApplied = Math.Min(monthsSinceCreation, lifeMonths);
-                var delta = targetApplied - asset.DepreciationMonthsApplied;
+                var delta = targetApplied - asset.UsedMonths;
                 if (delta <= 0)
                     continue;
 
@@ -94,7 +94,7 @@ namespace DFile.backend.Services
                     if (asset.CurrentBookValue <= floor)
                         break;
                     asset.CurrentBookValue = Math.Max(floor, asset.CurrentBookValue - asset.MonthlyDepreciation);
-                    asset.DepreciationMonthsApplied++;
+                    asset.UsedMonths++;
                 }
 
                 asset.UpdatedAt = now;

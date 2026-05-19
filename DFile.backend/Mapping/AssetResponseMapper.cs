@@ -38,7 +38,6 @@ namespace DFile.backend.Mapping
             {
                 Id = a.Id,
                 AssetCode = a.AssetCode,
-                TagNumber = null,
                 AssetName = a.AssetName,
                 CategoryId = a.CategoryId,
                 CategoryName = cat?.CategoryName,
@@ -48,7 +47,6 @@ namespace DFile.backend.Mapping
                 Status = StatusLabels.GetValueOrDefault(a.LifecycleStatus, "Unknown"),
                 CurrentCondition = a.CurrentCondition,
                 ConditionLabel = ConditionLabels.GetValueOrDefault(a.CurrentCondition, "Unknown"),
-                Room = null,
                 RoomId = activeRoom?.Id,
                 RoomCode = activeRoom?.RoomCode,
                 RoomName = activeRoom?.Name,
@@ -62,13 +60,23 @@ namespace DFile.backend.Mapping
                 PurchaseDate = a.PurchaseDate,
                 Vendor = a.Vendor,
                 AcquisitionCost = a.AcquisitionCost,
-                UsefulLifeYears = a.UsefulLifeYears,
+                
+                // ── MONTH-BASED SYSTEM (PRIMARY) ──
+                TotalLifeMonths = a.TotalLifeMonths,
+                UsedMonths = a.UsedMonths,
+                RemainingMonths = Math.Max(0, a.TotalLifeMonths - a.UsedMonths),
+                
+                // ── DERIVED YEAR VALUES (CALCULATED FROM MONTHS) ──
+                UsefulLifeYears = Math.Round((decimal)a.TotalLifeMonths / 12M, 2),
+                RemainingYears = Math.Round((decimal)Math.Max(0, a.TotalLifeMonths - a.UsedMonths) / 12M, 2),
+                
                 PurchasePrice = a.PurchasePrice,
                 ResidualValue = a.ResidualValue,
                 SalvagePercentage = a.SalvagePercentage,
                 SalvageValue = a.SalvageValue,
                 IsSalvageOverride = a.IsSalvageOverride,
                 CurrentBookValue = a.CurrentBookValue,
+                AccumulatedDepreciation = a.AccumulatedDepreciation,
                 MonthlyDepreciation = a.MonthlyDepreciation,
                 TenantId = a.TenantId,
                 WarrantyExpiry = a.WarrantyExpiry,

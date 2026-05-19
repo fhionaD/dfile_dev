@@ -107,34 +107,6 @@ namespace DFile.backend.Controllers
                 _context.Users.Add(adminUser);
                 await _context.SaveChangesAsync();
 
-                var systemTemplates = await _context.RoleTemplates
-                    .Where(rt => rt.IsSystem && !rt.IsArchived)
-                    .ToListAsync();
-
-                foreach (var template in systemTemplates)
-                {
-                    _context.TenantRoles.Add(new TenantRole
-                    {
-                        TenantId = tenant.Id,
-                        RoleTemplateId = template.Id
-                    });
-                }
-
-                await _context.SaveChangesAsync();
-
-                var adminTemplate = systemTemplates.FirstOrDefault(rt => rt.Name == "Admin");
-                if (adminTemplate != null)
-                {
-                    var tenantRole = await _context.TenantRoles
-                        .FirstAsync(tr => tr.TenantId == tenant.Id && tr.RoleTemplateId == adminTemplate.Id);
-                    _context.UserRoleAssignments.Add(new UserRoleAssignment
-                    {
-                        UserId = adminUser.Id,
-                        TenantRoleId = tenantRole.Id
-                    });
-                    await _context.SaveChangesAsync();
-                }
-
                 return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
             }
             catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))

@@ -22,7 +22,9 @@ namespace DFile.backend.Models
 
         public decimal PurchasePrice { get; set; }
         public DateTime? PurchaseDate { get; set; }
-        public int UsefulLifeYears { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (not years). E.g., 60 = 5 years.</summary>
+        public int UsefulLifeMonths { get; set; }
 
         public string Status { get; set; } = "Pending"; // Pending | Approved | Delivered | Cancelled
         public string? RequestedBy { get; set; }
@@ -39,7 +41,7 @@ namespace DFile.backend.Models
         [ForeignKey("ApprovedBy")]
         public User? ApprovedByUser { get; set; }
 
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]

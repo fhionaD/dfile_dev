@@ -121,7 +121,7 @@ namespace DFile.backend.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PayMongo checkout_sessions request failed.");
-                return new PayMongoCheckoutResult(false, null, null, ex.Message);
+                return new PayMongoCheckoutResult(false, null, null, "Payment processing failed. Please try again.");
             }
         }
     }

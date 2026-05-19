@@ -6,26 +6,37 @@ namespace DFile.backend.DTOs
     public class CreateAssetDto
     {
         [Required(ErrorMessage = "Asset name is required.")]
+        [MaxLength(200, ErrorMessage = "Asset name cannot exceed 200 characters.")]
         public string AssetName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "CategoryId is required.")]
+        [MaxLength(100)]
         public string CategoryId { get; set; } = string.Empty;
 
         public LifecycleStatus LifecycleStatus { get; set; } = LifecycleStatus.Registered;
         public AssetCondition CurrentCondition { get; set; } = AssetCondition.Good;
-        public string? Room { get; set; }
+        [MaxLength(2000)]
         public string? Image { get; set; }
+        [MaxLength(200)]
         public string? Manufacturer { get; set; }
+        [MaxLength(200)]
         public string? Model { get; set; }
+        [MaxLength(200)]
         public string? SerialNumber { get; set; }
         public DateTime? PurchaseDate { get; set; }
+        [MaxLength(200)]
         public string? Vendor { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Acquisition cost must be >= 0.")]
         public decimal AcquisitionCost { get; set; }
 
-        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 year.")]
-        public int UsefulLifeYears { get; set; }
+        /// <summary>Total useful life in MONTHS (primary). E.g., 60 months = 5 years.</summary>
+        [Range(1, int.MaxValue, ErrorMessage = "Total life must be at least 1 month.")]
+        public int TotalLifeMonths { get; set; }
+        
+        /// <summary>Deprecated: Use TotalLifeMonths instead. If provided, converted to months internally (multiply by 12).</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public decimal? UsefulLifeYears { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Purchase price must be >= 0.")]
         public decimal PurchasePrice { get; set; }
@@ -34,39 +45,53 @@ namespace DFile.backend.DTOs
 
         [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
         public decimal? SalvagePercentage { get; set; }
-        public bool IsSalvageOverride { get; set; } = false;
+        public bool IsSalvageOverride { get; set; }
 
         public DateTime? WarrantyExpiry { get; set; }
+        [MaxLength(2000)]
         public string? Notes { get; set; }
+        [MaxLength(2000)]
         public string? Documents { get; set; }
 
         /// <summary>When set, completes finance replacement workflow: creates asset, disposes original, completes maintenance record.</summary>
+        [MaxLength(100)]
         public string? ReplacementMaintenanceRecordId { get; set; }
     }
 
     public class UpdateAssetDto
     {
         [Required(ErrorMessage = "Asset name is required.")]
+        [MaxLength(200, ErrorMessage = "Asset name cannot exceed 200 characters.")]
         public string AssetName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "CategoryId is required.")]
+        [MaxLength(100)]
         public string CategoryId { get; set; } = string.Empty;
 
         public LifecycleStatus LifecycleStatus { get; set; } = LifecycleStatus.Registered;
         public AssetCondition CurrentCondition { get; set; } = AssetCondition.Good;
-        public string? Room { get; set; }
+        [MaxLength(2000)]
         public string? Image { get; set; }
+        [MaxLength(200)]
         public string? Manufacturer { get; set; }
+        [MaxLength(200)]
         public string? Model { get; set; }
+        [MaxLength(200)]
         public string? SerialNumber { get; set; }
         public DateTime? PurchaseDate { get; set; }
+        [MaxLength(200)]
         public string? Vendor { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Acquisition cost must be >= 0.")]
         public decimal AcquisitionCost { get; set; }
-
-        [Range(1, int.MaxValue, ErrorMessage = "Useful life must be at least 1 year.")]
-        public int UsefulLifeYears { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (primary). E.g., 60 months = 5 years.</summary>
+        [Range(1, int.MaxValue, ErrorMessage = "Total life must be at least 1 month.")]
+        public int TotalLifeMonths { get; set; }
+        
+        /// <summary>Deprecated: Use TotalLifeMonths instead. If provided, converted to months internally (multiply by 12).</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public int? UsefulLifeYears { get; set; }
 
         [Range(0, double.MaxValue, ErrorMessage = "Purchase price must be >= 0.")]
         public decimal PurchasePrice { get; set; }
@@ -75,12 +100,14 @@ namespace DFile.backend.DTOs
 
         [Range(0, 100, ErrorMessage = "Salvage percentage must be between 0 and 100.")]
         public decimal? SalvagePercentage { get; set; }
-        public bool IsSalvageOverride { get; set; } = false;
+        public bool IsSalvageOverride { get; set; }
 
         public decimal CurrentBookValue { get; set; }
         public decimal MonthlyDepreciation { get; set; }
         public DateTime? WarrantyExpiry { get; set; }
+        [MaxLength(2000)]
         public string? Notes { get; set; }
+        [MaxLength(2000)]
         public string? Documents { get; set; }
         public byte[]? RowVersion { get; set; }
     }
@@ -121,7 +148,6 @@ namespace DFile.backend.DTOs
         public string AssetId { get; set; } = string.Empty;
         public string AssetName { get; set; } = string.Empty;
         public string? AssetCode { get; set; }
-        public string? TagNumber { get; set; }
         public string RoomId { get; set; } = string.Empty;
         public string RoomCode { get; set; } = string.Empty;
         public string RoomName { get; set; } = string.Empty;
@@ -139,7 +165,6 @@ namespace DFile.backend.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public string AssetCode { get; set; } = string.Empty;
-        public string? TagNumber { get; set; }
         public string AssetName { get; set; } = string.Empty;
         public string? CategoryId { get; set; }
         public string? CategoryName { get; set; }
@@ -149,7 +174,6 @@ namespace DFile.backend.DTOs
         public string Status { get; set; } = string.Empty; // Human-readable label
         public AssetCondition CurrentCondition { get; set; }
         public string ConditionLabel { get; set; } = string.Empty;
-        public string? Room { get; set; }
         public string? RoomId { get; set; }
         public string? RoomCode { get; set; }
         public string? RoomName { get; set; }
@@ -166,13 +190,34 @@ namespace DFile.backend.DTOs
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }
         public decimal AcquisitionCost { get; set; }
-        public int UsefulLifeYears { get; set; }
+        
+        // ── MONTH-BASED SYSTEM (PRIMARY SOURCE OF TRUTH) ──
+        /// <summary>Total useful life in MONTHS (primary storage). E.g., 60 months = 5 years.</summary>
+        public int TotalLifeMonths { get; set; }
+        
+        /// <summary>Months already depreciated since purchase.</summary>
+        public int UsedMonths { get; set; }
+        
+        /// <summary>Remaining months = TotalLifeMonths - UsedMonths.</summary>
+        public int RemainingMonths { get; set; }
+        
+        // ── DERIVED YEAR VALUES (READ-ONLY FOR DISPLAY) ──
+        /// <summary>TotalLifeMonths / 12, formatted to 2 decimals.</summary>
+        public decimal UsefulLifeYears { get; set; }
+        
+        /// <summary>RemainingMonths / 12, formatted to 2 decimals.</summary>
+        public decimal RemainingYears { get; set; }
+        
         public decimal PurchasePrice { get; set; }
         public decimal? ResidualValue { get; set; }
         public decimal? SalvagePercentage { get; set; }
         public decimal? SalvageValue { get; set; }
         public bool IsSalvageOverride { get; set; }
         public decimal CurrentBookValue { get; set; }
+        
+        /// <summary>Total accumulated depreciation so far = MonthlyDepreciation * UsedMonths.</summary>
+        public decimal AccumulatedDepreciation { get; set; }
+        
         public decimal MonthlyDepreciation { get; set; }
         public int? TenantId { get; set; }
         public DateTime? WarrantyExpiry { get; set; }

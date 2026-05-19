@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DFile.backend.Configuration;
@@ -21,6 +21,7 @@ namespace DFile.backend.Controllers
         private readonly AppDbContext _db;
         private readonly IPayMongoPaymentService _payMongo;
         private readonly ITenantContext _tenant;
+        private readonly INotificationService _notifications;
         private readonly PayMongoOptions _payMongoOpts;
         private readonly PaymentAppOptions _paymentApp;
         private readonly ILogger<PaymentsController> _logger;
@@ -29,6 +30,7 @@ namespace DFile.backend.Controllers
             AppDbContext db,
             IPayMongoPaymentService payMongo,
             ITenantContext tenant,
+            INotificationService notifications,
             IOptions<PayMongoOptions> payMongoOpts,
             IOptions<PaymentAppOptions> paymentApp,
             ILogger<PaymentsController> logger)
@@ -36,12 +38,13 @@ namespace DFile.backend.Controllers
             _db = db;
             _payMongo = payMongo;
             _tenant = tenant;
+            _notifications = notifications;
             _payMongoOpts = payMongoOpts.Value;
             _paymentApp = paymentApp.Value;
             _logger = logger;
         }
 
-        /// <summary>Subscription tiers and amounts (server-defined test pricing).</summary>
+        /// <summary>Active subscription plans from the database + current subscription status for the tenant.</summary>
         [HttpGet("billing/plans")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<BillingPlansResponseDto>> GetBillingPlans(CancellationToken cancellationToken)
@@ -54,27 +57,116 @@ namespace DFile.backend.Controllers
             if (tenantEntity == null)
                 return NotFound();
 
-            var plans = Enum.GetValues<SubscriptionPlanType>()
+            var plans = await _db.Plans
+                .AsNoTracking()
+                .Where(p => !p.IsArchived && p.IsActive)
+                .OrderBy(p => p.MonthlyCost)
                 .Select(p => new BillingPlanOptionDto
                 {
-                    Plan = (int)p,
-                    Code = p.ToString(),
-                    DisplayName = p.ToString(),
-                    PricePesos = SubscriptionBillingPricing.GetPricePesos(p),
-                    AmountCents = SubscriptionBillingPricing.GetAmountCentavos(p),
-                    Summary = SubscriptionBillingPricing.GetSummary(p)
+                    Plan = p.Id,
+                    Code = p.Name,
+                    DisplayName = p.Name,
+                    PricePesos = (int)p.MonthlyCost,
+                    AmountCents = (int)(p.MonthlyCost * 100),
+                    YearlyPricePesos = (int)p.YearlyCost,
+                    YearlyAmountCents = (int)(p.YearlyCost * 100),
+                    Summary = p.Description ?? string.Empty,
+                    IsFreePlan = p.MonthlyCost == 0
                 })
-                .ToList();
+                .ToListAsync(cancellationToken);
+
+            var currentPlanCode = tenantEntity.PlanId.HasValue
+                ? (await _db.Plans.AsNoTracking()
+                    .Where(p => p.Id == tenantEntity.PlanId)
+                    .Select(p => p.Name)
+                    .FirstOrDefaultAsync(cancellationToken) ?? "Unknown")
+                : "None";
+
+            // Current active/expiring subscription
+            var activeSub = await _db.TenantSubscriptions
+                .AsNoTracking()
+                .Include(s => s.Plan)
+                .Where(s => s.TenantId == _tenant.TenantId.Value
+                    && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Expiring))
+                .OrderByDescending(s => s.EndDate)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            SubscriptionStatusDto? currentSubscription = null;
+            if (activeSub != null)
+            {
+                var daysLeft = (int)(activeSub.EndDate.Date - DateTime.UtcNow.Date).TotalDays;
+                currentSubscription = new SubscriptionStatusDto
+                {
+                    Id = activeSub.Id,
+                    PlanName = activeSub.Plan.Name,
+                    BillingCycle = activeSub.BillingCycle.ToString(),
+                    StartDate = activeSub.StartDate,
+                    EndDate = activeSub.EndDate,
+                    Status = activeSub.Status.ToString(),
+                    DaysUntilExpiry = daysLeft
+                };
+            }
 
             return Ok(new BillingPlansResponseDto
             {
-                CurrentPlanCode = tenantEntity.SubscriptionPlan.ToString(),
-                CurrentPlan = (int)tenantEntity.SubscriptionPlan,
+                CurrentPlanCode = currentPlanCode,
+                CurrentPlan = tenantEntity.PlanId ?? 0,
+                HasUsedFreePlan = tenantEntity.HasUsedFreePlan,
+                CurrentSubscription = currentSubscription,
                 Plans = plans
             });
         }
 
-        /// <summary>Tenant Admin only — creates hosted checkout session (PayMongo).</summary>
+        /// <summary>Activate the free plan for a tenant. Can only be used once per tenant. No payment required.</summary>
+        [HttpPost("free-plan/activate")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ActivateFreePlan(CancellationToken cancellationToken)
+        {
+            if (!_tenant.TenantId.HasValue || _tenant.IsSuperAdmin)
+                return Forbid();
+
+            var tenantId = _tenant.TenantId.Value;
+            var tenantEntity = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+            if (tenantEntity == null)
+                return NotFound();
+
+            if (tenantEntity.HasUsedFreePlan)
+                return UnprocessableEntity(new { message = "Free plan has already been used by this organization. Please subscribe to a paid plan." });
+
+            var freePlan = await _db.Plans
+                .FirstOrDefaultAsync(p => p.MonthlyCost == 0 && !p.IsArchived && p.IsActive, cancellationToken);
+            if (freePlan == null)
+                return NotFound(new { message = "No active free plan is available." });
+
+            var now = DateTime.UtcNow;
+            var subscription = new TenantSubscription
+            {
+                TenantId = tenantId,
+                PlanId = freePlan.Id,
+                BillingCycle = BillingCycle.Monthly,
+                StartDate = now,
+                EndDate = now.AddDays(30),
+                Status = SubscriptionStatus.Active,
+                IsFreePlan = true
+            };
+
+            tenantEntity.PlanId = freePlan.Id;
+            tenantEntity.HasUsedFreePlan = true;
+            tenantEntity.MaxRooms = freePlan.MaxRooms;
+            tenantEntity.MaxPersonnel = freePlan.MaxPersonnel;
+            tenantEntity.AssetTracking = freePlan.AssetTracking;
+            tenantEntity.Depreciation = freePlan.Depreciation;
+            tenantEntity.MaintenanceModule = freePlan.MaintenanceModule;
+            tenantEntity.UpdatedAt = now;
+
+            _db.TenantSubscriptions.Add(subscription);
+            await _notifications.NotifySubscriptionActivatedAsync(tenantId, freePlan.Name, "Monthly (Free)", subscription.EndDate, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return Ok(new { message = $"Free plan activated. Valid until {subscription.EndDate:MMMM d, yyyy}." });
+        }
+
+        /// <summary>Tenant Admin only â€” creates hosted checkout session for a paid plan (PayMongo).</summary>
         [HttpPost("paymongo/checkout")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<PayMongoCheckoutResponseDto>> CreatePayMongoCheckout(
@@ -84,30 +176,46 @@ namespace DFile.backend.Controllers
             if (!_tenant.TenantId.HasValue || _tenant.IsSuperAdmin)
                 return Forbid();
 
+            if (string.IsNullOrWhiteSpace(dto?.PlanCode))
+                return BadRequest(new { message = "Plan code is required." });
+
+            var billingCycle = string.Equals(dto.BillingCycle, "Yearly", StringComparison.OrdinalIgnoreCase)
+                ? BillingCycle.Yearly
+                : BillingCycle.Monthly;
+
             var tenantId = _tenant.TenantId.Value;
             var tenantEntity = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
             if (tenantEntity == null)
                 return BadRequest(new { message = "Organization not found." });
 
-            SubscriptionPlanType targetPlan;
-            if (dto?.SubscriptionPlan is { } requested &&
-                Enum.IsDefined(typeof(SubscriptionPlanType), requested))
-                targetPlan = (SubscriptionPlanType)requested;
-            else
-                targetPlan = tenantEntity.SubscriptionPlan;
+            var plan = await _db.Plans
+                .FirstOrDefaultAsync(p => p.Name == dto.PlanCode && !p.IsArchived && p.IsActive, cancellationToken);
+            if (plan == null)
+                return BadRequest(new { message = $"Plan '{dto.PlanCode}' not found or is not available." });
 
-            var amount = SubscriptionBillingPricing.GetAmountCentavos(targetPlan);
-            var planLabel = targetPlan.ToString();
-            var description = $"DFile {planLabel} subscription";
+            // Reject free plans â€” use POST /api/payments/free-plan/activate instead
+            if (plan.MonthlyCost == 0)
+                return UnprocessableEntity(new { message = "Free plans cannot be purchased. Use the free plan activation endpoint." });
+
+            var amount = billingCycle == BillingCycle.Yearly
+                ? (int)(plan.YearlyCost * 100)
+                : (int)(plan.MonthlyCost * 100);
+
+            if (amount <= 0)
+                return BadRequest(new { message = "Plan price is not configured correctly." });
+
+            var description = $"DFile {plan.Name} ({billingCycle}) subscription";
 
             var payment = new PaymentTransaction
             {
                 Id = Guid.NewGuid().ToString(),
                 TenantId = tenantId,
+                PlanId = plan.Id,
                 AmountCents = amount,
                 Currency = "PHP",
                 Description = description,
-                SubscriptionPlanCode = planLabel,
+                SubscriptionPlanCode = plan.Name,
+                BillingCycle = billingCycle.ToString(),
                 Provider = "PayMongo",
                 Status = "Pending",
                 ReferenceNumber = $"DFile-{tenantId}-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..8]}"
@@ -122,9 +230,11 @@ namespace DFile.backend.Controllers
 
             var metadata = new Dictionary<string, string>
             {
-                ["tenant_id"] = tenantId.ToString(),
+                ["tenant_id"] = tenantId.ToString(CultureInfo.InvariantCulture),
                 ["payment_transaction_id"] = payment.Id,
-                ["subscription_plan"] = planLabel
+                ["plan_id"] = plan.Id.ToString(CultureInfo.InvariantCulture),
+                ["subscription_plan"] = plan.Name,
+                ["billing_cycle"] = billingCycle.ToString()
             };
 
             var result = await _payMongo.CreateCheckoutSessionAsync(
@@ -229,26 +339,35 @@ namespace DFile.backend.Controllers
                         tx.LastEventType = eventType;
                         tx.UpdatedAt = DateTime.UtcNow;
 
-                        var et = eventType ?? "";
-                        if (et.Contains("checkout_session.payment.paid", StringComparison.OrdinalIgnoreCase)
+                        var et = eventType ?? string.Empty;
+                        bool isPaidEvent = et.Contains("checkout_session.payment.paid", StringComparison.OrdinalIgnoreCase)
                             || (et.Contains("paid", StringComparison.OrdinalIgnoreCase) && et.Contains("checkout", StringComparison.OrdinalIgnoreCase))
-                            || et.Equals("payment.paid", StringComparison.OrdinalIgnoreCase))
+                            || et.Equals("payment.paid", StringComparison.OrdinalIgnoreCase);
+                        bool isFailedEvent = et.Contains("payment.failed", StringComparison.OrdinalIgnoreCase)
+                            || et.Equals("payment.failed", StringComparison.OrdinalIgnoreCase);
+                        bool isExpiredEvent = et.Contains("expired", StringComparison.OrdinalIgnoreCase);
+
+                        if (isPaidEvent)
                             tx.Status = "Paid";
-                        else if (et.Contains("payment.failed", StringComparison.OrdinalIgnoreCase) || et.Equals("payment.failed", StringComparison.OrdinalIgnoreCase))
+                        else if (isFailedEvent)
                             tx.Status = "Failed";
-                        else if (et.Contains("expired", StringComparison.OrdinalIgnoreCase))
+                        else if (isExpiredEvent)
                             tx.Status = "Expired";
 
-                        if (string.Equals(tx.Status, "Paid", StringComparison.OrdinalIgnoreCase) && !wasPaid
-                            && !string.IsNullOrEmpty(tx.SubscriptionPlanCode)
-                            && Enum.TryParse<SubscriptionPlanType>(tx.SubscriptionPlanCode, ignoreCase: true, out var paidPlan))
+                        // Activate subscription when payment is newly confirmed
+                        if (isPaidEvent && !wasPaid && tx.PlanId > 0)
                         {
-                            var tenantRow = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tx.TenantId, cancellationToken);
-                            if (tenantRow != null)
-                            {
-                                tenantRow.SubscriptionPlan = paidPlan;
-                                tenantRow.UpdatedAt = DateTime.UtcNow;
-                            }
+                            await ActivateSubscriptionAsync(tx, cancellationToken);
+                        }
+
+                        // Notify admin on payment failure
+                        if (isFailedEvent && !wasPaid)
+                        {
+                            var plan = await _db.Plans.AsNoTracking()
+                                .Where(p => p.Id == tx.PlanId)
+                                .Select(p => p.Name)
+                                .FirstOrDefaultAsync(cancellationToken);
+                            await _notifications.NotifyPaymentFailedAsync(tx.TenantId, plan ?? tx.SubscriptionPlanCode, cancellationToken);
                         }
 
                         await _db.SaveChangesAsync(cancellationToken);
@@ -271,6 +390,59 @@ namespace DFile.backend.Controllers
             }
 
             return Ok(new { received = true });
+        }
+
+        private async Task ActivateSubscriptionAsync(PaymentTransaction tx, CancellationToken cancellationToken)
+        {
+            var plan = await _db.Plans.FirstOrDefaultAsync(p => p.Id == tx.PlanId, cancellationToken);
+            if (plan == null) return;
+
+            var tenantRow = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tx.TenantId, cancellationToken);
+            if (tenantRow == null) return;
+
+            var now = DateTime.UtcNow;
+            var cycle = string.Equals(tx.BillingCycle, "Yearly", StringComparison.OrdinalIgnoreCase)
+                ? BillingCycle.Yearly
+                : BillingCycle.Monthly;
+
+            var endDate = cycle == BillingCycle.Yearly ? now.AddDays(365) : now.AddDays(30);
+
+            // Expire any previous active subscription for this tenant
+            var previousSubs = await _db.TenantSubscriptions
+                .Where(s => s.TenantId == tx.TenantId
+                    && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Expiring))
+                .ToListAsync(cancellationToken);
+            foreach (var prev in previousSubs)
+            {
+                prev.Status = SubscriptionStatus.Expired;
+                prev.UpdatedAt = now;
+            }
+
+            // Create the new subscription record
+            var subscription = new TenantSubscription
+            {
+                TenantId = tx.TenantId,
+                PlanId = plan.Id,
+                BillingCycle = cycle,
+                StartDate = now,
+                EndDate = endDate,
+                Status = SubscriptionStatus.Active,
+                PaymentTransactionId = tx.Id,
+                IsFreePlan = false
+            };
+            _db.TenantSubscriptions.Add(subscription);
+
+            // Update tenant's active plan and limits
+            tenantRow.PlanId = plan.Id;
+            tenantRow.MaxRooms = plan.MaxRooms;
+            tenantRow.MaxPersonnel = plan.MaxPersonnel;
+            tenantRow.AssetTracking = plan.AssetTracking;
+            tenantRow.Depreciation = plan.Depreciation;
+            tenantRow.MaintenanceModule = plan.MaintenanceModule;
+            tenantRow.UpdatedAt = now;
+
+            await _notifications.NotifySubscriptionActivatedAsync(
+                tx.TenantId, plan.Name, cycle.ToString(), endDate, cancellationToken);
         }
 
         private static bool VerifyWebhookSignature(string? header, string body, string secret)
@@ -322,7 +494,6 @@ namespace DFile.backend.Controllers
                             return true;
                         }
                     }
-
                     break;
                 case JsonValueKind.Array:
                     foreach (var item in el.EnumerateArray())
@@ -333,7 +504,6 @@ namespace DFile.backend.Controllers
                             return true;
                         }
                     }
-
                     break;
             }
 
@@ -357,4 +527,5 @@ namespace DFile.backend.Controllers
             UpdatedAt = t.UpdatedAt
         };
     }
+
 }

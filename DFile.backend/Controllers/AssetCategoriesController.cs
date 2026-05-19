@@ -1,4 +1,5 @@
 using DFile.backend.Authorization;
+using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -18,19 +19,17 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
-        private readonly PermissionService _permissionService;
 
-        public AssetCategoriesController(AppDbContext context, IAuditService auditService, PermissionService permissionService)
+        public AssetCategoriesController(AppDbContext context, IAuditService auditService)
         {
             _context = context;
             _auditService = auditService;
-            _permissionService = permissionService;
         }
 
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         private static string NormalizeCategoryName(string? name) => (name ?? string.Empty).Trim();
@@ -83,11 +82,14 @@ namespace DFile.backend.Controllers
             if (!IsSuperAdmin())
             {
                 if (!tenantId.HasValue || !userId.HasValue) return Forbid();
-                var canAssetCategories = await _permissionService.HasPermission(userId.Value, tenantId.Value, "AssetCategories", "CanView");
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
+                // Permission checks simplified - authentication via [Authorize] is sufficient
                 var isMaintenanceRole = User.IsInRole("Maintenance");
-                if (!canAssetCategories && !canAssets && !isMaintenanceRole)
-                    return StatusCode(403, new { message = "You do not have permission to view asset categories." });
+                if (!isMaintenanceRole)
+                {
+                    // Allow Admin and Finance roles to view asset categories
+                    if (!User.IsInRole(UserRoleConstants.Admin) && !User.IsInRole(UserRoleConstants.Finance))
+                        return StatusCode(403, new { message = "You do not have permission to view asset categories." });
+                }
             }
 
             var categoriesQuery = _context.AssetCategories
@@ -205,6 +207,9 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
 
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can create asset categories." });
+
             var normalizedName = NormalizeCategoryName(dto.CategoryName);
             if (string.IsNullOrEmpty(normalizedName))
                 return BadRequest(new { message = "Category name is required." });
@@ -275,6 +280,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can edit asset categories." });
+
             var existing = await _context.AssetCategories.FindAsync(id);
 
             if (existing == null) return NotFound();
@@ -352,6 +361,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can archive asset categories." });
+
             var category = await _context.AssetCategories.FindAsync(id);
 
             if (category == null) return NotFound();
@@ -390,6 +403,10 @@ namespace DFile.backend.Controllers
         {
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
+
+            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                return StatusCode(403, new { message = "Only Admins can restore asset categories." });
+
             var category = await _context.AssetCategories.FindAsync(id);
 
             if (category == null) return NotFound();

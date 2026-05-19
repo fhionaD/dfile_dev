@@ -10,24 +10,17 @@ namespace DFile.backend.Data
         // Core entities
         public DbSet<User> Users { get; set; }
         public DbSet<Tenant> Tenants { get; set; }
+        public DbSet<Plan> Plans { get; set; }
         public DbSet<Asset> Assets { get; set; }
         public DbSet<AssetCategory> AssetCategories { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<RoomCategory> RoomCategories { get; set; }
         public DbSet<RoomSubCategory> RoomSubCategories { get; set; }
         public DbSet<Employee> Employees { get; set; }
-        public DbSet<Department> Departments { get; set; }
         public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
         public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
         public DbSet<PurchaseOrderItem> PurchaseOrderItems { get; set; }
         public DbSet<TaskItem> Tasks { get; set; }
-        public DbSet<Role> Roles { get; set; }
-
-        // Role template / permission system
-        public DbSet<RoleTemplate> RoleTemplates { get; set; }
-        public DbSet<RolePermission> RolePermissions { get; set; }
-        public DbSet<TenantRole> TenantRoles { get; set; }
-        public DbSet<UserRoleAssignment> UserRoleAssignments { get; set; }
 
         // Audit
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -41,10 +34,13 @@ namespace DFile.backend.Data
         // Asset Condition History
         public DbSet<AssetConditionLog> AssetConditionLogs { get; set; }
 
-        // Per-user settings
-        public DbSet<UserSettings> UserSettings { get; set; }
-
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+
+        public DbSet<TenantSubscription> TenantSubscriptions { get; set; }
+
+        // Authentication security
+        public DbSet<UserLoginAudit> UserLoginAudits { get; set; }
+        public DbSet<TrustedDevice> TrustedDevices { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -73,11 +69,6 @@ namespace DFile.backend.Data
                 e.HasIndex(a => a.AssetCode)
                     .IsUnique()
                     .HasDatabaseName("IX_Assets_AssetCode");
-
-                e.HasIndex(a => new { a.TenantId, a.TagNumber })
-                    .IsUnique()
-                    .HasFilter("[TagNumber] IS NOT NULL")
-                    .HasDatabaseName("IX_Assets_TenantId_TagNumber");
 
                 e.HasIndex(a => new { a.TenantId, a.SerialNumber })
                     .IsUnique()
@@ -355,52 +346,6 @@ namespace DFile.backend.Data
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            // ── Department ─────────────────────────────────────────
-            modelBuilder.Entity<Department>(e =>
-            {
-                e.HasIndex(d => d.DepartmentCode)
-                    .IsUnique()
-                    .HasDatabaseName("IX_Departments_DepartmentCode");
-
-                e.HasOne(d => d.Tenant)
-                    .WithMany()
-                    .HasForeignKey(d => d.TenantId)
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasOne(d => d.ParentDepartment)
-                    .WithMany()
-                    .HasForeignKey(d => d.ParentDepartmentId)
-                    .OnDelete(DeleteBehavior.NoAction);
-
-                e.HasOne(d => d.CreatedByUser)
-                    .WithMany()
-                    .HasForeignKey(d => d.CreatedBy)
-                    .OnDelete(DeleteBehavior.NoAction);
-
-                e.HasOne(d => d.UpdatedByUser)
-                    .WithMany()
-                    .HasForeignKey(d => d.UpdatedBy)
-                    .OnDelete(DeleteBehavior.NoAction);
-            });
-
-            // ── Role ───────────────────────────────────────────────
-            modelBuilder.Entity<Role>(e =>
-            {
-                e.HasIndex(r => r.RoleCode)
-                    .IsUnique()
-                    .HasDatabaseName("IX_Roles_RoleCode");
-
-                e.HasOne(r => r.Department)
-                    .WithMany()
-                    .HasForeignKey(r => r.DepartmentId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
-                e.HasOne(r => r.Tenant)
-                    .WithMany()
-                    .HasForeignKey(r => r.TenantId)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-
             // ── TaskItem ───────────────────────────────────────────
             modelBuilder.Entity<TaskItem>(e =>
             {
@@ -433,53 +378,6 @@ namespace DFile.backend.Data
                     .WithMany()
                     .HasForeignKey(u => u.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            // ── RoleTemplate / Permission system ───────────────────
-            modelBuilder.Entity<RolePermission>(e =>
-            {
-                e.HasOne(rp => rp.RoleTemplate)
-                    .WithMany(rt => rt.Permissions)
-                    .HasForeignKey(rp => rp.RoleTemplateId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasIndex(rp => new { rp.RoleTemplateId, rp.ModuleName })
-                    .IsUnique()
-                    .HasDatabaseName("IX_RolePermissions_Template_Module");
-            });
-
-            modelBuilder.Entity<TenantRole>(e =>
-            {
-                e.HasOne(tr => tr.Tenant)
-                    .WithMany()
-                    .HasForeignKey(tr => tr.TenantId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(tr => tr.RoleTemplate)
-                    .WithMany(rt => rt.TenantRoles)
-                    .HasForeignKey(tr => tr.RoleTemplateId)
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasIndex(tr => new { tr.TenantId, tr.RoleTemplateId })
-                    .IsUnique()
-                    .HasDatabaseName("IX_TenantRoles_Tenant_Template");
-            });
-
-            modelBuilder.Entity<UserRoleAssignment>(e =>
-            {
-                e.HasOne(ura => ura.User)
-                    .WithMany()
-                    .HasForeignKey(ura => ura.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(ura => ura.TenantRole)
-                    .WithMany(tr => tr.UserAssignments)
-                    .HasForeignKey(ura => ura.TenantRoleId)
-                    .OnDelete(DeleteBehavior.Restrict);
-
-                e.HasIndex(ura => new { ura.UserId, ura.TenantRoleId })
-                    .IsUnique()
-                    .HasDatabaseName("IX_UserRoleAssignment_User_TenantRole");
             });
 
             // ── AuditLog ───────────────────────────────────────────
@@ -560,19 +458,6 @@ namespace DFile.backend.Data
                     .HasForeignKey(a => a.TenantId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
-            // ── UserSettings ──────────────────────────────────────
-            modelBuilder.Entity<UserSettings>(e =>
-            {
-                e.HasIndex(s => s.UserId)
-                    .IsUnique()
-                    .HasDatabaseName("IX_UserSettings_UserId");
-
-                e.HasOne(s => s.User)
-                    .WithMany()
-                    .HasForeignKey(s => s.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            });
-
             // ── PaymentTransaction ─────────────────────────────────
             modelBuilder.Entity<PaymentTransaction>(e =>
             {
@@ -611,6 +496,74 @@ namespace DFile.backend.Data
                     .WithMany()
                     .HasForeignKey(l => l.TenantId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ── TenantSubscription ─────────────────────────────────
+            modelBuilder.Entity<TenantSubscription>(e =>
+            {
+                e.Property(s => s.BillingCycle)
+                    .HasConversion<string>()
+                    .HasMaxLength(20);
+
+                e.Property(s => s.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(20);
+
+                e.HasOne(s => s.Tenant)
+                    .WithMany()
+                    .HasForeignKey(s => s.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.Plan)
+                    .WithMany()
+                    .HasForeignKey(s => s.PlanId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.PaymentTransaction)
+                    .WithMany()
+                    .HasForeignKey(s => s.PaymentTransactionId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasIndex(s => new { s.TenantId, s.Status })
+                    .HasDatabaseName("IX_TenantSubscriptions_TenantId_Status");
+
+                e.HasIndex(s => s.EndDate)
+                    .HasDatabaseName("IX_TenantSubscriptions_EndDate");
+            });
+
+            // ── UserLoginAudit ─────────────────────────────────────
+            modelBuilder.Entity<UserLoginAudit>(e =>
+            {
+                e.HasIndex(a => a.AttemptedAt)
+                    .HasDatabaseName("IX_UserLoginAudits_AttemptedAt");
+
+                e.HasIndex(a => new { a.Email, a.AttemptedAt })
+                    .HasDatabaseName("IX_UserLoginAudits_Email_AttemptedAt");
+
+                e.HasIndex(a => a.IsSuspicious)
+                    .HasDatabaseName("IX_UserLoginAudits_IsSuspicious");
+
+                e.HasOne(a => a.User)
+                    .WithMany()
+                    .HasForeignKey(a => a.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(a => a.Tenant)
+                    .WithMany()
+                    .HasForeignKey(a => a.TenantId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ── TrustedDevice ──────────────────────────────────────
+            modelBuilder.Entity<TrustedDevice>(e =>
+            {
+                e.HasIndex(d => new { d.UserId, d.DeviceFingerprint })
+                    .HasDatabaseName("IX_TrustedDevices_UserId_Fingerprint");
+
+                e.HasOne(d => d.User)
+                    .WithMany()
+                    .HasForeignKey(d => d.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

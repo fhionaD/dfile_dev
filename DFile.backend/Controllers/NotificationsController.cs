@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -44,7 +44,7 @@ namespace DFile.backend.Controllers
         [HttpGet]
         public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
             var role = (User.GetJwtRole() ?? "").Trim();
             var tenantId = GetCurrentTenantId();
 
@@ -94,7 +94,7 @@ namespace DFile.backend.Controllers
         [HttpGet("unread-count")]
         public async Task<IActionResult> GetUnreadCount()
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
             var role = (User.GetJwtRole() ?? "").Trim();
             var tenantId = GetCurrentTenantId();
 
@@ -129,7 +129,7 @@ namespace DFile.backend.Controllers
             if (notification == null)
                 return NotFound();
 
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
             var role = (User.GetJwtRole() ?? "").Trim();
             var tenantId = GetCurrentTenantId();
             if (!NotificationMatchesCurrentUser(notification, userId, role, tenantId))
@@ -145,7 +145,7 @@ namespace DFile.backend.Controllers
         [HttpPut("read-all")]
         public async Task<IActionResult> MarkAllAsRead()
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
             var role = (User.GetJwtRole() ?? "").Trim();
             var tenantId = GetCurrentTenantId();
 
@@ -184,7 +184,7 @@ namespace DFile.backend.Controllers
             if (notification == null)
                 return NotFound();
 
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
             var role = (User.GetJwtRole() ?? "").Trim();
             var tenantId = GetCurrentTenantId();
             if (!NotificationMatchesCurrentUser(notification, userId, role, tenantId))
@@ -195,7 +195,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        // ── Static helper to create notifications from other controllers ──
+        // â”€â”€ Static helper to create notifications from other controllers â”€â”€
         public static async Task CreateNotification(
             AppDbContext context,
             string message,

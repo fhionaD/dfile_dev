@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
@@ -32,7 +32,7 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
 
             // Same tenant + status rules as AllocationsController.GetActiveAllocations.
-            // Do not require Room != null — orphaned FKs or soft issues would hide rows that tenant admin still sees via assets.
+            // Do not require Room != null â€” orphaned FKs or soft issues would hide rows that tenant admin still sees via assets.
             var query = _context.AssetAllocations
                 .Include(a => a.Asset)
                     .ThenInclude(asset => asset!.Category)
@@ -164,7 +164,6 @@ namespace DFile.backend.Controllers
                 AssetId = a.AssetId,
                 AssetCode = a.Asset?.AssetCode,
                 AssetName = a.Asset?.AssetName,
-                TagNumber = null,
                 CategoryName = a.Asset?.Category?.CategoryName,
                 RoomId = a.RoomId,
                 RoomCode = a.Room?.RoomCode,
@@ -179,7 +178,7 @@ namespace DFile.backend.Controllers
         /// <summary>Completed on-site repairs (persisted via AssetConditionLogs with MaintenanceRecordId).</summary>
         [HttpGet("repair-history")]
         [RequirePermission("Maintenance", "CanView")]
-        public async Task<ActionResult<IEnumerable<object>>> GetRepairHistory([FromQuery] string? assetId = null)
+        public async Task<ActionResult<IEnumerable<object>>> GetRepairHistory([FromQuery] string? assetId = null, [FromQuery] string? search = null)
         {
             var tenantId = GetCurrentTenantId();
             var q =
@@ -199,9 +198,19 @@ namespace DFile.backend.Controllers
                 q = q.Where(x => x.log.AssetId == aid);
             }
 
+            // Search by asset name or code
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchTerm = search.Trim().ToLowerInvariant();
+                q = q.Where(x =>
+                    x.asset.AssetName.ToLower().Contains(searchTerm) ||
+                    x.asset.AssetCode.ToLower().Contains(searchTerm) ||
+                    (x.asset.SerialNumber != null && x.asset.SerialNumber.ToLower().Contains(searchTerm)));
+            }
+
             var rows = await q
-                .OrderByDescending(x => x.log.CreatedAt)
-                .Take(200)
+                .OrderBy(x => x.log.CreatedAt) // Chronological order: oldest first for auditing
+                .Take(500)
                 .Select(x => new
                 {
                     x.log.Id,
@@ -210,6 +219,7 @@ namespace DFile.backend.Controllers
                     x.log.AssetId,
                     assetName = x.asset.AssetName,
                     assetCode = x.asset.AssetCode,
+                    categoryName = x.asset.Category != null ? x.asset.Category.CategoryName : null,
                     x.log.Notes,
                     previousCondition = x.log.PreviousCondition.ToString(),
                     newCondition = x.log.NewCondition.ToString(),
@@ -271,10 +281,10 @@ namespace DFile.backend.Controllers
             return Ok(MapToDto(record, allocDict, DateTime.UtcNow));
         }
 
-        // ── Status transition rules ──────────────────────────────
+        // â”€â”€ Status transition rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         private static readonly Dictionary<string, string[]> ValidTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
-            // Finance Review may only be entered via POST inspection-workflow or from Inspection/Quoted — not directly from Pending/Open/Scheduled.
+            // Finance Review may only be entered via POST inspection-workflow or from Inspection/Quoted â€” not directly from Pending/Open/Scheduled.
             ["Open"]        = new[] { "Inspection" },
             ["Inspection"]  = new[] { "Quoted", "In Progress", "Completed", "Finance Review" },
             ["Quoted"]      = new[] { "In Progress", "Finance Review" },
@@ -366,9 +376,9 @@ namespace DFile.backend.Controllers
                 .Where(d => dateSet.Contains(d.Date))
                 .ToList();
             
-            if (duplicateDates.Any())
+            if (duplicateDates.Count > 0)
             {
-                var duplicateDateStr = duplicateDates.First().ToString("yyyy-MM-dd");
+                var duplicateDateStr = duplicateDates.First().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 return Conflict(new { message = $"Maintenance is already scheduled for this asset on {duplicateDateStr}. Please select different dates." });
             }
 
@@ -401,6 +411,7 @@ namespace DFile.backend.Controllers
                     DiagnosisOutcome = dto.DiagnosisOutcome,
                     InspectionNotes = dto.InspectionNotes,
                     QuotationNotes = dto.QuotationNotes,
+                    RepairType = dto.RepairType,
                     DateReported = now,
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -535,7 +546,7 @@ namespace DFile.backend.Controllers
                 "Update",
                 "MaintenanceRecord",
                 id,
-                $"Maintenance record updated: status {previousStatus} → {dto.Status}.");
+                $"Maintenance record updated: status {previousStatus} â†’ {dto.Status}.");
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -632,7 +643,7 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = $"Inspection workflow cannot be submitted from status '{record.Status}'." });
 
             // Only block when the record is already in Inspection (field work) before the scheduled day.
-            // Scheduled / Open / Pending may still submit diagnosis (e.g. Not Repairable → Finance) without waiting for the visit date.
+            // Scheduled / Open / Pending may still submit diagnosis (e.g. Not Repairable â†’ Finance) without waiting for the visit date.
             if (string.Equals(record.Status, "Inspection", StringComparison.OrdinalIgnoreCase)
                 && record.StartDate.HasValue
                 && record.StartDate.Value.Date > DateTime.UtcNow.Date)
@@ -659,8 +670,15 @@ namespace DFile.backend.Controllers
                     return BadRequest(new { message = "Repair description is required." });
                 if (!dto.EstimatedRepairCost.HasValue || dto.EstimatedRepairCost.Value <= 0)
                     return BadRequest(new { message = "Estimated repair cost must be greater than zero." });
+                
+                var repairType = (dto.RepairType ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(repairType) || 
+                    (!string.Equals(repairType, "Minor", StringComparison.OrdinalIgnoreCase) && 
+                     !string.Equals(repairType, "Major", StringComparison.OrdinalIgnoreCase)))
+                    return BadRequest(new { message = "Repair type must be Minor or Major." });
 
                 record.DiagnosisOutcome = "Repairable";
+                record.RepairType = repairType;
                 record.QuotationNotes = notes;
                 record.Cost = dto.EstimatedRepairCost;
                 record.Attachments = string.IsNullOrWhiteSpace(dto.Attachments) ? null : dto.Attachments.Trim();
@@ -817,7 +835,7 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        // ── File Upload ───────────────────────────────────────────
+        // â”€â”€ File Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         [HttpPost("upload")]
         [RequirePermission("Maintenance", "CanCreate")]
@@ -844,7 +862,7 @@ namespace DFile.backend.Controllers
             return Ok(new { url, fileName = file.FileName, size = file.Length });
         }
 
-        // ── Mark Asset Beyond Repair ──────────────────────────────
+        // â”€â”€ Mark Asset Beyond Repair â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         [HttpPut("mark-beyond-repair/{maintenanceId}")]
         [RequirePermission("Maintenance", "CanEdit")]
@@ -898,7 +916,7 @@ namespace DFile.backend.Controllers
             return Ok(new { message = "Asset marked as beyond repair. Admin has been notified." });
         }
 
-        // ── Asset Condition History ───────────────────────────────
+        // â”€â”€ Asset Condition History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         [HttpGet("condition-history/{assetId}")]
         [RequirePermission("Maintenance", "CanView")]
@@ -928,9 +946,9 @@ namespace DFile.backend.Controllers
             return Ok(logs);
         }
 
-        // ── Helpers ───────────────────────────────────────────────
+        // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-        private IActionResult? ValidateActiveAllocationAndOptionalRoom(string? requestedRoomId, AssetAllocation? alloc)
+        private BadRequestObjectResult? ValidateActiveAllocationAndOptionalRoom(string? requestedRoomId, AssetAllocation? alloc)
         {
             if (alloc == null)
                 return BadRequest(new { message = "This asset has no active room allocation. Assign the asset to a room before scheduling maintenance." });
@@ -980,7 +998,7 @@ namespace DFile.backend.Controllers
 
         private static MaintenanceRecordResponseDto MapListRowToDto(
             MaintenanceRecordListRow r,
-            IReadOnlyDictionary<string, (string? RoomId, string? RoomCode, string? RoomName, string? RoomFloor)> roomByAsset,
+            Dictionary<string, (string? RoomId, string? RoomCode, string? RoomName, string? RoomFloor)> roomByAsset,
             DateTime utcNow)
         {
             roomByAsset.TryGetValue(r.AssetId, out var room);
@@ -991,7 +1009,6 @@ namespace DFile.backend.Controllers
                 AssetId = r.AssetId,
                 AssetName = r.AssetName,
                 AssetCode = r.AssetCode,
-                TagNumber = null,
                 CategoryName = r.CategoryName,
                 RoomId = room.RoomId,
                 RoomCode = room.RoomCode,
@@ -1061,7 +1078,6 @@ namespace DFile.backend.Controllers
                 AssetId = r.AssetId,
                 AssetName = r.Asset?.AssetName,
                 AssetCode = r.Asset?.AssetCode,
-                TagNumber = null,
                 CategoryName = r.Asset?.Category?.CategoryName,
                 RoomId = alloc?.Room?.Id,
                 RoomCode = alloc?.Room?.RoomCode,
@@ -1089,6 +1105,12 @@ namespace DFile.backend.Controllers
                 FinanceWorkflowStatus = r.FinanceWorkflowStatus,
                 LinkedPurchaseOrderId = r.LinkedPurchaseOrderId,
                 ReplacementRegisteredAssetId = r.ReplacementRegisteredAssetId,
+                RepairType = r.RepairType,
+                FinanceDecision = r.FinanceDecision,
+                AddedLifeMonths = r.AddedLifeMonths,
+                AdjustmentValue = r.AdjustmentValue,
+                ApprovedBy = r.ApprovedBy,
+                ApprovedAt = r.ApprovedAt,
                 ScheduleSeriesId = r.ScheduleSeriesId,
             };
         }

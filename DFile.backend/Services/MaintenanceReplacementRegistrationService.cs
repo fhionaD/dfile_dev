@@ -66,7 +66,7 @@ namespace DFile.backend.Services
             {
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
+                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
                     ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId),
                     cancellationToken);
                 if (serialExists)
@@ -110,13 +110,11 @@ namespace DFile.backend.Services
                 {
                     Id = Guid.NewGuid().ToString(),
                     AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                    TagNumber = null,
                     AssetName = dto.AssetName.Trim(),
                     CategoryId = dto.CategoryId,
                     LifecycleStatus = LifecycleStatus.Registered,
                     CurrentCondition = dto.CurrentCondition,
                     HandlingTypeSnapshot = category.HandlingType.ToString(),
-                    Room = dto.Room,
                     Image = dto.Image,
                     Manufacturer = dto.Manufacturer,
                     Model = dto.Model,
@@ -124,17 +122,18 @@ namespace DFile.backend.Services
                     PurchaseDate = dto.PurchaseDate,
                     Vendor = dto.Vendor,
                     AcquisitionCost = dto.AcquisitionCost,
-                    UsefulLifeYears = dto.UsefulLifeYears,
+                    TotalLifeMonths = dto.TotalLifeMonths,
+                    UsedMonths = 0,
                     PurchasePrice = dto.PurchasePrice,
                     ResidualValue = dto.ResidualValue,
                     SalvagePercentage = effectiveSalvagePct,
                     SalvageValue = computedSalvageValue,
                     IsSalvageOverride = dto.IsSalvageOverride,
                     CurrentBookValue = dto.PurchasePrice,
-                    MonthlyDepreciation = dto.UsefulLifeYears > 0
-                        ? Math.Round(dto.PurchasePrice / (dto.UsefulLifeYears * 12), 2)
+                    AccumulatedDepreciation = 0,
+                    MonthlyDepreciation = dto.TotalLifeMonths > 0
+                        ? Math.Round((dto.PurchasePrice - computedSalvageValue) / dto.TotalLifeMonths, 2)
                         : 0,
-                    DepreciationMonthsApplied = 0,
                     TenantId = effectiveTenantId,
                     WarrantyExpiry = dto.WarrantyExpiry,
                     Notes = mergedNotes,

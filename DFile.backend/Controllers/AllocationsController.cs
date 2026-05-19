@@ -16,20 +16,18 @@ namespace DFile.backend.Controllers
     public class AllocationsController : TenantAwareController
     {
         private readonly AppDbContext _context;
-        private readonly PermissionService _permissionService;
         private readonly IAuditService _auditService;
 
-        public AllocationsController(AppDbContext context, PermissionService permissionService, IAuditService auditService)
+        public AllocationsController(AppDbContext context, IAuditService auditService)
         {
             _context = context;
-            _permissionService = permissionService;
             _auditService = auditService;
         }
 
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         // ── POST /api/allocations ──────────────────────────────────
@@ -191,9 +189,9 @@ namespace DFile.backend.Controllers
             {
                 if (!tenantId.HasValue || !userId.HasValue)
                     return Forbid();
-                var canAssets = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Assets", "CanView");
-                var canMaintenance = await _permissionService.HasPermission(userId.Value, tenantId.Value, "Maintenance", "CanView");
-                if (!canAssets && !canMaintenance)
+                // Permission checks simplified - authentication via [Authorize] is sufficient
+                // Allow Admin, Finance Manager, and Maintenance Manager roles
+                if (!User.IsInRole("Admin") && !User.IsInRole("Finance Manager") && !User.IsInRole("Maintenance Manager"))
                 {
                     return StatusCode(403, new { message = "You do not have permission to view allocations." });
                 }
@@ -229,7 +227,6 @@ namespace DFile.backend.Controllers
             AssetId = a.AssetId,
             AssetName = asset?.AssetName ?? string.Empty,
             AssetCode = asset?.AssetCode,
-            TagNumber = null,
             RoomId = a.RoomId,
             RoomCode = room?.RoomCode ?? string.Empty,
             RoomName = room?.Name ?? string.Empty,

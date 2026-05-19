@@ -20,7 +20,7 @@ namespace DFile.backend.Services
             get
             {
                 var v = User?.FindFirst("TenantId")?.Value;
-                return string.IsNullOrEmpty(v) ? null : int.Parse(v);
+                return string.IsNullOrEmpty(v) ? null : int.Parse(v, CultureInfo.InvariantCulture);
             }
         }
 
@@ -30,7 +30,7 @@ namespace DFile.backend.Services
             {
                 var v = User?.FindFirst("UserId")?.Value
                     ?? User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                return string.IsNullOrEmpty(v) ? null : int.Parse(v);
+                return string.IsNullOrEmpty(v) ? null : int.Parse(v, CultureInfo.InvariantCulture);
             }
         }
 

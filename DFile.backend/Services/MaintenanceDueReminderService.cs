@@ -1,4 +1,4 @@
-using DFile.backend.Data;
+﻿using DFile.backend.Data;
 using DFile.backend.DTOs;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,7 +74,7 @@ namespace DFile.backend.Services
         {
             var today = DateTime.UtcNow.Date;
             var utcNow = DateTime.UtcNow;
-            // Narrow projection only — the old Include(r => r.Asset) pulled every column from both tables
+            // Narrow projection only â€” the old Include(r => r.Asset) pulled every column from both tables
             // (see EF logs) and competed with interactive API traffic.
             var rows = await db.MaintenanceRecords
                 .AsNoTracking()

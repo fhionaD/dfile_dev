@@ -1,5 +1,4 @@
-using DFile.backend.Services;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Linq;
 using System.Security.Claims;
@@ -8,17 +7,59 @@ namespace DFile.backend.Authorization
 {
     /// <summary>
     /// Global authorization filter for <see cref="RequirePermissionAttribute"/> and
-    /// <see cref="RequirePermissionOrRolesAttribute"/>. Runs before model binding.
-    /// Super Admin bypasses all permission checks.
+    /// <see cref="RequirePermissionOrRolesAttribute"/>. Evaluates role-based module permissions.
+    /// Super Admin bypasses all checks. Other roles are validated against a static permission table.
     /// </summary>
     public class PermissionAuthorizationFilter : IAsyncAuthorizationFilter
     {
-        private readonly PermissionService _permissionService;
-
-        public PermissionAuthorizationFilter(PermissionService permissionService)
+        // Key: "role|module|action" — pipe-delimited, OrdinalIgnoreCase for O(1) lookup.
+        private static readonly HashSet<string> _permissions = new(StringComparer.OrdinalIgnoreCase)
         {
-            _permissionService = permissionService;
-        }
+            // Admin: full access to all modules
+            "Admin|Assets|CanView",    "Admin|Assets|CanCreate",  "Admin|Assets|CanEdit",
+            "Admin|Assets|CanApprove", "Admin|Assets|CanArchive",
+            "Admin|Allocation|CanView",    "Admin|Allocation|CanCreate",
+            "Admin|Allocation|CanEdit",    "Admin|Allocation|CanArchive",
+            "Admin|Maintenance|CanView",   "Admin|Maintenance|CanCreate",
+            "Admin|Maintenance|CanEdit",   "Admin|Maintenance|CanArchive",
+            "Admin|PurchaseOrders|CanView",   "Admin|PurchaseOrders|CanCreate",
+            "Admin|PurchaseOrders|CanEdit",   "Admin|PurchaseOrders|CanApprove",
+            "Admin|PurchaseOrders|CanArchive",
+            "Admin|Rooms|CanView",   "Admin|Rooms|CanCreate",
+            "Admin|Rooms|CanEdit",   "Admin|Rooms|CanArchive",
+            "Admin|Categories|CanView",   "Admin|Categories|CanCreate",
+            "Admin|Categories|CanEdit",   "Admin|Categories|CanArchive",
+            "Admin|Users|CanView",   "Admin|Users|CanCreate", "Admin|Users|CanEdit",
+            "Admin|AuditLogs|CanView",
+
+            // Finance: view + manage asset financial data; view maintenance costs
+            "Finance|Assets|CanView",  "Finance|Assets|CanCreate", "Finance|Assets|CanEdit",
+            "Finance|Maintenance|CanView",
+            "Finance|MaintenanceRequests|CanView", "Finance|MaintenanceRequests|CanEdit",
+            "Finance|Rooms|CanView",
+            "Finance|PurchaseOrders|CanView",
+
+            // Maintenance: create and manage maintenance records; view assets
+            "Maintenance|Maintenance|CanView",  "Maintenance|Maintenance|CanCreate",
+            "Maintenance|Maintenance|CanEdit",
+            "Maintenance|Assets|CanView",
+            "Maintenance|Rooms|CanView",
+            "Maintenance|PurchaseOrders|CanView",
+
+            // Procurement: full purchase order lifecycle; view assets
+            "Procurement|PurchaseOrders|CanView",   "Procurement|PurchaseOrders|CanCreate",
+            "Procurement|PurchaseOrders|CanEdit",   "Procurement|PurchaseOrders|CanApprove",
+            "Procurement|PurchaseOrders|CanArchive",
+            "Procurement|Assets|CanView",
+            "Procurement|Rooms|CanView",
+
+            // Employee: view-only on assets and rooms
+            "Employee|Assets|CanView",
+            "Employee|Rooms|CanView",
+        };
+
+        private static bool HasPermission(string role, string moduleName, string action)
+            => _permissions.Contains($"{role}|{moduleName}|{action}");
 
         public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
@@ -31,6 +72,7 @@ namespace DFile.backend.Authorization
 
             if (attributes.Count == 0 && orRoleAttributes.Count == 0)
             {
+                await Task.CompletedTask;
                 return;
             }
 
@@ -42,47 +84,38 @@ namespace DFile.backend.Authorization
                 return;
             }
 
+            // Super Admin bypasses all permission checks
             if (user.IsInRole("Super Admin"))
             {
+                await Task.CompletedTask;
                 return;
             }
 
-            var userIdStr = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var tenantIdStr = user.FindFirst("TenantId")?.Value;
+            var role = user.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
 
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId) ||
-                string.IsNullOrEmpty(tenantIdStr) || !int.TryParse(tenantIdStr, out int tenantId))
-            {
-                context.Result = new ForbidResult();
-                return;
-            }
-
-            foreach (var attr in orRoleAttributes)
-            {
-                var hasPerm = await _permissionService.HasPermission(userId, tenantId, attr.ModuleName, attr.Action);
-                var hasRole = attr.AlternateRoles.Length > 0 && attr.AlternateRoles.Any(user.IsInRole);
-                if (!hasPerm && !hasRole)
-                {
-                    context.Result = new ObjectResult(new { message = $"You do not have permission to {attr.Action.Replace("Can", "").ToLower()} {attr.ModuleName}." })
-                    {
-                        StatusCode = 403
-                    };
-                    return;
-                }
-            }
-
+            // Check [RequirePermission] attributes — all must pass (AND semantics per action)
             foreach (var attr in attributes)
             {
-                var allowed = await _permissionService.HasPermission(userId, tenantId, attr.ModuleName, attr.Action);
-                if (!allowed)
+                if (!HasPermission(role, attr.ModuleName, attr.Action))
                 {
-                    context.Result = new ObjectResult(new { message = $"You do not have permission to {attr.Action.Replace("Can", "").ToLower()} {attr.ModuleName}." })
-                    {
-                        StatusCode = 403
-                    };
+                    context.Result = new ForbidResult();
                     return;
                 }
             }
+
+            // Check [RequirePermissionOrRoles] attributes — permission OR explicit role match
+            foreach (var attr in orRoleAttributes)
+            {
+                var permissionOk = HasPermission(role, attr.ModuleName, attr.Action);
+                var roleOk = attr.AlternateRoles != null && attr.AlternateRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
+                if (!permissionOk && !roleOk)
+                {
+                    context.Result = new ForbidResult();
+                    return;
+                }
+            }
+
+            await Task.CompletedTask;
         }
     }
 }

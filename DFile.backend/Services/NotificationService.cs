@@ -2,16 +2,19 @@ using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DFile.backend.Services
 {
     public class NotificationService : INotificationService
     {
         private readonly AppDbContext _context;
+        private readonly IEmailService _email;
 
-        public NotificationService(AppDbContext context)
+        public NotificationService(AppDbContext context, IEmailService email)
         {
             _context = context;
+            _email = email;
         }
 
         public Task NotifyPurchaseOrderApprovedAsync(PurchaseOrder order, CancellationToken cancellationToken = default)
@@ -165,7 +168,7 @@ namespace DFile.backend.Services
         public Task NotifyMaintenanceFinanceRejectionAsync(MaintenanceRecord record, CancellationToken cancellationToken = default)
         {
             var label = !string.IsNullOrEmpty(record.RequestId) ? record.RequestId : record.Id;
-            var kind = string.IsNullOrWhiteSpace(record.FinanceRequestType) ? "request" : record.FinanceRequestType.ToLower();
+            var kind = string.IsNullOrWhiteSpace(record.FinanceRequestType) ? "request" : record.FinanceRequestType.ToLowerInvariant();
             var tenantId = record.TenantId ?? record.Asset?.TenantId;
             _context.Notifications.Add(new Notification
             {
@@ -178,6 +181,101 @@ namespace DFile.backend.Services
                 TenantId = tenantId,
             });
             return Task.CompletedTask;
+        }
+
+        // ── Subscription lifecycle ────────────────────────────────────────
+
+        public async Task NotifySubscriptionActivatedAsync(int tenantId, string planName, string billingCycle, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            var msg = $"Your {planName} ({billingCycle}) subscription is now active. It expires on {endDate:MMMM d, yyyy}.";
+            _context.Notifications.Add(new Notification
+            {
+                Message = msg,
+                Type = "Success",
+                Module = "Billing",
+                EntityType = "Subscription",
+                TargetRole = UserRoleConstants.Admin,
+                TenantId = tenantId,
+            });
+
+            var email = await GetTenantAdminEmailAsync(tenantId, cancellationToken);
+            if (!string.IsNullOrEmpty(email))
+            {
+                await _email.SendEmailAsync(email, $"DFile — {planName} subscription activated",
+                    $"<p>{msg}</p><p>Log in to your DFile dashboard to manage your subscription.</p>");
+            }
+        }
+
+        public async Task NotifySubscriptionExpiringAsync(int tenantId, string planName, DateTime endDate, int daysLeft, CancellationToken cancellationToken = default)
+        {
+            var dayLabel = daysLeft == 1 ? "1 day" : $"{daysLeft} days";
+            var msg = $"Your {planName} subscription expires in {dayLabel} (on {endDate:MMMM d, yyyy}). Renew now to avoid interruption.";
+            _context.Notifications.Add(new Notification
+            {
+                Message = msg,
+                Type = "Warning",
+                Module = "Billing",
+                EntityType = "Subscription",
+                TargetRole = UserRoleConstants.Admin,
+                TenantId = tenantId,
+            });
+
+            var email = await GetTenantAdminEmailAsync(tenantId, cancellationToken);
+            if (!string.IsNullOrEmpty(email))
+            {
+                await _email.SendEmailAsync(email, $"DFile — {planName} subscription expiring in {dayLabel}",
+                    $"<p>{msg}</p><p>Visit your <strong>Billing</strong> page to renew your subscription.</p>");
+            }
+        }
+
+        public async Task NotifySubscriptionExpiredAsync(int tenantId, string planName, CancellationToken cancellationToken = default)
+        {
+            var msg = $"Your {planName} subscription has expired. Renew to restore full access.";
+            _context.Notifications.Add(new Notification
+            {
+                Message = msg,
+                Type = "Error",
+                Module = "Billing",
+                EntityType = "Subscription",
+                TargetRole = UserRoleConstants.Admin,
+                TenantId = tenantId,
+            });
+
+            var email = await GetTenantAdminEmailAsync(tenantId, cancellationToken);
+            if (!string.IsNullOrEmpty(email))
+            {
+                await _email.SendEmailAsync(email, $"DFile — {planName} subscription expired",
+                    $"<p>{msg}</p><p>Visit your <strong>Billing</strong> page to renew your subscription.</p>");
+            }
+        }
+
+        public async Task NotifyPaymentFailedAsync(int tenantId, string planName, CancellationToken cancellationToken = default)
+        {
+            var msg = $"Payment for your {planName} subscription failed. Please try again or contact support.";
+            _context.Notifications.Add(new Notification
+            {
+                Message = msg,
+                Type = "Error",
+                Module = "Billing",
+                EntityType = "Payment",
+                TargetRole = UserRoleConstants.Admin,
+                TenantId = tenantId,
+            });
+
+            var email = await GetTenantAdminEmailAsync(tenantId, cancellationToken);
+            if (!string.IsNullOrEmpty(email))
+            {
+                await _email.SendEmailAsync(email, $"DFile — {planName} payment failed",
+                    $"<p>{msg}</p><p>Visit your <strong>Billing</strong> page to retry your payment.</p>");
+            }
+        }
+
+        private async Task<string?> GetTenantAdminEmailAsync(int tenantId, CancellationToken cancellationToken)
+        {
+            return await _context.Users
+                .Where(u => u.TenantId == tenantId && u.Role == "Admin" && u.Status == "Active")
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync(cancellationToken);
         }
     }
 }

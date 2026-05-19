@@ -1,7 +1,8 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
+using DFile.backend.Helpers;
 using DFile.backend.Models;
 using DFile.backend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -9,8 +10,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace DFile.backend.Controllers
 {
@@ -20,15 +23,21 @@ namespace DFile.backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
-        private readonly PermissionService _permissionService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IEmailService _emailService;
+        private readonly IMemoryCache _cache;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILoginAuditService _loginAudit;
 
-        public AuthController(AppDbContext context, IConfiguration configuration, PermissionService permissionService, ILogger<AuthController> logger)
+        public AuthController(AppDbContext context, IConfiguration configuration, ILogger<AuthController> logger, IEmailService emailService, IMemoryCache cache, IHttpClientFactory httpClientFactory, ILoginAuditService loginAudit)
         {
             _context = context;
             _configuration = configuration;
-            _permissionService = permissionService;
             _logger = logger;
+            _emailService = emailService;
+            _cache = cache;
+            _httpClientFactory = httpClientFactory;
+            _loginAudit = loginAudit;
         }
 
         [HttpPost("login")]
@@ -37,46 +46,60 @@ namespace DFile.backend.Controllers
         {
             try
             {
-                // Input validation
                 if (dto == null || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
-                {
-                    return BadRequest(new { message = "Email and password are required." });
-                }
+                    return BadRequest(new { success = false, message = "Email and password are required." });
 
                 var emailNormalized = dto.Email.Trim().ToLowerInvariant();
-                _logger.LogInformation("Login attempt for email: {Email}", emailNormalized);
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+                var userAgent = Request.Headers.UserAgent.ToString();
 
-                // Safe user lookup with case-insensitive email
-                // Note: .ToLower() is used in LINQ (EF Core compatible), emailNormalized for comparison
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
 
                 if (user == null)
                 {
                     _logger.LogWarning("Login failed: User not found for email: {Email}", emailNormalized);
-                    return Unauthorized(new { message = "Invalid credentials" });
+                    // Record anonymous failed attempt without user
+                    _context.UserLoginAudits.Add(new UserLoginAudit
+                    {
+                        Email = emailNormalized,
+                        AttemptStatus = "LOGIN_FAILED",
+                        IpAddress = ipAddress,
+                        UserAgent = userAgent,
+                        AttemptedAt = DateTime.UtcNow,
+                        FailureReason = "User not found"
+                    });
+                    await _context.SaveChangesAsync();
+                    return Unauthorized(new { success = false, message = "Invalid credentials.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
                 }
 
-                // Validate user account exists and basic data is present
-                if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                // Check lockout before anything else
+                if (await _loginAudit.IsLockedOutAsync(user))
                 {
-                    _logger.LogError("Login failed: User {UserId} has no password hash", user.Id);
-                    return Unauthorized(new { message = "Invalid credentials" });
+                    var remainingSeconds = (int)(user.LockoutEnd!.Value - DateTime.UtcNow).TotalSeconds;
+                    var remainingMinutes = (int)Math.Ceiling(remainingSeconds / 60.0);
+                    return StatusCode(429, new
+                    {
+                        success = false,
+                        message = "Too many failed login attempts. Your account is temporarily locked.",
+                        attemptsLeft = 0,
+                        cooldownMinutes = remainingMinutes,
+                        cooldownSeconds = remainingSeconds
+                    });
                 }
 
-                _logger.LogInformation("User found: {UserId}, Status: {Status}, TenantId: {TenantId}", user.Id, user.Status, user.TenantId);
+                if (user.Status == "PendingActivation")
+                    return Unauthorized(new { success = false, message = "Your account is pending activation. Please check your email for the activation link.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
 
-                // Check tenant status if user belongs to a tenant
+                if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                    return Unauthorized(new { success = false, message = "Invalid credentials.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
+
                 if (user.TenantId.HasValue)
                 {
                     var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
                     if (tenant != null && tenant.Status != "Active")
-                    {
-                        _logger.LogWarning("Login failed: Tenant inactive for user {UserId}, tenant status: {Status}", user.Id, tenant.Status);
-                        return Unauthorized(new { message = "Your organization's account is inactive. Please contact support." });
-                    }
+                        return Unauthorized(new { success = false, message = "Your organization's account is inactive. Please contact support.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
                 }
 
-                // Verify password
                 bool passwordMatches;
                 try
                 {
@@ -91,19 +114,100 @@ namespace DFile.backend.Controllers
                 if (!passwordMatches)
                 {
                     _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
-                    return Unauthorized(new { message = "Invalid credentials" });
+                    var result = await _loginAudit.RecordFailedAttemptAsync(user, ipAddress, userAgent, "Invalid password");
+
+                    if (result.IsLocked)
+                    {
+                        return StatusCode(429, new
+                        {
+                            success = false,
+                            message = "Too many failed login attempts. Your account has been temporarily locked for 15 minutes.",
+                            attemptsLeft = 0,
+                            cooldownMinutes = result.CooldownMinutes,
+                            cooldownSeconds = result.CooldownMinutes * 60,
+                            securityAlertSent = result.SecurityAlertSent
+                        });
+                    }
+
+                    return Unauthorized(new
+                    {
+                        success = false,
+                        message = result.IsSuspicious
+                            ? "Invalid credentials. Suspicious activity detected â€” a security email has been sent to your account."
+                            : "Invalid credentials.",
+                        attemptsLeft = result.AttemptsLeft,
+                        cooldownMinutes = 0,
+                        securityAlertSent = result.SecurityAlertSent,
+                        isSuspicious = result.IsSuspicious
+                    });
                 }
 
-                // Generate token and user response
+                // Login succeeded â€” reset failed attempts
+                await _loginAudit.ResetFailedAttemptsAsync(user);
+
+                // Device recognition
+                var fingerprint = _loginAudit.GenerateDeviceFingerprint(userAgent, ipAddress);
+                var isKnownDevice = await _loginAudit.IsKnownDeviceAsync(user.Id, fingerprint);
+                bool emailNotificationSent = false;
+
+                await _loginAudit.SaveTrustedDeviceAsync(user.Id, fingerprint, ipAddress, userAgent);
+                await _loginAudit.RecordSuccessAsync(user, ipAddress, userAgent);
+
+                if (!isKnownDevice)
+                {
+                    // Log new device audit event
+                    _context.UserLoginAudits.Add(new UserLoginAudit
+                    {
+                        UserId = user.Id,
+                        Email = user.Email,
+                        AttemptStatus = "NEW_DEVICE_LOGIN",
+                        IpAddress = ipAddress,
+                        UserAgent = userAgent,
+                        AttemptedAt = DateTime.UtcNow,
+                        TenantId = user.TenantId
+                    });
+                    await _context.SaveChangesAsync();
+
+                    try
+                    {
+                        await _emailService.SendNewDeviceLoginAlertAsync(user.Email, user.FirstName, ipAddress, userAgent);
+                        emailNotificationSent = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to send new device alert for user {UserId}", user.Id);
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        await _emailService.SendLoginSuccessNotificationAsync(user.Email, user.FirstName, ipAddress, userAgent, false);
+                        emailNotificationSent = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to send login notification for user {UserId}", user.Id);
+                    }
+                }
+
                 _logger.LogInformation("Login successful for user {UserId}: {Email}", user.Id, user.Email);
                 var token = GenerateJwtToken(user);
                 var userResponse = await MapToResponseWithPermissions(user);
-                return Ok(new { token, user = userResponse });
+
+                return Ok(new
+                {
+                    success = true,
+                    token,
+                    user = userResponse,
+                    newDeviceDetected = !isKnownDevice,
+                    emailNotificationSent
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during login");
-                return StatusCode(500, new { message = "Internal server error. Please try again later." });
+                return StatusCode(500, new { success = false, message = "Internal server error. Please try again later." });
             }
         }
 
@@ -128,122 +232,398 @@ namespace DFile.backend.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 return BadRequest(new { message = "User with this email already exists." });
 
-            // Resolve the role template
-            var roleTemplate = await _context.RoleTemplates.FindAsync(dto.RoleTemplateId);
-            if (roleTemplate == null)
-                return BadRequest(new { message = "Invalid role template." });
-            if (roleTemplate.IsArchived)
-                return BadRequest(new { message = "Cannot assign an archived role template." });
-
-            if (roleTemplate.IsSystem && !UserRoleConstants.IsKnownName(roleTemplate.Name))
-                return BadRequest(new { message = "Invalid system role template name." });
+            // Validate role
+            var validRoles = new[] { "Admin", "Finance Manager", "Maintenance Manager", "Super Admin" };
+            if (!validRoles.Contains(dto.Role))
+                return BadRequest(new { message = "Invalid role. Must be one of: Admin, Finance Manager, Maintenance Manager, Super Admin" });
 
             var callerRole = User.GetJwtRole();
             var callerTenantClaim = User.FindFirst("TenantId")?.Value;
-            int? callerTenantId = string.IsNullOrEmpty(callerTenantClaim) ? null : int.Parse(callerTenantClaim);
+            int? callerTenantId = string.IsNullOrEmpty(callerTenantClaim) ? null : int.Parse(callerTenantClaim, CultureInfo.InvariantCulture);
 
+            // Super Admin can create users for any tenant, Admin can only create for their own tenant
             int? newUserTenantId;
             if (callerRole == "Super Admin")
             {
                 newUserTenantId = dto.TenantId;
             }
-            else
+            else if (callerRole == "Admin")
             {
+                // Admin can only create users for their own tenant
                 newUserTenantId = callerTenantId;
             }
+            else
+            {
+                return Forbid("Only Super Admin or Admin can create users");
+            }
 
+            // Create the user with all personal details
             var user = new User
             {
                 FirstName = dto.FirstName,
+                MiddleName = dto.MiddleName,
                 LastName = dto.LastName,
                 Email = dto.Email,
-                Role = roleTemplate.Name,
-                RoleLabel = roleTemplate.Name,
+                ContactNumber = dto.ContactNumber,
+                Address = dto.Address,
+                Role = dto.Role,
+                RoleLabel = dto.Role,
                 TenantId = newUserTenantId,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Create UserRoleAssignment if user has a tenant
-            if (newUserTenantId.HasValue)
-            {
-                // Find or create TenantRole for this tenant + template
-                var tenantRole = await _context.TenantRoles
-                    .FirstOrDefaultAsync(tr => tr.TenantId == newUserTenantId.Value && tr.RoleTemplateId == dto.RoleTemplateId);
+            return Ok(new { message = "User created successfully", userId = user.Id });
+        }
 
-                if (tenantRole == null)
-                {
-                    tenantRole = new TenantRole
+        [HttpPost("setup-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SetupPassword([FromBody] SetupPasswordDto dto)
+        {
+            if (dto == null)
+                return BadRequest(new { message = "Invalid request." });
+
+            var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+            if (user == null || user.Status != "PendingActivation")
+                return BadRequest(new { message = "Invalid or already used activation link." });
+
+            if (user.ActivationTokenExpiry == null || user.ActivationTokenExpiry < DateTime.UtcNow)
+                return BadRequest(new { message = "Activation link has expired. Please ask your administrator to resend the invitation." });
+
+            var tokenHash = ComputeTokenHash(dto.Token);
+            if (tokenHash != user.ActivationTokenHash)
+                return BadRequest(new { message = "Invalid or already used activation link." });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.Status = "Active";
+            user.ActivationTokenHash = null;
+            user.ActivationTokenExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} completed account activation", user.Id);
+            return Ok(new { message = "Password set successfully. You can now log in." });
+        }
+
+        private static string ComputeTokenHash(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        [HttpGet("google")]
+        [AllowAnonymous]
+        public IActionResult InitiateGoogleOAuth()
+        {
+            var clientId = _configuration["Google:ClientId"];
+            if (string.IsNullOrWhiteSpace(clientId))
+                return StatusCode(503, new { message = "Google OAuth is not configured on this server." });
+
+            var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .Replace("+", "-").Replace("/", "_").TrimEnd('=');
+            _cache.Set($"oauth_state:{state}", true, TimeSpan.FromMinutes(10));
+
+            var backendBase = (_configuration["Google:BackendBaseUrl"] ?? $"{Request.Scheme}://{Request.Host}").TrimEnd('/');
+            var redirectUri = $"{backendBase}/api/auth/google/callback";
+
+            var url = "https://accounts.google.com/o/oauth2/v2/auth" +
+                      $"?client_id={Uri.EscapeDataString(clientId)}" +
+                      $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+                      $"&response_type=code" +
+                      $"&scope={Uri.EscapeDataString("openid email profile")}" +
+                      $"&state={Uri.EscapeDataString(state)}" +
+                      $"&access_type=offline" +
+                      $"&prompt=select_account";
+
+            return Redirect(url);
+        }
+
+        [HttpGet("google/callback")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GoogleOAuthCallback(
+            [FromQuery] string? code,
+            [FromQuery] string? state,
+            [FromQuery] string? error)
+        {
+            var appBaseUrl = (_configuration["Payment:AppBaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+
+            if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
+                return Redirect($"{appBaseUrl}/google-callback?error=google_auth_failed");
+
+            var stateKey = $"oauth_state:{state}";
+            if (!_cache.TryGetValue(stateKey, out _))
+                return Redirect($"{appBaseUrl}/google-callback?error=invalid_state");
+            _cache.Remove(stateKey);
+
+            var clientId = _configuration["Google:ClientId"]!;
+            var clientSecret = _configuration["Google:ClientSecret"]!;
+            var backendBase = (_configuration["Google:BackendBaseUrl"] ?? $"{Request.Scheme}://{Request.Host}").TrimEnd('/');
+            var redirectUri = $"{backendBase}/api/auth/google/callback";
+
+            string googleEmail;
+            try
+            {
+                using var http = _httpClientFactory.CreateClient();
+                var tokenResponse = await http.PostAsync("https://oauth2.googleapis.com/token",
+                    new FormUrlEncodedContent(new Dictionary<string, string>
                     {
-                        TenantId = newUserTenantId.Value,
-                        RoleTemplateId = dto.RoleTemplateId
-                    };
-                    _context.TenantRoles.Add(tenantRole);
-                    await _context.SaveChangesAsync();
+                        ["code"] = code,
+                        ["client_id"] = clientId,
+                        ["client_secret"] = clientSecret,
+                        ["redirect_uri"] = redirectUri,
+                        ["grant_type"] = "authorization_code"
+                    }));
+
+                if (!tokenResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Google token exchange failed with status {Status}", tokenResponse.StatusCode);
+                    return Redirect($"{appBaseUrl}/google-callback?error=google_token_exchange_failed");
                 }
 
-                _context.UserRoleAssignments.Add(new UserRoleAssignment
+                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+                using var tokenDoc = System.Text.Json.JsonDocument.Parse(tokenJson);
+                var accessToken = tokenDoc.RootElement.GetProperty("access_token").GetString();
+                if (string.IsNullOrEmpty(accessToken))
+                    return Redirect($"{appBaseUrl}/google-callback?error=google_token_missing");
+
+                http.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var userInfoResponse = await http.GetAsync("https://www.googleapis.com/oauth2/v3/userinfo");
+
+                if (!userInfoResponse.IsSuccessStatusCode)
                 {
-                    UserId = user.Id,
-                    TenantRoleId = tenantRole.Id
-                });
-                await _context.SaveChangesAsync();
+                    _logger.LogWarning("Google userinfo request failed with status {Status}", userInfoResponse.StatusCode);
+                    return Redirect($"{appBaseUrl}/google-callback?error=google_userinfo_failed");
+                }
+
+                var userInfoJson = await userInfoResponse.Content.ReadAsStringAsync();
+                using var userInfoDoc = System.Text.Json.JsonDocument.Parse(userInfoJson);
+                googleEmail = userInfoDoc.RootElement.GetProperty("email").GetString()
+                    ?? throw new InvalidOperationException("No email in Google userinfo response");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Google OAuth flow failed");
+                return Redirect($"{appBaseUrl}/google-callback?error=google_auth_error");
             }
 
-            return Ok(new { message = "User created", userId = user.Id });
+            var emailNormalized = googleEmail.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+            if (user == null)
+                return Redirect($"{appBaseUrl}/google-callback?error=no_account");
+
+            if (user.Status == "PendingActivation")
+                return Redirect($"{appBaseUrl}/google-callback?error=pending_activation");
+
+            if (user.TenantId.HasValue)
+            {
+                var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
+                if (tenant != null && tenant.Status != "Active")
+                    return Redirect($"{appBaseUrl}/google-callback?error=tenant_inactive");
+            }
+
+            var jwt = GenerateJwtToken(user);
+            return Redirect($"{appBaseUrl}/google-callback#{Uri.EscapeDataString(jwt)}");
         }
 
         private string GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]!);
+            var jwtKey = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+            {
+                throw new InvalidOperationException("JWT Key is not configured in appsettings.json");
+            }
+
+            var key = Encoding.ASCII.GetBytes(jwtKey);
+            var userRole = string.IsNullOrWhiteSpace(user.Role) ? "Employee" : user.Role;
+            var authRole = UserRoleConstants.ToAuthorizationRole(userRole);
 
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, UserRoleConstants.ToAuthorizationRole(user.Role))
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
+                new Claim(ClaimTypes.Email, user.Email ?? ""),
+                new Claim(ClaimTypes.Role, authRole)
             };
 
             if (user.TenantId.HasValue)
             {
-                claims.Add(new Claim("TenantId", user.TenantId.Value.ToString()));
+                claims.Add(new Claim("TenantId", user.TenantId.Value.ToString(CultureInfo.InvariantCulture)));
             }
+
+            var expirationMinutes = int.TryParse(_configuration["Jwt:ExpirationMinutes"], out var mins) ? mins : 30;
+            var issuer = _configuration["Jwt:Issuer"] ?? "DFile";
+            var audience = _configuration["Jwt:Audience"] ?? "DFile";
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
+                Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
+                Issuer = issuer,
+                Audience = audience,
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
 
-        private async Task<UserResponseDto> MapToResponseWithPermissions(User user)
+        private static async Task<UserResponseDto> MapToResponseWithPermissions(User user)
         {
             var response = new UserResponseDto
             {
                 Id = user.Id,
                 FirstName = user.FirstName,
+                MiddleName = user.MiddleName,
                 LastName = user.LastName,
                 Email = user.Email,
+                ContactNumber = user.ContactNumber,
+                Address = user.Address,
                 Role = user.Role,
                 RoleLabel = user.RoleLabel,
-                Avatar = user.Avatar,
                 Status = user.Status,
                 TenantId = user.TenantId
             };
 
-            // Resolve permissions for tenant users
-            if (user.TenantId.HasValue && user.Role != "Super Admin")
+            return await Task.FromResult(response);
+        }
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
+                return BadRequest(new { message = "Email is required." });
+
+            // Always return the same response to prevent user enumeration
+            const string safeResponse = "If that email is registered, a password reset link has been sent.";
+
+            var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+            if (user == null || user.Status == "PendingActivation")
+                return Ok(new { message = safeResponse });
+
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+            var tokenHash = ComputeTokenHash(rawToken);
+
+            user.ActivationTokenHash = tokenHash;
+            user.ActivationTokenExpiry = DateTime.UtcNow.AddHours(1);
+
+            await _context.SaveChangesAsync();
+
+            var appBaseUrl = _configuration["Payment:AppBaseUrl"]?.TrimEnd('/') ?? "";
+            var encodedToken = Uri.EscapeDataString(rawToken);
+            var encodedEmail = Uri.EscapeDataString(user.Email);
+            var resetLink = $"{appBaseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
+
+            var html = $"""
+                <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;border:1px solid #e2e8f0">
+                  <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Reset your DFile password</h2>
+                  <p style="margin:0 0 24px;font-size:14px;color:#475569">
+                    We received a request to reset the password for your account (<strong>{user.Email}</strong>).
+                    Click the button below to choose a new password. This link expires in <strong>1 hour</strong>.
+                  </p>
+                  <a href="{resetLink}"
+                     style="display:inline-block;padding:12px 28px;background:#2563eb;color:#ffffff;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none">
+                    Reset Password
+                  </a>
+                  <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">
+                    If you didn&rsquo;t request this, you can safely ignore this email. Your password will not change.
+                  </p>
+                </div>
+                """;
+
+            try
             {
-                response.Permissions = await _permissionService.GetUserPermissions(user.Id, user.TenantId.Value);
+                await _emailService.SendEmailAsync(user.Email, "Reset Your DFile Password", html);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+                // Do not expose send failure to the caller
             }
 
-            return response;
+            return Ok(new { message = safeResponse });
+        }
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            if (dto == null)
+                return BadRequest(new { message = "Invalid request." });
+
+            var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+            if (user == null || user.ActivationTokenHash == null || user.ActivationTokenExpiry == null)
+                return BadRequest(new { message = "This reset link is invalid or has already been used." });
+
+            if (user.ActivationTokenExpiry < DateTime.UtcNow)
+                return BadRequest(new { message = "This reset link has expired. Please request a new one." });
+
+            var tokenHash = ComputeTokenHash(dto.Token);
+            if (tokenHash != user.ActivationTokenHash)
+                return BadRequest(new { message = "This reset link is invalid or has already been used." });
+
+            var (isValid, errorMessage) = PasswordHelper.Validate(dto.NewPassword);
+            if (!isValid)
+                return BadRequest(new { message = errorMessage });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.ActivationTokenHash = null;
+            user.ActivationTokenExpiry = null;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Password reset completed for user {UserId}", user.Id);
+            return Ok(new { message = "Password has been successfully reset. Please log in." });
+        }
+
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        {
+            if (dto == null)
+                return BadRequest(new { message = "Invalid request." });
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
+                return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return Unauthorized();
+
+            bool currentMatches;
+            try
+            {
+                currentMatches = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash);
+            }
+            catch
+            {
+                currentMatches = false;
+            }
+
+            if (!currentMatches)
+                return BadRequest(new { message = "Current password is incorrect." });
+
+            var (isValid, errorMessage) = PasswordHelper.Validate(dto.NewPassword);
+            if (!isValid)
+                return BadRequest(new { message = errorMessage });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Password changed for user {UserId}", user.Id);
+            return Ok(new { message = "Password changed successfully." });
         }
     }
 }
+
+

@@ -11,8 +11,6 @@ namespace DFile.backend.Models
         [Required]
         public string AssetCode { get; set; } = string.Empty;
 
-        public string? TagNumber { get; set; }
-
         [Required]
         public string AssetName { get; set; } = string.Empty;
 
@@ -28,7 +26,6 @@ namespace DFile.backend.Models
 
         public string? HandlingTypeSnapshot { get; set; }
 
-        public string? Room { get; set; }
         public string? Image { get; set; }
         public string? Manufacturer { get; set; }
         public string? Model { get; set; }
@@ -36,15 +33,31 @@ namespace DFile.backend.Models
         public DateTime? PurchaseDate { get; set; }
         public string? Vendor { get; set; }
         public decimal AcquisitionCost { get; set; }
-        public int UsefulLifeYears { get; set; }
         public decimal PurchasePrice { get; set; }
+        
+        /// <summary>Total useful life in MONTHS (primary storage, not years). E.g., 60 months = 5 years.</summary>
+        public int TotalLifeMonths { get; set; }
+        
+        /// <summary>Months already depreciated since purchase. Increments monthly via background job or computed from PurchaseDate.</summary>
+        public int UsedMonths { get; set; }
+        
         public decimal? ResidualValue { get; set; }
         public decimal? SalvagePercentage { get; set; }
         public decimal? SalvageValue { get; set; }
-        public bool IsSalvageOverride { get; set; } = false;
-        public decimal CurrentBookValue { get; set; }
+        public bool IsSalvageOverride { get; set; }
+        
+        /// <summary>Monthly depreciation amount. Recalculated when Cost or TotalLifeMonths changes.</summary>
         public decimal MonthlyDepreciation { get; set; }
+        
+        /// <summary>Total depreciation so far = MonthlyDepreciation * UsedMonths. Must be tracked explicitly.</summary>
+        public decimal AccumulatedDepreciation { get; set; }
+        
+        /// <summary>Deprecated: Use (TotalLifeMonths - UsedMonths) instead for remaining months.</summary>
+        [Obsolete("Use (TotalLifeMonths - UsedMonths) for remaining months")]
         public int DepreciationMonthsApplied { get; set; }
+        
+        /// <summary>Book value = Cost - AccumulatedDepreciation. Should match CurrentBookValue for backward compat.</summary>
+        public decimal CurrentBookValue { get; set; }
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]
@@ -58,7 +71,7 @@ namespace DFile.backend.Models
         public DateTime? WarrantyExpiry { get; set; }
         public string? Notes { get; set; }
         public string? Documents { get; set; }
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

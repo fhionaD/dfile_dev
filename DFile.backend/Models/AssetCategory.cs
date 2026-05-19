@@ -23,7 +23,7 @@ namespace DFile.backend.Models
         [Range(0, 100)]
         public decimal SalvagePercentage { get; set; } = 10m;
 
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
 
         public int? TenantId { get; set; }
 

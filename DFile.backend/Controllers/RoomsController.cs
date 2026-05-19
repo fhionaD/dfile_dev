@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -27,7 +27,7 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         [HttpGet]
@@ -57,7 +57,7 @@ namespace DFile.backend.Controllers
 
             if (!string.IsNullOrEmpty(search))
             {
-                search = search.ToLower();
+                search = search.ToLowerInvariant();
                 query = query.Where(r =>
                     (r.Name != null && r.Name.ToLower().Contains(search)) ||
                     (r.RoomCode != null && r.RoomCode.ToLower().Contains(search)) ||
@@ -151,8 +151,8 @@ namespace DFile.backend.Controllers
 
             // Duplicate check: same Name + Floor + TenantId among active rooms
             var duplicateExists = await _context.Rooms.AnyAsync(r =>
-                r.Name.ToLower() == trimmedName.ToLower() &&
-                r.Floor.ToLower() == trimmedFloor.ToLower() &&
+                r.Name.ToLower() == trimmedName.ToLowerInvariant() &&
+                r.Floor.ToLower() == trimmedFloor.ToLowerInvariant() &&
                 !r.IsArchived &&
                 (IsSuperAdmin() ? r.TenantId == null : r.TenantId == tenantId));
             if (duplicateExists)
@@ -303,7 +303,7 @@ namespace DFile.backend.Controllers
 
             room.IsArchived = true;
             room.ArchivedAt = DateTime.UtcNow;
-            room.ArchivedBy = userId?.ToString();
+            room.ArchivedBy = userId?.ToString(CultureInfo.InvariantCulture);
             room.UpdatedAt = DateTime.UtcNow;
             room.UpdatedBy = userId;
 

@@ -24,6 +24,9 @@ namespace DFile.backend.DTOs
         public string? InspectionNotes { get; set; }
         public string? QuotationNotes { get; set; }
 
+        /// <summary>Minor | Major — only set when DiagnosisOutcome is "Repairable".</summary>
+        public string? RepairType { get; set; }
+
         /// <summary>Optional UUID from client; prevents duplicate rows if the same batch is submitted twice.</summary>
         public string? ScheduleSeriesId { get; set; }
     }
@@ -50,6 +53,9 @@ namespace DFile.backend.DTOs
         public string? DiagnosisOutcome { get; set; }
         public string? InspectionNotes { get; set; }
         public string? QuotationNotes { get; set; }
+
+        /// <summary>Minor | Major — only when DiagnosisOutcome is "Repairable".</summary>
+        public string? RepairType { get; set; }
     }
 
     public class MaintenanceRecordResponseDto
@@ -61,7 +67,6 @@ namespace DFile.backend.DTOs
         // Denormalized Asset fields
         public string? AssetName { get; set; }
         public string? AssetCode { get; set; }
-        public string? TagNumber { get; set; }
         public string? CategoryName { get; set; }
 
         // Denormalized Room fields (from active allocation)
@@ -94,6 +99,24 @@ namespace DFile.backend.DTOs
         public string? FinanceWorkflowStatus { get; set; }
         public string? LinkedPurchaseOrderId { get; set; }
         public string? ReplacementRegisteredAssetId { get; set; }
+
+        /// <summary>Minor | Major — classification of repair type set after diagnosis.</summary>
+        public string? RepairType { get; set; }
+
+        /// <summary>Finance decision for major repairs: Expense | IncreaseValue | ExtendLife | Both.</summary>
+        public string? FinanceDecision { get; set; }
+
+        /// <summary>Additional months to extend useful life (for ExtendLife decisions).</summary>
+        public int? AddedLifeMonths { get; set; }
+
+        /// <summary>Dollar amount to adjust asset value (for IncreaseValue decisions).</summary>
+        public decimal? AdjustmentValue { get; set; }
+
+        /// <summary>User ID who approved the repair (Finance user).</summary>
+        public string? ApprovedBy { get; set; }
+
+        /// <summary>Timestamp when repair was approved by Finance.</summary>
+        public DateTime? ApprovedAt { get; set; }
 
         public string? ScheduleSeriesId { get; set; }
     }
@@ -149,6 +172,22 @@ namespace DFile.backend.DTOs
     }
 
     /// <summary>
+    /// Finance decision for repair financial impact (used for major repairs approval).
+    /// </summary>
+    public class ApproveRepairFinancialImpactDto
+    {
+        /// <summary>Expense | IncreaseValue | ExtendLife | Both</summary>
+        [Required]
+        public string FinanceDecision { get; set; } = string.Empty;
+
+        /// <summary>Dollar amount to adjust asset value (required if FinanceDecision includes IncreaseValue).</summary>
+        public decimal? AdjustmentValue { get; set; }
+
+        /// <summary>Additional months to extend useful life (required if FinanceDecision includes ExtendLife).</summary>
+        public int? AddedLifeMonths { get; set; }
+    }
+
+    /// <summary>
     /// Finance queue / awaiting-parts list: triage identifiers and workflow flags only (no description, notes, dates, or attachments).
     /// </summary>
     public class FinanceMaintenanceQueueRowDto
@@ -177,6 +216,9 @@ namespace DFile.backend.DTOs
 
         /// <summary>Required when Outcome is Repairable.</summary>
         public decimal? EstimatedRepairCost { get; set; }
+
+        /// <summary>Minor | Major — required when Outcome is Repairable.</summary>
+        public string? RepairType { get; set; }
 
         public string? Attachments { get; set; }
 
@@ -215,7 +257,6 @@ namespace DFile.backend.DTOs
         public string AssetId { get; set; } = string.Empty;
         public string? AssetCode { get; set; }
         public string? AssetName { get; set; }
-        public string? TagNumber { get; set; }
         public string? CategoryName { get; set; }
         public string RoomId { get; set; } = string.Empty;
         public string? RoomCode { get; set; }

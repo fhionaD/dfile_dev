@@ -28,5 +28,19 @@ namespace DFile.backend.Services
 
         /// <summary>Maintenance users: Finance rejected their repair or replacement request.</summary>
         Task NotifyMaintenanceFinanceRejectionAsync(MaintenanceRecord record, CancellationToken cancellationToken = default);
+
+        // ── Subscription lifecycle ────────────────────────────────────────
+
+        /// <summary>Tenant Admin: subscription successfully activated after payment.</summary>
+        Task NotifySubscriptionActivatedAsync(int tenantId, string planName, string billingCycle, DateTime endDate, CancellationToken cancellationToken = default);
+
+        /// <summary>Tenant Admin: subscription is expiring soon. Called for 7-day, 3-day, and 1-day thresholds.</summary>
+        Task NotifySubscriptionExpiringAsync(int tenantId, string planName, DateTime endDate, int daysLeft, CancellationToken cancellationToken = default);
+
+        /// <summary>Tenant Admin: subscription has expired.</summary>
+        Task NotifySubscriptionExpiredAsync(int tenantId, string planName, CancellationToken cancellationToken = default);
+
+        /// <summary>Tenant Admin: payment for subscription failed.</summary>
+        Task NotifyPaymentFailedAsync(int tenantId, string planName, CancellationToken cancellationToken = default);
     }
 }

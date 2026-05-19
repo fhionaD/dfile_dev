@@ -16,7 +16,7 @@ namespace DFile.backend.Services
             int? tenantId,
             int? userId,
             string? userRole,
-            string module,
+            string moduleName,
             string action,
             string entityType,
             string? entityId,

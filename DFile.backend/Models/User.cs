@@ -11,6 +11,8 @@ namespace DFile.backend.Models
         [Required]
         public string FirstName { get; set; } = string.Empty;
 
+        public string? MiddleName { get; set; }
+
         [Required]
         public string LastName { get; set; } = string.Empty;
 
@@ -20,15 +22,26 @@ namespace DFile.backend.Models
         [JsonIgnore]
         public string PasswordHash { get; set; } = string.Empty;
 
-        public string Role { get; set; } = "Admin"; // Super Admin, Admin, Finance, Maintenance
+        public string Role { get; set; } = "Admin"; // Super Admin, Admin, Finance Manager, Maintenance Manager
         public string RoleLabel { get; set; } = string.Empty;
-        public string? Avatar { get; set; }
-        public string Status { get; set; } = "Active"; // Active, Inactive, Archived
+        public string? ContactNumber { get; set; }
+        public string? Address { get; set; }
+        public DateTime? HireDate { get; set; }
+        public string Status { get; set; } = "Active"; // Active, Inactive, Archived, PendingActivation
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [JsonIgnore]
+        public string? ActivationTokenHash { get; set; }
+
+        public DateTime? ActivationTokenExpiry { get; set; }
 
         public int? TenantId { get; set; }
 
         [ForeignKey("TenantId")]
         public Tenant? Tenant { get; set; }
+
+        // Login security fields
+        public int FailedLoginAttempts { get; set; }
+        public DateTime? LockoutEnd { get; set; }
     }
 }

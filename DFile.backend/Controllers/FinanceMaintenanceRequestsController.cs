@@ -38,11 +38,11 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         /// <summary>Finance maintenance APIs are not for pure Maintenance users (UI is Finance/Admin).</summary>
-        private ActionResult? ForbidMaintenanceOnFinanceEndpoints()
+        private ObjectResult? ForbidMaintenanceOnFinanceEndpoints()
         {
             if (!IsMaintenanceJwtRole()) return null;
             return new ObjectResult(new { message = "This endpoint is not available for the Maintenance role." })
@@ -399,6 +399,123 @@ namespace DFile.backend.Controllers
             if (saveReplacement != null) return saveReplacement;
             return NoContent();
         }
+
+        [HttpPost("{id}/approve-repair-financial-impact")]
+        [RequirePermissionOrRoles("Assets", "CanApprove", "Finance")]
+        public async Task<IActionResult> ApproveRepairFinancialImpact(string id, [FromBody] ApproveRepairFinancialImpactDto dto)
+        {
+            var forbid = ForbidMaintenanceOnFinanceEndpoints();
+            if (forbid != null) return forbid;
+
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors.Count > 0)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
+                return BadRequest(new { message = "Validation failed.", errors });
+            }
+
+            var tenantId = GetCurrentTenantId();
+            var userId = GetCurrentUserId();
+
+            // Load maintenance record with asset
+            var record = await _context.MaintenanceRecords
+                .Include(r => r.Asset)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (record == null) return NotFound();
+            if (!IsMaintenanceVisibleToTenant(record, tenantId)) return NotFound();
+
+            // Validate record is an approved repair awaiting financial decision (after "Parts Ready" step)
+            if (!string.Equals(record.Status, "In Progress", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(record.FinanceRequestType, "Repair", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(record.FinanceWorkflowStatus, "Approved", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "This is not an approved repair ready for financial impact decision." });
+
+            // Validate asset exists
+            if (record.Asset == null)
+                return BadRequest(new { message = "Associated asset not found." });
+
+            var decision = (dto.FinanceDecision ?? "").Trim();
+            if (!IsValidFinanceDecision(decision))
+                return BadRequest(new { message = $"Invalid finance decision: {decision}. Valid options: Expense, IncreaseValue, ExtendLife, Both." });
+
+            // Validate conditional fields
+            if ((decision.Equals("IncreaseValue", StringComparison.OrdinalIgnoreCase) ||
+                 decision.Equals("Both", StringComparison.OrdinalIgnoreCase)) && !dto.AdjustmentValue.HasValue)
+                return BadRequest(new { message = "AdjustmentValue is required for IncreaseValue or Both decisions." });
+
+            if ((decision.Equals("ExtendLife", StringComparison.OrdinalIgnoreCase) ||
+                 decision.Equals("Both", StringComparison.OrdinalIgnoreCase)) && !dto.AddedLifeMonths.HasValue)
+                return BadRequest(new { message = "AddedLifeMonths is required for ExtendLife or Both decisions." });
+
+            // Apply asset changes based on decision
+            if (decision.Equals("IncreaseValue", StringComparison.OrdinalIgnoreCase) ||
+                decision.Equals("Both", StringComparison.OrdinalIgnoreCase))
+            {
+                if (dto.AdjustmentValue.HasValue && dto.AdjustmentValue.Value > 0)
+                {
+                    record.Asset.PurchasePrice += dto.AdjustmentValue.Value;
+                    record.Asset.AcquisitionCost = record.Asset.PurchasePrice;
+                }
+            }
+
+            if (decision.Equals("ExtendLife", StringComparison.OrdinalIgnoreCase) ||
+                decision.Equals("Both", StringComparison.OrdinalIgnoreCase))
+            {
+                if (dto.AddedLifeMonths.HasValue && dto.AddedLifeMonths.Value > 0)
+                {
+                    record.Asset.TotalLifeMonths += dto.AddedLifeMonths.Value;
+                }
+            }
+
+            // Recalculate depreciation using new months-based system
+            if (record.Asset.TotalLifeMonths > 0)
+                record.Asset.MonthlyDepreciation = Math.Round((record.Asset.PurchasePrice - (record.Asset.SalvageValue ?? 0)) / record.Asset.TotalLifeMonths, 2);
+            else
+                record.Asset.MonthlyDepreciation = 0;
+
+            // Update maintenance record with finance decision
+            record.FinanceDecision = decision;
+            record.AdjustmentValue = dto.AdjustmentValue;
+            record.AddedLifeMonths = dto.AddedLifeMonths;
+            record.ApprovedBy = userId?.ToString(CultureInfo.InvariantCulture);
+            record.ApprovedAt = DateTime.UtcNow;
+            record.UpdatedAt = DateTime.UtcNow;
+
+            // Mark asset as updated
+            record.Asset.UpdatedAt = DateTime.UtcNow;
+            record.Asset.UpdatedBy = userId;
+
+            _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Approve", "MaintenanceRecord", id,
+                $"Finance approved repair {record.RequestId ?? id} with decision: {decision}. " +
+                (dto.AdjustmentValue.HasValue ? $"Adjusted asset value by ${dto.AdjustmentValue}. " : "") +
+                (dto.AddedLifeMonths.HasValue ? $"Extended useful life by {dto.AddedLifeMonths} months. " : "") +
+                $"New total life: {record.Asset.TotalLifeMonths} months, monthly depreciation: ${record.Asset.MonthlyDepreciation}.");
+
+            var saveResult = await TrySaveMaintenanceFinanceAsync();
+            if (saveResult != null) return saveResult;
+
+            // Return the updated asset to confirm changes were persisted
+            var responseDto = new
+            {
+                assetId = record.Asset.Id,
+                purchasePrice = record.Asset.PurchasePrice,
+                totalLifeMonths = record.Asset.TotalLifeMonths,
+                monthlyDepreciation = record.Asset.MonthlyDepreciation,
+                financeDecision = record.FinanceDecision,
+                adjustmentValue = record.AdjustmentValue,
+                addedLifeMonths = record.AddedLifeMonths,
+                approvedAt = record.ApprovedAt,
+            };
+            return Ok(responseDto);
+        }
+
+        private static bool IsValidFinanceDecision(string decision) =>
+            decision.Equals("Expense", StringComparison.OrdinalIgnoreCase) ||
+            decision.Equals("IncreaseValue", StringComparison.OrdinalIgnoreCase) ||
+            decision.Equals("ExtendLife", StringComparison.OrdinalIgnoreCase) ||
+            decision.Equals("Both", StringComparison.OrdinalIgnoreCase);
 
         [HttpPost("{id}/complete-replacement")]
         [RequirePermissionOrRoles("Assets", "CanApprove", "Finance")]

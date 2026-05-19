@@ -4,10 +4,14 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <!-- Suppress: CA1707/CA1861 = migration auto-generated names/arrays; CA1848 = LoggerMessage perf pattern; CA1708 = namespace case (project name); CA1862 = EF-query StringComparison not translatable -->
+    <NoWarn>CA1707;CA1861;CA1848;CA1708;CA1862;CA1304;CA1311</NoWarn>
     <!-- Prevent dotnet publish from overwriting our custom web.config.
          Without this, the SDK replaces processPath/arguments automatically,
          which breaks self-contained (exe) deployments. -->
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
+    <UserSecretsId>dfile-backend-secrets</UserSecretsId>
   </PropertyGroup>
 
   <!-- Debug: skip native apphost so `dotnet build` does not fail when dfile.backend.exe is still running. -->
@@ -16,9 +20,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Using Include="System.Globalization" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Ensure web.config and wwwroot are always included in publish output -->
     <Content Update="web.config" CopyToPublishDirectory="Always" />
     <Content Update="wwwroot\**" CopyToPublishDirectory="Always" />
+    <!-- Exclude test projects from the main build — the SDK glob would otherwise pick them up -->
+    <Compile Remove="tests\**\*.cs" />
+    <Content Remove="tests\**" />
+    <None Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
   </ItemGroup>
 
   <ItemGroup>

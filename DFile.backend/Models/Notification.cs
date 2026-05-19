@@ -37,7 +37,7 @@ namespace DFile.backend.Models
         [ForeignKey("TenantId")]
         public Tenant? Tenant { get; set; }
 
-        public bool IsRead { get; set; } = false;
+        public bool IsRead { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

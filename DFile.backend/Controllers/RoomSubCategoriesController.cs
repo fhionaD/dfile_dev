@@ -1,4 +1,4 @@
-using DFile.backend.Authorization;
+﻿using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -28,7 +28,7 @@ namespace DFile.backend.Controllers
         private int? GetCurrentUserId()
         {
             var claim = User.FindFirst("UserId")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim);
+            return string.IsNullOrEmpty(claim) ? null : int.Parse(claim, CultureInfo.InvariantCulture);
         }
 
         private static bool IsUniqueConstraintViolation(DbUpdateException ex)
@@ -139,7 +139,7 @@ namespace DFile.backend.Controllers
             if (parentCategory == null)
                 return BadRequest(new { message = "Invalid or archived room category." });
 
-            var nameLower = trimmedName.ToLower();
+            var nameLower = trimmedName.ToLowerInvariant();
 
             var nameExists = await _context.RoomSubCategories.AnyAsync(s =>
                 s.RoomCategoryId == dto.RoomCategoryId &&
@@ -218,9 +218,9 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrWhiteSpace(trimmedName))
                 return BadRequest(new { message = "Sub-category name is required." });
 
-            if (existing.Name.ToLower() != trimmedName.ToLower())
+            if (existing.Name.ToLowerInvariant() != trimmedName.ToLowerInvariant())
             {
-                var nameLower = trimmedName.ToLower();
+                var nameLower = trimmedName.ToLowerInvariant();
 
                 var nameExists = await _context.RoomSubCategories.AnyAsync(s =>
                     s.Id != id &&
@@ -339,7 +339,7 @@ namespace DFile.backend.Controllers
             var nameExists = await _context.RoomSubCategories.AnyAsync(s =>
                 s.Id != id &&
                 s.RoomCategoryId == sub.RoomCategoryId &&
-                s.Name.ToLower() == sub.Name.ToLower() &&
+                s.Name.ToLower() == sub.Name.ToLowerInvariant() &&
                 !s.IsArchived &&
                 (IsSuperAdmin() ? s.TenantId == null : s.TenantId == tenantId));
             if (nameExists)
