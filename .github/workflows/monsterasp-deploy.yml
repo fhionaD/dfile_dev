@@ -159,13 +159,20 @@ jobs:
         exclude: |
           **/app_offline.htm
 
-    # 7. Bring app back online by deleting app_offline.htm
+    # 7. Bring app back online — delete app_offline.htm via FTP using Python ftplib
     - name: Remove app_offline.htm (bring app online)
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./.github/online/
-        server-dir: /wwwroot/
-        dangerous-clean-slate: false
+      shell: python3 {0}
+      env:
+        FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      run: |
+        import ftplib, os
+        ftp = ftplib.FTP(os.environ['FTP_SERVER'])
+        ftp.login(os.environ['FTP_USERNAME'], os.environ['FTP_PASSWORD'])
+        try:
+            ftp.delete('wwwroot/app_offline.htm')
+            print('app_offline.htm deleted — site is online')
+        except ftplib.error_perm as e:
+            print(f'Note: {e}')
+        ftp.quit()
