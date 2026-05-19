@@ -107,35 +107,14 @@ jobs:
       # Produces dfile.backend.dll + web.config in ./publish/ (no bundled runtime = smaller upload).
       run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish
 
-    # 4. Correctly Merge Frontend into Backend wwwroot
-    - name: Copy Frontend to Backend wwwroot
+    # 4. Verify publish output structure before upload
+    - name: Verify publish output
       run: |
-        # Ensure wwwroot directory exists (ASP.NET Core serves static files from here)
-        mkdir -p ./publish/wwwroot
-
-        # Force-copy our custom web.config AFTER dotnet publish.
-        # Even with IsTransformWebConfigDisabled=true, some SDK versions still
-        # generate a default web.config. This guarantees our settings always win.
-        cp DFile.backend/web.config ./publish/web.config
-        echo "=== Deployed web.config (expecting processPath=dotnet, inprocess) ==="
-        cat ./publish/web.config
-
-        # Copy Next.js static export into the backend's wwwroot subdirectory.
-        # With server-dir=/wwwroot/, the final server layout will be:
-        #   /wwwroot/dfile.backend.dll    ← IIS app root (ANCM loads this)
-        #   /wwwroot/web.config           ← IIS reads this to start ANCM
-        #   /wwwroot/wwwroot/index.html   ← ASP.NET Core UseStaticFiles root
-        #   /wwwroot/wwwroot/_next/...    ← served as static files
-        cp -r DFile.frontend/out/* ./publish/wwwroot/
-
-        # Diagnostic marker
-        echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
-
-        # Verify the publish output structure before upload
         echo "=== publish root (goes to server /wwwroot/) ==="
         ls ./publish/*.dll ./publish/web.config ./publish/appsettings.json
         echo "=== publish/wwwroot (goes to server /wwwroot/wwwroot/) ==="
         ls ./publish/wwwroot/index.html ./publish/wwwroot/_next 2>/dev/null || echo "WARNING: index.html or _next missing"
+        echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
 
     # 5. Take app offline — releases IIS file locks so the .dll can be replaced
     - name: Upload app_offline.htm
@@ -156,8 +135,6 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./publish/
         server-dir: /wwwroot/
-        exclude: |
-          **/app_offline.htm
 
     # 7. Bring app back online — delete app_offline.htm via FTP using Python ftplib
     - name: Remove app_offline.htm (bring app online)
