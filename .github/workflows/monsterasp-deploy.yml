@@ -137,7 +137,17 @@ jobs:
         echo "=== publish/wwwroot (goes to server /wwwroot/wwwroot/) ==="
         ls ./publish/wwwroot/index.html ./publish/wwwroot/_next 2>/dev/null || echo "WARNING: index.html or _next missing"
 
-    # 5. Deploy via FTP
+    # 5. Take app offline — releases IIS file locks so the .dll can be replaced
+    - name: Upload app_offline.htm
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./.github/offline/
+        server-dir: /wwwroot/
+
+    # 6. Deploy via FTP (files overwrite in-place; no clean-slate to avoid locked-file errors)
     - name: Deploy to MonsterAsp.net via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
@@ -145,14 +155,17 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./publish/
-        # CRITICAL: server-dir must be the IIS web root, NOT the FTP root.
-        # On MonsterASP.NET the FTP root is the account home directory.
-        # The IIS web root (where web.config and .dll must live) is /wwwroot/.
-        # Without this, dfile.backend.dll and web.config land outside the IIS
-        # application directory and ANCM never starts — every /api/* call gets
-        # an IIS-native "404 File or directory not found" response.
         server-dir: /wwwroot/
-        # Wipe the server-dir clean before uploading. This removes stale files
-        # (old JS chunks, old self-contained exe, leftover deploys) so the server
-        # always matches exactly what was just built — no ghost files.
-        dangerous-clean-slate: true
+        exclude: |
+          **/app_offline.htm
+
+    # 7. Bring app back online by deleting app_offline.htm
+    - name: Remove app_offline.htm (bring app online)
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./.github/online/
+        server-dir: /wwwroot/
+        dangerous-clean-slate: false
