@@ -134,7 +134,7 @@ namespace DFile.backend.Controllers
                     {
                         success = false,
                         message = result.IsSuspicious
-                            ? "Invalid credentials. Suspicious activity detected â€” a security email has been sent to your account."
+                            ? "Invalid credentials. Suspicious activity detected — a security email has been sent to your account."
                             : "Invalid credentials.",
                         attemptsLeft = result.AttemptsLeft,
                         cooldownMinutes = 0,

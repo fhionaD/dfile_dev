@@ -33,7 +33,8 @@ namespace DFile.backend.Services
             {
                 user.LockoutEnd = null;
                 user.FailedLoginAttempts = 0;
-                await _context.SaveChangesAsync();
+                try { await _context.SaveChangesAsync(); }
+                catch (Exception ex) { _logger.LogError(ex, "Failed to clear expired lockout for user {UserId}", user.Id); }
             }
 
             return false;
@@ -119,7 +120,8 @@ namespace DFile.backend.Services
         {
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to reset failed attempts for user {UserId}", user.Id); }
         }
 
         public string GenerateDeviceFingerprint(string? userAgent, string? ipAddress)
