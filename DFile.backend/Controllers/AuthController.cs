@@ -68,7 +68,8 @@ namespace DFile.backend.Controllers
                         AttemptedAt = DateTime.UtcNow,
                         FailureReason = "User not found"
                     });
-                    await _context.SaveChangesAsync();
+                    try { await _context.SaveChangesAsync(); }
+                    catch (Exception ex) { _logger.LogError(ex, "Failed to save anonymous login audit for {Email}", emailNormalized); }
                     return Unauthorized(new { success = false, message = "Invalid credentials.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
                 }
 
@@ -166,7 +167,8 @@ namespace DFile.backend.Controllers
                         AttemptedAt = DateTime.UtcNow,
                         TenantId = user.TenantId
                     });
-                    await _context.SaveChangesAsync();
+                    try { await _context.SaveChangesAsync(); }
+                    catch (Exception ex) { _logger.LogError(ex, "Failed to save new-device audit for user {UserId}", user.Id); }
 
                     try
                     {

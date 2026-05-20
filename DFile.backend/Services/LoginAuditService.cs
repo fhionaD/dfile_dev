@@ -52,7 +52,8 @@ namespace DFile.backend.Services
                 isNowLocked = true;
             }
 
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to save failed-attempt count for user {UserId}", user.Id); }
 
             var audit = new UserLoginAudit
             {
@@ -67,7 +68,8 @@ namespace DFile.backend.Services
                 TenantId = user.TenantId
             };
             _context.UserLoginAudits.Add(audit);
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to save login audit record for user {UserId}", user.Id); }
 
             // Send security alert on suspicious threshold
             if (isSuspicious)
@@ -109,7 +111,8 @@ namespace DFile.backend.Services
                 TenantId = user.TenantId
             };
             _context.UserLoginAudits.Add(audit);
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to save login success audit for user {UserId}", user.Id); }
         }
 
         public async Task ResetFailedAttemptsAsync(User user)
@@ -155,7 +158,8 @@ namespace DFile.backend.Services
                 });
             }
 
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to save trusted device for user {UserId}", userId); }
         }
     }
 }
