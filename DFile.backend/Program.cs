@@ -81,8 +81,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 // Authentication
-var jwtKey = builder.Configuration["Jwt:Key"]
-    ?? throw new InvalidOperationException("JWT key is not configured. Set Jwt:Key in appsettings or environment variables.");
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("JWT key is not configured or is empty. Set Jwt:Key in appsettings or environment variables.");
 var key = Encoding.ASCII.GetBytes(jwtKey);
 builder.Services.AddAuthentication(options =>
 {
@@ -91,7 +92,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = true;
+    options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -237,8 +238,6 @@ app.UseExceptionHandler(errApp =>
         });
     });
 });
-app.UseDefaultFiles();
-
 // Rewrite Next.js RSC payload dot-notation URLs to their directory equivalents.
 // The static export generates: /login/__next.!KGF1dGgp/login.txt
 // The client router requests: /login/__next.!KGF1dGgp.login.txt
@@ -287,8 +286,6 @@ if (app.Environment.IsDevelopment())
 }
 app.UseStaticFiles(staticFileOptions);
 
-app.UseHttpsRedirection();
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -306,18 +303,6 @@ app.MapControllers();
 
 // Health endpoint
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
-
-// SMTP test endpoint — Super Admin only
-app.MapGet("/api/test-email", async (IEmailService email) =>
-{
-    await email.SendEmailAsync(
-        "fhionadominic.escurzon@email.com",
-        "SMTP Test",
-        "<h1>Email Working</h1>"
-    );
-
-    return Results.Ok("Email sent");
-}).RequireAuthorization(policy => policy.RequireRole("Super Admin"));
 
 // DB test endpoint — Super Admin only, error message sanitized
 if (app.Environment.IsDevelopment())
