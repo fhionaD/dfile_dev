@@ -20,6 +20,8 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: DFile.frontend/package-lock.json
 
     - name: Install Frontend Dependencies
       working-directory: ./DFile.frontend
@@ -38,6 +40,14 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('DFile.backend/**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
 
     # Inject production secrets into appsettings.Production.json before publish.
     # Values come from GitHub repository secrets (Settings → Secrets and variables → Actions).
@@ -101,11 +111,14 @@ jobs:
         }
         EOF
 
+    - name: Restore Backend Dependencies
+      run: dotnet restore DFile.backend/dfile.backend.csproj
+
     - name: Publish Backend
       # Framework-dependent publish — relies on the server's installed .NET 8 runtime.
       # MonsterASP.NET FreeSite plan has .NET 8 LTS installed.
       # Produces dfile.backend.dll + web.config in ./publish/ (no bundled runtime = smaller upload).
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish
+      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish --no-restore
 
     # 4. Verify publish output structure before upload
     - name: Verify publish output
