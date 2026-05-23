@@ -118,7 +118,10 @@ builder.Services.AddCors(options =>
         else
         {
             var frontendOrigin = builder.Configuration["AllowedOrigins:Frontend"] ?? "";
-            corsBuilder.WithOrigins(frontendOrigin).AllowAnyMethod().AllowAnyHeader();
+            if (!string.IsNullOrWhiteSpace(frontendOrigin))
+                corsBuilder.WithOrigins(frontendOrigin).AllowAnyMethod().AllowAnyHeader();
+            else
+                corsBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
         }
     });
 });

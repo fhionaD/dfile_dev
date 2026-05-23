@@ -115,9 +115,17 @@ namespace DFile.backend.Controllers
                 if (!passwordMatches)
                 {
                     _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
-                    var result = await _loginAudit.RecordFailedAttemptAsync(user, ipAddress, userAgent, "Invalid password");
+                    LoginAttemptResult? result = null;
+                    try
+                    {
+                        result = await _loginAudit.RecordFailedAttemptAsync(user, ipAddress, userAgent, "Invalid password");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to record login attempt for user {UserId}", user.Id);
+                    }
 
-                    if (result.IsLocked)
+                    if (result?.IsLocked == true)
                     {
                         return StatusCode(429, new
                         {
@@ -133,13 +141,13 @@ namespace DFile.backend.Controllers
                     return Unauthorized(new
                     {
                         success = false,
-                        message = result.IsSuspicious
+                        message = result?.IsSuspicious == true
                             ? "Invalid credentials. Suspicious activity detected — a security email has been sent to your account."
                             : "Invalid credentials.",
-                        attemptsLeft = result.AttemptsLeft,
+                        attemptsLeft = result?.AttemptsLeft ?? 0,
                         cooldownMinutes = 0,
-                        securityAlertSent = result.SecurityAlertSent,
-                        isSuspicious = result.IsSuspicious
+                        securityAlertSent = result?.SecurityAlertSent ?? false,
+                        isSuspicious = result?.IsSuspicious ?? false
                     });
                 }
 

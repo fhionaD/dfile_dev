@@ -18,31 +18,30 @@ namespace DFile.backend.Services
 
         public async Task SendEmailAsync(string recipient, string subject, string html)
         {
-            using var client = new SmtpClient(_smtp.Host, _smtp.Port)
-            {
-                Credentials = new NetworkCredential(_smtp.Email, _smtp.Password),
-                EnableSsl = true,
-                DeliveryMethod = SmtpDeliveryMethod.Network
-            };
-
-            using var message = new MailMessage
-            {
-                From = new MailAddress(_smtp.Email, "DFile System"),
-                Subject = subject,
-                Body = html,
-                IsBodyHtml = true
-            };
-            message.To.Add(recipient);
-
             try
             {
+                using var client = new SmtpClient(_smtp.Host, _smtp.Port)
+                {
+                    Credentials = new NetworkCredential(_smtp.Email, _smtp.Password),
+                    EnableSsl = true,
+                    DeliveryMethod = SmtpDeliveryMethod.Network
+                };
+
+                using var message = new MailMessage
+                {
+                    From = new MailAddress(_smtp.Email ?? "", "DFile System"),
+                    Subject = subject,
+                    Body = html,
+                    IsBodyHtml = true
+                };
+                message.To.Add(recipient);
+
                 await client.SendMailAsync(message);
                 _logger.LogInformation("Email sent to {Recipient} with subject '{Subject}'", recipient, subject);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send email to {Recipient}", recipient);
-                throw;
             }
         }
 
