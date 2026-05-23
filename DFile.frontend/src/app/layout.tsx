@@ -6,7 +6,6 @@ import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import QueryProvider from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { GlobalErrorBanner } from "@/components/global-error-banner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -53,7 +52,6 @@ if(typeof MutationObserver!=="undefined"&&document.documentElement){
               enableSystem
               disableTransitionOnChange
             >
-              <GlobalErrorBanner />
               {children}
               <Toaster />
             </ThemeProvider>

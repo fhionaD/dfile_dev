@@ -150,22 +150,15 @@ if (!skipMigrations)
         using var migrateScope = app.Services.CreateScope();
         var db = migrateScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var migrateLogger = migrateScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        if (db.Database.CanConnect())
-        {
-            migrateLogger.LogInformation("Applying EF Core migrations...");
-            db.Database.Migrate();
-            migrateLogger.LogInformation("EF Core migrations applied.");
-        }
-        else
-        {
-            migrateLogger.LogWarning("Database not reachable; skipping migrations until connection is available.");
-        }
+        migrateLogger.LogInformation("Applying EF Core migrations...");
+        db.Database.Migrate();
+        migrateLogger.LogInformation("EF Core migrations applied successfully.");
     }
     catch (Exception ex)
     {
         var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
         var log = loggerFactory.CreateLogger("Program");
-        log.LogError(ex, "EF Core migrations failed.");
+        log.LogError(ex, "EF Core migrations failed — app will not start to prevent running against a stale schema.");
         throw;
     }
 }
