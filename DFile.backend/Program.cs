@@ -317,6 +317,32 @@ app.MapControllers();
 // Health endpoint
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 
+// Diagnostic endpoint — tests DB and scoped DI without the MVC controller pipeline.
+// Returns a plain-text status that reveals what's actually failing.
+app.MapGet("/api/diag", async (IServiceProvider sp) =>
+{
+    var results = new System.Text.StringBuilder();
+    try
+    {
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        try
+        {
+            var canConnect = db.Database.CanConnect();
+            results.Append($"db_connect:{canConnect};");
+        }
+        catch (Exception ex) { results.Append($"db_connect_err:{ex.GetType().Name};"); }
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync("SELECT 1");
+            results.Append("db_query:ok;");
+        }
+        catch (Exception ex) { results.Append($"db_query_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"); }
+    }
+    catch (Exception ex) { results.Append($"scope_err:{ex.GetType().Name};"); }
+    return Results.Ok(results.ToString());
+});
+
 // DB test endpoint — Super Admin only, error message sanitized
 if (app.Environment.IsDevelopment())
 {
