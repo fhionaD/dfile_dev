@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,7 +93,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -108,14 +109,28 @@ builder.Services.AddAuthentication(options =>
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        builder => builder
-        .AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader());
+    options.AddPolicy("AllowAll", corsBuilder =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            corsBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        }
+        else
+        {
+            var frontendOrigin = builder.Configuration["AllowedOrigins:Frontend"] ?? "";
+            corsBuilder.WithOrigins(frontendOrigin).AllowAnyMethod().AllowAnyHeader();
+        }
+    });
 });
 
 builder.Services.AddAuthorization();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 var duplicateRequestLocks = new ConcurrentDictionary<string, DateTime>();
@@ -158,7 +173,8 @@ else
         "DFILE_SKIP_MIGRATIONS=1: skipping EF Core Migrate() at startup.");
 }
 
-// Seed initial test data (non-critical, errors are caught)
+// Seed initial test data — development only
+if (app.Environment.IsDevelopment())
 _ = Task.Run(async () =>
 {
     try
@@ -224,6 +240,7 @@ _ = Task.Run(async () =>
 });
 
 // Configure the HTTP request pipeline
+app.UseForwardedHeaders();
 app.UseExceptionHandler(errApp =>
 {
     errApp.Run(async context =>
