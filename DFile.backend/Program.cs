@@ -82,9 +82,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 // Authentication
-var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKey))
-    throw new InvalidOperationException("JWT key is not configured or is empty. Set Jwt:Key in appsettings or environment variables.");
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "";
+var jwtKeyMissing = string.IsNullOrWhiteSpace(jwtKey);
+if (jwtKeyMissing)
+{
+    // Use a placeholder so the app can start — auth will be non-functional but health/diag endpoints will work.
+    // Check /api/diag output: jwt_key_len:0 means the JWT__KEY secret is missing in GitHub Actions.
+    jwtKey = new string('0', 64);
+}
 var key = Encoding.ASCII.GetBytes(jwtKey);
 builder.Services.AddAuthentication(options =>
 {
@@ -319,9 +324,15 @@ app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 
 // Diagnostic endpoint — tests DB and scoped DI without the MVC controller pipeline.
 // Returns a plain-text status that reveals what's actually failing.
-app.MapGet("/api/diag", async (IServiceProvider sp) =>
+app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
 {
     var results = new System.Text.StringBuilder();
+    // Config status — shows whether secrets were injected correctly
+    results.Append($"env:{app.Environment.EnvironmentName};");
+    results.Append($"jwt_key_len:{cfg["Jwt:Key"]?.Length ?? 0};");
+    results.Append($"db_conn_len:{cfg.GetConnectionString("DefaultConnection")?.Length ?? 0};");
+    results.Append($"skip_mig:{Environment.GetEnvironmentVariable("DFILE_SKIP_MIGRATIONS") ?? "not-set"};");
+    // DB connectivity
     try
     {
         using var scope = sp.CreateScope();

@@ -120,6 +120,10 @@ jobs:
       # Produces dfile.backend.dll + web.config in ./publish/ (no bundled runtime = smaller upload).
       run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish --no-restore
 
+    # 4a. Create logs directory so stdoutLogEnabled=true does not crash the app
+    - name: Create logs directory in publish output
+      run: mkdir -p ./publish/logs
+
     # 4. Verify publish output structure before upload
     - name: Verify publish output
       run: |
