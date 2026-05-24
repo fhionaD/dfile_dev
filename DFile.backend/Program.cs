@@ -379,6 +379,8 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
     {
         results.Append($"jwt_configured:{(!string.IsNullOrWhiteSpace(cfg["Jwt:Key"])).ToString().ToLowerInvariant()};");
         results.Append($"db_configured:{(!string.IsNullOrWhiteSpace(cfg.GetConnectionString("DefaultConnection"))).ToString().ToLowerInvariant()};");
+        results.Append($"google_configured:{(!string.IsNullOrWhiteSpace(cfg["Google:ClientId"])).ToString().ToLowerInvariant()};");
+        results.Append($"google_base_url_configured:{(!string.IsNullOrWhiteSpace(cfg["Google:BackendBaseUrl"])).ToString().ToLowerInvariant()};");
     }
 
     try
