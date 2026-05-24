@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types/asset";
+import { isAxiosError } from "axios";
 import api from "@/lib/api"; // Centralized API client
 import { globalQueryClient } from "@/components/query-provider";
 
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } as { attemptsLeft?: number; cooldownSeconds?: number; isSuspicious?: boolean; securityAlertSent?: boolean };
         } catch (error: unknown) {
             // Thrown above (e.g. invalid role) is a normal Error — not an Axios failure; do not map to "cannot reach API".
-            if (!axios.isAxiosError(error)) {
+            if (!isAxiosError(error)) {
                 throw error instanceof Error
                     ? error
                     : new Error("Sign-in failed. Please try again.");
