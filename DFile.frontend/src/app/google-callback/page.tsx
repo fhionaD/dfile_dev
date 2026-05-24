@@ -33,8 +33,10 @@ export default function GoogleCallbackPage() {
         processedRef.current = true;
 
         const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
         const error = params.get("error");
+        // Backend sends the JWT as a hash fragment (#<token>) to keep it out of server access logs.
+        const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+        const token = rawHash ? decodeURIComponent(rawHash) : null;
 
         if (error || !token) {
             const msg = ERROR_MESSAGES[error ?? ""] ?? "Google sign-in failed. Please try again.";
