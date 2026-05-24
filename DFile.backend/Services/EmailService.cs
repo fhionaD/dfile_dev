@@ -18,18 +18,25 @@ namespace DFile.backend.Services
 
         public async Task SendEmailAsync(string recipient, string subject, string html)
         {
+            if (string.IsNullOrWhiteSpace(_smtp.Email) || string.IsNullOrWhiteSpace(_smtp.Host))
+            {
+                _logger.LogWarning("Email not sent to {Recipient}: SMTP is not configured (SmtpSettings__Email or SmtpSettings__Host missing).", recipient);
+                return;
+            }
+
             try
             {
                 using var client = new SmtpClient(_smtp.Host, _smtp.Port)
                 {
                     Credentials = new NetworkCredential(_smtp.Email, _smtp.Password),
                     EnableSsl = true,
-                    DeliveryMethod = SmtpDeliveryMethod.Network
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 30_000 // 30 s — prevent indefinite thread-pool hold on SMTP unreachable
                 };
 
                 using var message = new MailMessage
                 {
-                    From = new MailAddress(_smtp.Email ?? "", "DFile System"),
+                    From = new MailAddress(_smtp.Email, "DFile System"),
                     Subject = subject,
                     Body = html,
                     IsBodyHtml = true

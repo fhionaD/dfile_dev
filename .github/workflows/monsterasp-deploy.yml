@@ -6,16 +6,56 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-deploy:
+  # ────────────────────────────────────────────────────────────────
+  # JOB 1: Run backend unit tests — fail fast before building artifacts
+  # ────────────────────────────────────────────────────────────────
+  test-backend:
+    name: Backend Tests
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('DFile.backend/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore backend dependencies
+        working-directory: ./DFile.backend
+        run: dotnet restore
+
+      - name: Run backend tests
+        working-directory: ./DFile.backend/tests/DFile.Backend.Tests
+        run: dotnet test --no-restore --verbosity normal
+
+  # ────────────────────────────────────────────────────────────────
+  # JOB 2: Build frontend + backend, inject secrets, deploy
+  # Depends on test-backend passing.
+  # ────────────────────────────────────────────────────────────────
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    needs: test-backend
 
     steps:
-    # 1. Checkout Code
+    # ── Step 1: Checkout ────────────────────────────────────────────
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. Setup Node.js and Build Frontend
+    # ── Step 2: Frontend Build ──────────────────────────────────────
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -23,20 +63,37 @@ jobs:
         cache: 'npm'
         cache-dependency-path: DFile.frontend/package-lock.json
 
-    - name: Install Frontend Dependencies
+    - name: Restore Next.js build cache
+      uses: actions/cache@v4
+      with:
+        path: DFile.frontend/.next/cache
+        # Invalidate when package-lock or any source file changes.
+        key: ${{ runner.os }}-nextjs-${{ hashFiles('DFile.frontend/package-lock.json') }}-${{ hashFiles('DFile.frontend/src/**/*') }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-${{ hashFiles('DFile.frontend/package-lock.json') }}-
+
+    - name: Install frontend dependencies
       working-directory: ./DFile.frontend
       run: npm ci --legacy-peer-deps
 
-    - name: Build Frontend (Next.js)
+    - name: Build frontend (Next.js static export)
       working-directory: ./DFile.frontend
       env:
-        # IMPORTANT: Keep this empty for relative paths in "Static Export" mode
-        # or use the full URL if you prefer. Relative is safest for same-domain hosting.
-        NEXT_PUBLIC_API_URL: "" 
+        # Must be empty for same-origin deployment — frontend and API share the same host.
+        # Only set this if frontend is served from a different host than the ASP.NET Core backend.
+        NEXT_PUBLIC_API_URL: ""
+        NODE_ENV: production
       run: npm run build
 
-    # 3. Setup .NET and Build Backend
-    - name: Setup .NET Core
+    - name: Verify frontend output
+      run: |
+        test -f DFile.frontend/out/index.html || { echo "FATAL: out/index.html not found — Next.js static export did not produce output"; exit 1; }
+        test -d DFile.backend/wwwroot         || { echo "FATAL: wwwroot not populated — postbuild copy-wwwroot.cjs may have failed"; exit 1; }
+        test -f DFile.backend/wwwroot/index.html || { echo "FATAL: wwwroot/index.html missing after postbuild copy"; exit 1; }
+        echo "Frontend output verified: $(find DFile.backend/wwwroot -name '*.html' | wc -l) HTML files."
+
+    # ── Step 3: Backend Build & Test ───────────────────────────────
+    - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
@@ -49,127 +106,228 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
 
-    # Inject production secrets into appsettings.Production.json before publish.
-    # Values come from GitHub repository secrets (Settings → Secrets and variables → Actions).
-    - name: Write production appsettings
-      shell: bash
-      env:
-        DB_CONNECTION: ${{ secrets.CONNECTIONSTRINGS__DEFAULTCONNECTION }}
-        JWT_KEY: ${{ secrets.JWT__KEY }}
-        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE__CLIENTID }}
-        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE__CLIENTSECRET }}
-        GOOGLE_BACKEND_BASE_URL: ${{ secrets.APP_BASE_URL }}
-        PAYMONGO_SECRET_KEY: ${{ secrets.PAYMONGO__SECRETKEY }}
-        PAYMONGO_PUBLIC_KEY: ${{ secrets.PAYMONGO__PUBLICKEY }}
-        PAYMONGO_WEBHOOK_SECRET: ${{ secrets.PAYMONGO__WEBHOOKSECRET }}
-        PAYMENT_APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-        SMTP_HOST: ${{ secrets.SMTPSETTINGS__HOST }}
-        SMTP_PORT: ${{ secrets.SMTPSETTINGS__PORT }}
-        SMTP_EMAIL: ${{ secrets.SMTPSETTINGS__EMAIL }}
-        SMTP_PASSWORD: ${{ secrets.SMTPSETTINGS__PASSWORD }}
-        FRONTEND_ORIGIN: ${{ secrets.APP_BASE_URL }}
+    - name: Restore backend dependencies
+      working-directory: ./DFile.backend
+      run: dotnet restore
+
+    - name: Build backend (verify no compile errors before publish)
+      working-directory: ./DFile.backend
+      run: dotnet build dfile.backend.csproj -c Release --no-restore
+
+    - name: Publish backend (Release, framework-dependent)
+      working-directory: ./DFile.backend
       run: |
-        cat > DFile.backend/appsettings.Production.json << EOF
-        {
-          "Logging": {
-            "LogLevel": {
-              "Default": "Warning",
-              "Microsoft.AspNetCore": "Warning"
-            }
-          },
-          "ConnectionStrings": {
-            "DefaultConnection": "$DB_CONNECTION"
-          },
-          "Jwt": {
-            "Key": "$JWT_KEY",
-            "ExpirationMinutes": 30,
-            "Issuer": "DFile",
-            "Audience": "DFile"
-          },
-          "Google": {
-            "ClientId": "$GOOGLE_CLIENT_ID",
-            "ClientSecret": "$GOOGLE_CLIENT_SECRET",
-            "BackendBaseUrl": "$GOOGLE_BACKEND_BASE_URL"
-          },
-          "PayMongo": {
-            "SecretKey": "$PAYMONGO_SECRET_KEY",
-            "PublicKey": "$PAYMONGO_PUBLIC_KEY",
-            "WebhookSecret": "$PAYMONGO_WEBHOOK_SECRET"
-          },
-          "Payment": {
-            "AppBaseUrl": "$PAYMENT_APP_BASE_URL"
-          },
-          "SmtpSettings": {
-            "Host": "$SMTP_HOST",
-            "Port": $SMTP_PORT,
-            "Email": "$SMTP_EMAIL",
-            "Password": "$SMTP_PASSWORD"
-          },
-          "AllowedOrigins": {
-            "Frontend": "$FRONTEND_ORIGIN"
-          }
-        }
-        EOF
+        dotnet publish dfile.backend.csproj \
+          -c Release \
+          --no-restore \
+          --no-build \
+          -o ../publish
 
-    - name: Restore Backend Dependencies
-      run: dotnet restore DFile.backend/dfile.backend.csproj
-
-    - name: Publish Backend
-      # Framework-dependent publish — relies on the server's installed .NET 8 runtime.
-      # MonsterASP.NET FreeSite plan has .NET 8 LTS installed.
-      # Produces dfile.backend.dll + web.config in ./publish/ (no bundled runtime = smaller upload).
-      run: dotnet publish DFile.backend/dfile.backend.csproj -c Release -o ./publish --no-restore
-
-    # 4a. Create logs directory so stdoutLogEnabled=true does not crash the app
-    - name: Create logs directory in publish output
+    # ── Step 4: Assemble deployment artifact ───────────────────────
+    - name: Create logs directory (ANCM requires this for stdoutLogEnabled=true)
       run: |
         mkdir -p ./publish/logs
-        # FTP deploy skips empty directories — placeholder ensures logs/ is transferred
-        echo "Log directory" > ./publish/logs/.logdir
+        # Placeholder prevents the directory from being skipped by FTP action (empty dirs are not uploaded).
+        touch ./publish/logs/.gitkeep
 
-    # 4. Verify publish output structure before upload
-    - name: Verify publish output
+    - name: Inject production secrets into web.config
+      env:
+        PROD_DB_CONNECTION:           ${{ secrets.CONNECTIONSTRINGS__DEFAULTCONNECTION }}
+        PROD_JWT_KEY:                 ${{ secrets.JWT__KEY }}
+        PROD_APP_BASE_URL:            ${{ secrets.APP_BASE_URL }}
+        PROD_GOOGLE_CLIENT_ID:        ${{ secrets.GOOGLE__CLIENTID }}
+        PROD_GOOGLE_CLIENT_SECRET:    ${{ secrets.GOOGLE__CLIENTSECRET }}
+        PROD_PAYMONGO_SECRET_KEY:     ${{ secrets.PAYMONGO__SECRETKEY }}
+        PROD_PAYMONGO_PUBLIC_KEY:     ${{ secrets.PAYMONGO__PUBLICKEY }}
+        PROD_PAYMONGO_WEBHOOK_SECRET: ${{ secrets.PAYMONGO__WEBHOOKSECRET }}
+        PROD_SMTP_HOST:               ${{ secrets.SMTPSETTINGS__HOST }}
+        PROD_SMTP_PORT:               ${{ secrets.SMTPSETTINGS__PORT }}
+        PROD_SMTP_EMAIL:              ${{ secrets.SMTPSETTINGS__EMAIL }}
+        PROD_SMTP_PASSWORD:           ${{ secrets.SMTPSETTINGS__PASSWORD }}
       run: |
-        echo "=== publish root (goes to server /wwwroot/) ==="
-        ls ./publish/*.dll ./publish/web.config ./publish/appsettings.json
-        echo "=== publish/wwwroot (goes to server /wwwroot/wwwroot/) ==="
-        ls ./publish/wwwroot/index.html ./publish/wwwroot/_next 2>/dev/null || echo "WARNING: index.html or _next missing"
-        echo "Deployed: $(date -u)" > ./publish/deploy-check.txt
+        python3 << 'PYEOF'
+        import os, xml.sax.saxutils as saxutils, sys
 
-    # 5. Take app offline — releases IIS file locks so the .dll can be replaced
-    - name: Upload app_offline.htm
+        def e(v):
+            """XML-escape a secret value so it is safe as an XML attribute value."""
+            return saxutils.escape(v or "", {'"': '&quot;', "'": '&apos;'})
+
+        # Validate required secrets — fail hard before FTP upload starts
+        required = {
+            "PROD_DB_CONNECTION":  "CONNECTIONSTRINGS__DEFAULTCONNECTION",
+            "PROD_JWT_KEY":        "JWT__KEY",
+            "PROD_APP_BASE_URL":   "APP_BASE_URL",
+            "PROD_SMTP_HOST":      "SMTPSETTINGS__HOST",
+            "PROD_SMTP_PORT":      "SMTPSETTINGS__PORT",
+            "PROD_SMTP_EMAIL":     "SMTPSETTINGS__EMAIL",
+            "PROD_SMTP_PASSWORD":  "SMTPSETTINGS__PASSWORD",
+        }
+        missing = [secret_name for env_var, secret_name in required.items() if not os.environ.get(env_var)]
+        if missing:
+            print(f"FATAL: The following GitHub Secrets are not set: {', '.join(missing)}", file=sys.stderr)
+            print("Go to: Settings → Secrets and variables → Actions → New repository secret", file=sys.stderr)
+            sys.exit(1)
+
+        # Validate JWT key length — HMAC-SHA256 requires at least 32 bytes (256 bits)
+        jwt_key = os.environ["PROD_JWT_KEY"]
+        if len(jwt_key) < 32:
+            print(f"FATAL: JWT__KEY is {len(jwt_key)} characters. Minimum required is 32 for HMAC-SHA256.", file=sys.stderr)
+            sys.exit(1)
+
+        app_base_url = os.environ["PROD_APP_BASE_URL"].rstrip('/')
+
+        new_vars = (
+            f'          <environmentVariable name="ConnectionStrings__DefaultConnection" value="{e(os.environ["PROD_DB_CONNECTION"])}" />\n'
+            f'          <environmentVariable name="Jwt__Key" value="{e(jwt_key)}" />\n'
+            f'          <environmentVariable name="Jwt__Issuer" value="DFile" />\n'
+            f'          <environmentVariable name="Jwt__Audience" value="DFile" />\n'
+            f'          <environmentVariable name="Jwt__ExpirationMinutes" value="30" />\n'
+            f'          <environmentVariable name="Google__ClientId" value="{e(os.environ.get("PROD_GOOGLE_CLIENT_ID", ""))}" />\n'
+            f'          <environmentVariable name="Google__ClientSecret" value="{e(os.environ.get("PROD_GOOGLE_CLIENT_SECRET", ""))}" />\n'
+            f'          <environmentVariable name="Google__BackendBaseUrl" value="{e(app_base_url)}" />\n'
+            f'          <environmentVariable name="PayMongo__SecretKey" value="{e(os.environ.get("PROD_PAYMONGO_SECRET_KEY", ""))}" />\n'
+            f'          <environmentVariable name="PayMongo__PublicKey" value="{e(os.environ.get("PROD_PAYMONGO_PUBLIC_KEY", ""))}" />\n'
+            f'          <environmentVariable name="PayMongo__WebhookSecret" value="{e(os.environ.get("PROD_PAYMONGO_WEBHOOK_SECRET", ""))}" />\n'
+            f'          <environmentVariable name="Payment__AppBaseUrl" value="{e(app_base_url)}" />\n'
+            f'          <environmentVariable name="SmtpSettings__Host" value="{e(os.environ["PROD_SMTP_HOST"])}" />\n'
+            f'          <environmentVariable name="SmtpSettings__Port" value="{e(os.environ["PROD_SMTP_PORT"])}" />\n'
+            f'          <environmentVariable name="SmtpSettings__Email" value="{e(os.environ["PROD_SMTP_EMAIL"])}" />\n'
+            f'          <environmentVariable name="SmtpSettings__Password" value="{e(os.environ["PROD_SMTP_PASSWORD"])}" />\n'
+            f'          <environmentVariable name="AllowedOrigins__Frontend" value="{e(app_base_url)}" />\n'
+        )
+
+        path = 'publish/web.config'
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        if '</environmentVariables>' not in content:
+            print("FATAL: </environmentVariables> marker not found in publish/web.config.", file=sys.stderr)
+            print("This means dotnet publish overwrote the custom web.config. Check IsTransformWebConfigDisabled=true in .csproj", file=sys.stderr)
+            sys.exit(1)
+
+        content = content.replace(
+            '</environmentVariables>',
+            new_vars + '        </environmentVariables>'
+        )
+
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        print(f"web.config secrets injected successfully ({len(new_vars.splitlines())} environment variables added).")
+        print(f"APP_BASE_URL set to: {app_base_url}")
+        PYEOF
+
+    # ── Step 5: Validate full publish artifact ──────────────────────
+    - name: Validate publish artifact
+      run: |
+        echo "=== Validating publish artifact ==="
+
+        # Critical DLL must exist
+        test -f publish/dfile.backend.dll  || { echo "FATAL: dfile.backend.dll not found in publish/"; exit 1; }
+
+        # web.config must exist and have secrets injected
+        test -f publish/web.config         || { echo "FATAL: web.config not found in publish/"; exit 1; }
+        grep -q "ConnectionStrings__DefaultConnection" publish/web.config || { echo "FATAL: DB connection string was not injected into web.config"; exit 1; }
+        grep -q "Jwt__Key" publish/web.config                             || { echo "FATAL: JWT key was not injected into web.config"; exit 1; }
+
+        # Frontend must be embedded in wwwroot
+        test -f publish/wwwroot/index.html || { echo "FATAL: publish/wwwroot/index.html missing — frontend not bundled"; exit 1; }
+
+        # Log directory must exist for ANCM stdout logging
+        test -d publish/logs               || { echo "FATAL: publish/logs/ directory missing — ANCM will fail to start (500.30)"; exit 1; }
+
+        # Stamp build time for traceability
+        echo "Build: $(date -u '+%Y-%m-%d %H:%M:%S UTC') | Commit: ${GITHUB_SHA:0:8} | Ref: ${GITHUB_REF_NAME}" > ./publish/BUILD_INFO.txt
+
+        echo "=== All artifact checks passed ==="
+        echo "DLL:        $(du -sh publish/dfile.backend.dll)"
+        echo "wwwroot:    $(find publish/wwwroot -name '*.html' | wc -l) HTML files, $(find publish/wwwroot -name '*.js' | wc -l) JS files"
+        echo "Total size: $(du -sh publish/ | cut -f1)"
+
+    # ── Step 6: Deploy ──────────────────────────────────────────────
+    - name: Upload app_offline.htm (take site offline, release IIS file locks)
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
+        server:    ${{ secrets.FTP_SERVER }}
+        username:  ${{ secrets.FTP_USERNAME }}
+        password:  ${{ secrets.FTP_PASSWORD }}
         local-dir: ./.github/offline/
         server-dir: /wwwroot/
 
-    # 6. Deploy via FTP (files overwrite in-place; no clean-slate to avoid locked-file errors)
     - name: Deploy to MonsterAsp.net via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./publish/
+        server:    ${{ secrets.FTP_SERVER }}
+        username:  ${{ secrets.FTP_USERNAME }}
+        password:  ${{ secrets.FTP_PASSWORD }}
+        local-dir:  ./publish/
         server-dir: /wwwroot/
+        # Never use dangerous-clean-slate=true on shared hosting.
+        # IIS holds locks on running DLLs — a clean-slate delete will fail mid-transfer.
+        # Instead rely on overwrite semantics: existing files are replaced, new files are added.
+        dangerous-clean-slate: false
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          **/logs/*.log
+          **/appsettings.Development.json
 
-    # 7. Bring app back online — delete app_offline.htm via FTP using Python ftplib
-    - name: Remove app_offline.htm (bring app online)
+    - name: Remove app_offline.htm (bring site back online)
       shell: python3 {0}
       env:
-        FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        FTP_SERVER:   ${{ secrets.FTP_SERVER }}
         FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
         FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       run: |
-        import ftplib, os
-        ftp = ftplib.FTP(os.environ['FTP_SERVER'].strip())
-        ftp.login(os.environ['FTP_USERNAME'].strip(), os.environ['FTP_PASSWORD'].strip())
-        try:
-            ftp.delete('wwwroot/app_offline.htm')
-            print('app_offline.htm deleted — site is online')
-        except ftplib.error_perm as e:
-            print(f'Note: {e}')
-        ftp.quit()
+        import ftplib, os, sys, time
+
+        server   = os.environ['FTP_SERVER'].strip()
+        username = os.environ['FTP_USERNAME'].strip()
+        password = os.environ['FTP_PASSWORD'].strip()
+
+        for attempt in range(3):
+            try:
+                ftp = ftplib.FTP(server)
+                ftp.login(username, password)
+                try:
+                    ftp.delete('wwwroot/app_offline.htm')
+                    print('app_offline.htm deleted — site is online')
+                except ftplib.error_perm as e:
+                    # File may not exist if offline step was skipped; not fatal.
+                    print(f'Note: could not delete app_offline.htm: {e}')
+                ftp.quit()
+                sys.exit(0)
+            except Exception as ex:
+                print(f'Attempt {attempt+1}/3 failed: {ex}')
+                if attempt < 2:
+                    time.sleep(5)
+
+        print('WARNING: Could not remove app_offline.htm after 3 attempts. Remove it manually via FTP.', file=sys.stderr)
+        # Do not exit(1) here — deployment succeeded; this is a cleanup-only failure.
+
+    # ── Step 7: Post-deployment smoke test ─────────────────────────
+    - name: Post-deployment health check
+      env:
+        APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      run: |
+        echo "Waiting 30 seconds for IIS to recycle and app to start..."
+        sleep 30
+
+        BASE_URL="${APP_BASE_URL%/}"
+        HEALTH_URL="${BASE_URL}/api/health"
+        DIAG_URL="${BASE_URL}/api/diag"
+
+        echo "Checking: ${HEALTH_URL}"
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${HEALTH_URL}" || echo "CURL_FAILED")
+
+        if [ "$STATUS" = "200" ]; then
+          echo "Health check PASSED (HTTP 200)"
+        else
+          echo "WARNING: Health check returned HTTP ${STATUS} (expected 200)."
+          echo "Check IIS logs or /api/diag for details. This may be a cold-start delay."
+          echo "DIAG URL: ${DIAG_URL}"
+          # Not failing the workflow — app may still be starting (ANCM cold start can take 10-60s).
+          # A failed health check here is a warning, not a deployment failure indicator.
+        fi
+

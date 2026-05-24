@@ -1,4 +1,4 @@
-﻿using DFile.backend.Authorization;
+using DFile.backend.Authorization;
 using DFile.backend.Constants;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
@@ -21,12 +21,14 @@ namespace DFile.backend.Controllers
         private readonly AppDbContext _context;
         private readonly IAuditService _auditService;
         private readonly INotificationService _notificationService;
+        private readonly IWebHostEnvironment _env;
 
-        public MaintenanceController(AppDbContext context, IAuditService auditService, INotificationService notificationService)
+        public MaintenanceController(AppDbContext context, IAuditService auditService, INotificationService notificationService, IWebHostEnvironment env)
         {
             _context = context;
             _auditService = auditService;
             _notificationService = notificationService;
+            _env = env;
         }
 
         private int? GetCurrentUserId()
@@ -137,7 +139,7 @@ namespace DFile.backend.Controllers
             var tenantId = GetCurrentTenantId();
 
             // Same tenant + status rules as AllocationsController.GetActiveAllocations.
-            // Do not require Room != null â€” orphaned FKs or soft issues would hide rows that tenant admin still sees via assets.
+            // Do not require Room != null — orphaned FKs or soft issues would hide rows that tenant admin still sees via assets.
             var query = _context.AssetAllocations
                 .Include(a => a.Asset)
                     .ThenInclude(asset => asset!.Category)
@@ -281,10 +283,10 @@ namespace DFile.backend.Controllers
             return Ok(MapToDto(record, allocDict, DateTime.UtcNow));
         }
 
-        // â”€â”€ Status transition rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Status transition rules ──────────────────────────────
         private static readonly Dictionary<string, string[]> ValidTransitions = new(StringComparer.OrdinalIgnoreCase)
         {
-            // Finance Review may only be entered via POST inspection-workflow or from Inspection/Quoted â€” not directly from Pending/Open/Scheduled.
+            // Finance Review may only be entered via POST inspection-workflow or from Inspection/Quoted — not directly from Pending/Open/Scheduled.
             ["Open"]        = new[] { "Inspection" },
             ["Inspection"]  = new[] { "Quoted", "In Progress", "Completed", "Finance Review" },
             ["Quoted"]      = new[] { "In Progress", "Finance Review" },
@@ -546,7 +548,7 @@ namespace DFile.backend.Controllers
                 "Update",
                 "MaintenanceRecord",
                 id,
-                $"Maintenance record updated: status {previousStatus} â†’ {dto.Status}.");
+                $"Maintenance record updated: status {previousStatus} → {dto.Status}.");
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -643,7 +645,7 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = $"Inspection workflow cannot be submitted from status '{record.Status}'." });
 
             // Only block when the record is already in Inspection (field work) before the scheduled day.
-            // Scheduled / Open / Pending may still submit diagnosis (e.g. Not Repairable â†’ Finance) without waiting for the visit date.
+            // Scheduled / Open / Pending may still submit diagnosis (e.g. Not Repairable → Finance) without waiting for the visit date.
             if (string.Equals(record.Status, "Inspection", StringComparison.OrdinalIgnoreCase)
                 && record.StartDate.HasValue
                 && record.StartDate.Value.Date > DateTime.UtcNow.Date)
@@ -835,22 +837,33 @@ namespace DFile.backend.Controllers
             return NoContent();
         }
 
-        // â”€â”€ File Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── File Upload ───────────────────────────────────────────
+
+        private static readonly HashSet<string> AllowedUploadExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            ".docx", ".xlsx", ".csv", ".txt"
+        };
 
         [HttpPost("upload")]
         [RequirePermission("Maintenance", "CanCreate")]
+        [RequestSizeLimit(10_485_760)]
         public async Task<IActionResult> UploadAttachment(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "No file provided." });
 
-            if (file.Length > 10 * 1024 * 1024) // 10MB limit
+            if (file.Length > 10 * 1024 * 1024)
                 return BadRequest(new { message = "File size exceeds 10MB limit." });
 
-            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads", "maintenance");
+            var ext = Path.GetExtension(file.FileName ?? "").Trim();
+            if (string.IsNullOrEmpty(ext) || !AllowedUploadExtensions.Contains(ext))
+                return BadRequest(new { message = $"File type '{ext}' is not allowed. Permitted: pdf, jpg, jpeg, png, gif, webp, docx, xlsx, csv, txt." });
+
+            var uploadsDir = Path.Combine(_env.ContentRootPath, "uploads", "maintenance");
             Directory.CreateDirectory(uploadsDir);
 
-            var uniqueName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var uniqueName = $"{Guid.NewGuid()}{ext}";
             var filePath = Path.Combine(uploadsDir, uniqueName);
 
             using (var stream = new FileStream(filePath, FileMode.Create))
@@ -862,7 +875,7 @@ namespace DFile.backend.Controllers
             return Ok(new { url, fileName = file.FileName, size = file.Length });
         }
 
-        // â”€â”€ Mark Asset Beyond Repair â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Mark Asset Beyond Repair ──────────────────────────────
 
         [HttpPut("mark-beyond-repair/{maintenanceId}")]
         [RequirePermission("Maintenance", "CanEdit")]
@@ -916,7 +929,7 @@ namespace DFile.backend.Controllers
             return Ok(new { message = "Asset marked as beyond repair. Admin has been notified." });
         }
 
-        // â”€â”€ Asset Condition History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Asset Condition History ───────────────────────────────
 
         [HttpGet("condition-history/{assetId}")]
         [RequirePermission("Maintenance", "CanView")]
@@ -946,7 +959,7 @@ namespace DFile.backend.Controllers
             return Ok(logs);
         }
 
-        // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Helpers ───────────────────────────────────────────────
 
         private BadRequestObjectResult? ValidateActiveAllocationAndOptionalRoom(string? requestedRoomId, AssetAllocation? alloc)
         {

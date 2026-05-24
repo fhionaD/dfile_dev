@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,9 +86,22 @@ var jwtKey = builder.Configuration["Jwt:Key"] ?? "";
 var jwtKeyMissing = string.IsNullOrWhiteSpace(jwtKey);
 if (jwtKeyMissing)
 {
-    // Use a placeholder so the app can start — auth will be non-functional but health/diag endpoints will work.
-    // Check /api/diag output: jwt_key_len:0 means the JWT__KEY secret is missing in GitHub Actions.
-    jwtKey = new string('0', 64);
+    if (builder.Environment.IsDevelopment())
+    {
+        // In development only: fall back so the app can start without secrets configured.
+        // Auth will be non-functional (all tokens will be rejected / mismatch). Use dotnet user-secrets.
+        jwtKey = new string('0', 64);
+    }
+    else
+    {
+        // In production: refuse to start. A missing JWT key means EVERY login returns HTTP 500.
+        // This 500.30 is intentional — it is far easier to diagnose than a silent auth failure.
+        // Fix: ensure the JWT__KEY GitHub secret is set and the web.config injection step succeeded.
+        throw new InvalidOperationException(
+            "FATAL: Jwt:Key is not configured. " +
+            "Set the JWT__KEY GitHub secret and verify the workflow web.config injection step completed successfully. " +
+            "Check /api/diag for jwt_key_len:0 to confirm the secret is missing.");
+    }
 }
 var key = Encoding.ASCII.GetBytes(jwtKey);
 builder.Services.AddAuthentication(options =>
@@ -124,9 +137,23 @@ builder.Services.AddCors(options =>
         {
             var frontendOrigin = builder.Configuration["AllowedOrigins:Frontend"] ?? "";
             if (!string.IsNullOrWhiteSpace(frontendOrigin))
+            {
                 corsBuilder.WithOrigins(frontendOrigin).AllowAnyMethod().AllowAnyHeader();
+            }
             else
+            {
+                // AllowedOrigins:Frontend is not configured.
+                // For same-host deployments (frontend in wwwroot) the browser sends no Origin header,
+                // so CORS is irrelevant. AllowAnyOrigin is safe in that scenario.
+                // If the frontend is hosted separately, set AllowedOrigins__Frontend in GitHub Secrets.
+                var startupLogger = Microsoft.Extensions.Logging.LoggerFactory
+                    .Create(lb => lb.AddConsole())
+                    .CreateLogger("CORS");
+                startupLogger.LogWarning(
+                    "CORS: AllowedOrigins:Frontend is not set. Defaulting to AllowAnyOrigin. " +
+                    "Set AllowedOrigins__Frontend in GitHub Secrets if the frontend is on a separate host.");
                 corsBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+            }
         }
     });
 });
@@ -141,7 +168,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
-var duplicateRequestLocks = new ConcurrentDictionary<string, DateTime>();
 
 // Apply EF Core migrations
 var skipMigrations = string.Equals(
@@ -304,6 +330,17 @@ if (app.Environment.IsDevelopment())
 }
 app.UseStaticFiles(staticFileOptions);
 
+// Serve user-uploaded files from <ContentRoot>/uploads/ under the /uploads/* URL path.
+// The uploads/ directory is outside wwwroot so it must be registered explicitly.
+// Creates the directory if it does not exist to avoid PhysicalFileProvider throwing on startup.
+var uploadsPhysicalPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+Directory.CreateDirectory(uploadsPhysicalPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPhysicalPath),
+    RequestPath = "/uploads"
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -322,17 +359,28 @@ app.MapControllers();
 // Health endpoint
 app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 
-// Diagnostic endpoint — tests DB and scoped DI without the MVC controller pipeline.
-// Returns a plain-text status that reveals what's actually failing.
+// Diagnostic endpoint — verifies secret injection and DB connectivity after deployment.
+// In Development: full detail including exception types and connection lengths.
+// In Production: boolean status only — no raw exception messages, no secret metadata.
 app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
 {
+    var isDev = app.Environment.IsDevelopment();
     var results = new System.Text.StringBuilder();
-    // Config status — shows whether secrets were injected correctly
+
     results.Append($"env:{app.Environment.EnvironmentName};");
-    results.Append($"jwt_key_len:{cfg["Jwt:Key"]?.Length ?? 0};");
-    results.Append($"db_conn_len:{cfg.GetConnectionString("DefaultConnection")?.Length ?? 0};");
-    results.Append($"skip_mig:{Environment.GetEnvironmentVariable("DFILE_SKIP_MIGRATIONS") ?? "not-set"};");
-    // DB connectivity
+
+    if (isDev)
+    {
+        results.Append($"jwt_key_len:{cfg["Jwt:Key"]?.Length ?? 0};");
+        results.Append($"db_conn_len:{cfg.GetConnectionString("DefaultConnection")?.Length ?? 0};");
+        results.Append($"skip_mig:{Environment.GetEnvironmentVariable("DFILE_SKIP_MIGRATIONS") ?? "not-set"};");
+    }
+    else
+    {
+        results.Append($"jwt_configured:{(!string.IsNullOrWhiteSpace(cfg["Jwt:Key"])).ToString().ToLowerInvariant()};");
+        results.Append($"db_configured:{(!string.IsNullOrWhiteSpace(cfg.GetConnectionString("DefaultConnection"))).ToString().ToLowerInvariant()};");
+    }
+
     try
     {
         using var scope = sp.CreateScope();
@@ -340,17 +388,33 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
         try
         {
             var canConnect = db.Database.CanConnect();
-            results.Append($"db_connect:{canConnect};");
+            results.Append($"db_connect:{canConnect.ToString().ToLowerInvariant()};");
         }
-        catch (Exception ex) { results.Append($"db_connect_err:{ex.GetType().Name};"); }
+        catch (Exception ex)
+        {
+            results.Append(isDev
+                ? $"db_connect_err:{ex.GetType().Name};"
+                : "db_connect_err:true;");
+        }
         try
         {
             await db.Database.ExecuteSqlRawAsync("SELECT 1");
             results.Append("db_query:ok;");
         }
-        catch (Exception ex) { results.Append($"db_query_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"); }
+        catch (Exception ex)
+        {
+            results.Append(isDev
+                ? $"db_query_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"
+                : "db_query_err:true;");
+        }
     }
-    catch (Exception ex) { results.Append($"scope_err:{ex.GetType().Name};"); }
+    catch (Exception ex)
+    {
+        results.Append(isDev
+            ? $"scope_err:{ex.GetType().Name};"
+            : "scope_err:true;");
+    }
+
     return Results.Ok(results.ToString());
 });
 

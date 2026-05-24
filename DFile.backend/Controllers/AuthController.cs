@@ -361,7 +361,12 @@ namespace DFile.backend.Controllers
             [FromQuery] string? state,
             [FromQuery] string? error)
         {
-            var appBaseUrl = (_configuration["Payment:AppBaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+            // Payment:AppBaseUrl must be set via the Payment__AppBaseUrl environment variable.
+            // Fall back to the current request origin so redirects remain functional even if the env var is missing.
+            var rawAppBaseUrl = _configuration["Payment:AppBaseUrl"];
+            var appBaseUrl = !string.IsNullOrWhiteSpace(rawAppBaseUrl)
+                ? rawAppBaseUrl.TrimEnd('/')
+                : $"{Request.Scheme}://{Request.Host}";
 
             if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
                 return Redirect($"{appBaseUrl}/google-callback?error=google_auth_failed");
@@ -527,7 +532,10 @@ namespace DFile.backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            var appBaseUrl = _configuration["Payment:AppBaseUrl"]?.TrimEnd('/') ?? "";
+            var rawForgotAppBaseUrl = _configuration["Payment:AppBaseUrl"];
+            var appBaseUrl = !string.IsNullOrWhiteSpace(rawForgotAppBaseUrl)
+                ? rawForgotAppBaseUrl.TrimEnd('/')
+                : $"{Request.Scheme}://{Request.Host}";
             var encodedToken = Uri.EscapeDataString(rawToken);
             var encodedEmail = Uri.EscapeDataString(user.Email);
             var resetLink = $"{appBaseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";

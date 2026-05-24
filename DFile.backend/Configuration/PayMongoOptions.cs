@@ -17,7 +17,9 @@ namespace DFile.backend.Configuration
     {
         public const string SectionName = "Payment";
 
-        /// <summary>Absolute base URL for success/cancel redirects (e.g. https://app.example.com).</summary>
-        public string AppBaseUrl { get; set; } = "http://localhost:3000";
+        /// <summary>Absolute base URL for success/cancel redirects (e.g. https://app.example.com).
+        /// Must be set via the Payment__AppBaseUrl environment variable. An empty string here is intentional —
+        /// it causes checkout creation to fail loudly rather than redirect users to localhost in production.</summary>
+        public string AppBaseUrl { get; set; } = string.Empty;
     }
 }

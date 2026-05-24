@@ -299,17 +299,21 @@ namespace DFile.backend.Controllers
             var sigHeader = Request.Headers["Paymongo-Signature"].FirstOrDefault()
                 ?? Request.Headers["paymongo-signature"].FirstOrDefault();
 
-            if (!string.IsNullOrEmpty(_payMongoOpts.WebhookSecret))
+            if (string.IsNullOrEmpty(_payMongoOpts.WebhookSecret))
             {
-                if (!VerifyWebhookSignature(sigHeader, body, _payMongoOpts.WebhookSecret))
-                {
-                    _logger.LogWarning("PayMongo webhook signature verification failed.");
-                    return Unauthorized();
-                }
+                // A missing webhook secret means any caller can trigger subscription upgrades without paying.
+                // Refuse ALL webhook requests when the secret is not configured so the misconfiguration is
+                // immediately visible in logs rather than silently allowing unauthenticated events.
+                _logger.LogError(
+                    "PayMongo webhook rejected: PayMongo__WebhookSecret is not configured. " +
+                    "Set the PAYMONGO__WEBHOOKSECRET GitHub secret and redeploy.");
+                return StatusCode(503, new { error = "Webhook endpoint is not configured. Contact support." });
             }
-            else
+
+            if (!VerifyWebhookSignature(sigHeader, body, _payMongoOpts.WebhookSecret))
             {
-                _logger.LogInformation("PayMongo webhook received without WebhookSecret configured; signature not verified.");
+                _logger.LogWarning("PayMongo webhook signature verification failed.");
+                return Unauthorized();
             }
 
             try

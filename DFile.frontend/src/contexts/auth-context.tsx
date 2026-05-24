@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types/asset";
-import axios from "axios";
 import api from "@/lib/api"; // Centralized API client
 import { globalQueryClient } from "@/components/query-provider";
 
@@ -56,7 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (storedUser && storedToken) {
                 // 1. Restore from localStorage immediately — this makes the page
                 //    render instantly without waiting for a network round-trip.
-                const parsed = JSON.parse(storedUser) as Record<string, unknown>;
+                let parsed: Record<string, unknown>;
+                try {
+                    parsed = JSON.parse(storedUser) as Record<string, unknown>;
+                } catch {
+                    // Corrupted localStorage entry (e.g. partial write after crash) — start fresh
+                    localStorage.removeItem("dfile_user");
+                    localStorage.removeItem("dfile_token");
+                    setIsLoading(false);
+                    return;
+                }
                 const parsedUser = normalizeStoredUser(parsed);
 
                 // Guard: if localStorage has a stale schema (e.g. unknown role), clear it

@@ -28,6 +28,10 @@ DFile.frontend/out/
 .env.local
 .env.*.local
 
+# Development appsettings contain real credentials — use dotnet user-secrets instead.
+# See: https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets
+DFile.backend/appsettings.Development.json
+
 # ─── OS / editor ─────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
