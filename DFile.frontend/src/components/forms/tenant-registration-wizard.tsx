@@ -116,6 +116,7 @@ export function TenantRegistrationWizard() {
 
     // Load Google GSI script
     useEffect(() => {
+        if (document.querySelector('script[src*="accounts.google.com/gsi"]')) return;
         const script = document.createElement("script");
         script.src = "https://accounts.google.com/gsi/client";
         script.async = true;
@@ -130,11 +131,16 @@ export function TenantRegistrationWizard() {
             setGoogleError("Google sign-in is not configured.");
             return;
         }
+        if (!window.google?.accounts?.id) {
+            setGoogleError("Google sign-in is still loading. Please try again in a moment.");
+            return;
+        }
         setGoogleError(null);
-        window.google?.accounts.id.initialize({
+        setIsGoogleLoading(true);
+        window.google.accounts.id.initialize({
             client_id: clientId,
+            use_fedcm_for_prompt: false,
             callback: async (response: { credential: string }) => {
-                setIsGoogleLoading(true);
                 try {
                     const { data } = await api.post<{ token: string }>("/api/auth/google/token", {
                         credential: response.credential,
@@ -152,7 +158,17 @@ export function TenantRegistrationWizard() {
                 }
             },
         });
-        window.google?.accounts.id.prompt();
+        window.google.accounts.id.prompt((notification: {
+            isNotDisplayed(): boolean;
+            isSkippedMoment(): boolean;
+        }) => {
+            // One Tap was suppressed (user previously dismissed it, cookies blocked, etc.)
+            // Fall back to the standard OAuth redirect flow
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                setIsGoogleLoading(false);
+                window.location.href = "/api/auth/google";
+            }
+        });
     };
 
     // Fetch plans on mount
