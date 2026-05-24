@@ -108,4 +108,10 @@ namespace DFile.backend.DTOs
         [Required]
         public string NewPassword { get; set; } = string.Empty;
     }
+
+    public class GoogleTokenDto
+    {
+        [Required]
+        public string Credential { get; set; } = string.Empty;
+    }
 }

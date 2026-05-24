@@ -82,6 +82,7 @@ jobs:
         # Must be empty for same-origin deployment — frontend and API share the same host.
         # Only set this if frontend is served from a different host than the ASP.NET Core backend.
         NEXT_PUBLIC_API_URL: ""
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE__CLIENTID }}
         NODE_ENV: production
       run: npm run build
 

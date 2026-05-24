@@ -327,6 +327,79 @@ namespace DFile.backend.Controllers
             return Convert.ToHexString(bytes).ToLowerInvariant();
         }
 
+        [HttpPost("google/token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GoogleTokenLogin([FromBody] GoogleTokenDto? dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Credential))
+                return BadRequest(new { message = "Google credential is required." });
+
+            var clientId = _configuration["Google:ClientId"];
+            if (string.IsNullOrWhiteSpace(clientId))
+                return StatusCode(503, new { message = "Google OAuth is not configured on this server." });
+
+            string googleEmail;
+            try
+            {
+                using var http = _httpClientFactory.CreateClient();
+                var verifyResponse = await http.GetAsync(
+                    $"https://oauth2.googleapis.com/tokeninfo?id_token={Uri.EscapeDataString(dto.Credential)}");
+
+                if (!verifyResponse.IsSuccessStatusCode)
+                    return Unauthorized(new { message = "Invalid Google credential." });
+
+                var json = await verifyResponse.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("aud", out var audProp) || audProp.GetString() != clientId)
+                    return Unauthorized(new { message = "Google credential was not issued for this application." });
+
+                if (!root.TryGetProperty("email_verified", out var evProp) || evProp.GetString() != "true")
+                    return Unauthorized(new { message = "Google account email is not verified." });
+
+                if (!root.TryGetProperty("email", out var emailProp) || string.IsNullOrWhiteSpace(emailProp.GetString()))
+                    return Unauthorized(new { message = "Could not retrieve email from Google account." });
+
+                googleEmail = emailProp.GetString()!;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Google token verification failed");
+                return Unauthorized(new { message = "Google sign-in failed. Please try again." });
+            }
+
+            var emailNormalized = googleEmail.Trim().ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+
+            if (user == null)
+                return Unauthorized(new { message = "No DFile account found for your Google email. Contact your administrator." });
+
+            if (user.Status == "PendingActivation")
+                return Unauthorized(new { message = "Your account is pending activation. Check your email." });
+
+            if (user.TenantId.HasValue)
+            {
+                var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
+                if (tenant != null && tenant.Status != "Active")
+                    return Unauthorized(new { message = "Your organization account is inactive. Contact support." });
+            }
+
+            var jwt = GenerateJwtToken(user);
+            return Ok(new
+            {
+                token = jwt,
+                user = new
+                {
+                    id = user.Id,
+                    email = user.Email,
+                    role = user.Role,
+                    tenantId = user.TenantId,
+                    fullName = user.FullName
+                }
+            });
+        }
+
         [HttpGet("google")]
         [AllowAnonymous]
         public IActionResult InitiateGoogleOAuth()
