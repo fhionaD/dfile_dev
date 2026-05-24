@@ -155,13 +155,15 @@ jobs:
 
         # Validate required secrets — fail hard before FTP upload starts
         required = {
-            "PROD_DB_CONNECTION":  "CONNECTIONSTRINGS__DEFAULTCONNECTION",
-            "PROD_JWT_KEY":        "JWT__KEY",
-            "PROD_APP_BASE_URL":   "APP_BASE_URL",
-            "PROD_SMTP_HOST":      "SMTPSETTINGS__HOST",
-            "PROD_SMTP_PORT":      "SMTPSETTINGS__PORT",
-            "PROD_SMTP_EMAIL":     "SMTPSETTINGS__EMAIL",
-            "PROD_SMTP_PASSWORD":  "SMTPSETTINGS__PASSWORD",
+            "PROD_DB_CONNECTION":        "CONNECTIONSTRINGS__DEFAULTCONNECTION",
+            "PROD_JWT_KEY":              "JWT__KEY",
+            "PROD_APP_BASE_URL":         "APP_BASE_URL",
+            "PROD_GOOGLE_CLIENT_ID":     "GOOGLE__CLIENTID",
+            "PROD_GOOGLE_CLIENT_SECRET": "GOOGLE__CLIENTSECRET",
+            "PROD_SMTP_HOST":            "SMTPSETTINGS__HOST",
+            "PROD_SMTP_PORT":            "SMTPSETTINGS__PORT",
+            "PROD_SMTP_EMAIL":           "SMTPSETTINGS__EMAIL",
+            "PROD_SMTP_PASSWORD":        "SMTPSETTINGS__PASSWORD",
         }
         missing = [secret_name for env_var, secret_name in required.items() if not os.environ.get(env_var)]
         if missing:

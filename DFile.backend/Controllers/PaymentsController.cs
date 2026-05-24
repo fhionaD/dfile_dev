@@ -445,6 +445,10 @@ namespace DFile.backend.Controllers
             tenantRow.MaintenanceModule = plan.MaintenanceModule;
             tenantRow.UpdatedAt = now;
 
+            // Activate org if it was awaiting payment from the registration flow
+            if (string.Equals(tenantRow.Status, "PendingPayment", StringComparison.OrdinalIgnoreCase))
+                tenantRow.Status = "Active";
+
             await _notifications.NotifySubscriptionActivatedAsync(
                 tx.TenantId, plan.Name, cycle.ToString(), endDate, cancellationToken);
         }
@@ -512,6 +516,33 @@ namespace DFile.backend.Controllers
             }
 
             return id != null;
+        }
+
+        /// <summary>
+        /// Anonymous endpoint for the registration payment-return page to poll payment status.
+        /// Returns only the minimal fields needed for UI feedback — no tenant PII is exposed.
+        /// </summary>
+        [HttpGet("registration/{id}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetRegistrationPaymentStatus(string id, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest();
+
+            var tx = await _db.PaymentTransactions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+            if (tx == null)
+                return NotFound();
+
+            return Ok(new RegistrationPaymentStatusDto
+            {
+                Status = tx.Status,
+                PlanName = tx.SubscriptionPlanCode,
+                AmountCents = tx.AmountCents,
+                Currency = tx.Currency
+            });
         }
 
         private static PaymentTransactionResponseDto Map(PaymentTransaction t) => new()

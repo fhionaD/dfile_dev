@@ -308,14 +308,25 @@ export function TenantRegistrationWizard() {
         setIsLoading(true);
         setErrors({});
         try {
-            await api.post("/api/Tenants/register", {
+            const selectedPlanObj = plans.find((p) => p.code === selectedPlan);
+            const response = await api.post("/api/Tenants/register", {
                 tenantName,
                 adminFirstName: firstName,
                 adminLastName: lastName,
                 adminEmail: workEmail,
                 adminPassword: initialPassword,
                 subscriptionPlan: ({ Starter: 0, Basic: 1, Pro: 2 } as Record<string, number>)[selectedPlan] ?? 0,
+                planId: selectedPlanObj?.plan ?? null,
+                billingCycle: "Monthly",
             });
+
+            // 202 = paid plan selected — redirect to PayMongo hosted checkout
+            if (response.status === 202 && response.data?.requiresPayment && response.data?.checkoutUrl) {
+                window.location.href = response.data.checkoutUrl as string;
+                return;
+            }
+
+            // 201 = free plan activated immediately
             setIsLoading(false);
             setSuccess(true);
         } catch (err: unknown) {

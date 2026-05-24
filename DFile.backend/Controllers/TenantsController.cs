@@ -1,11 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using DFile.backend.Configuration;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
+using DFile.backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using BCrypt.Net;
 
 namespace DFile.backend.Controllers
@@ -16,17 +20,27 @@ namespace DFile.backend.Controllers
     public class TenantsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IPayMongoPaymentService _payMongo;
+        private readonly PaymentAppOptions _paymentAppOptions;
+        private readonly ILogger<TenantsController> _logger;
 
-        public TenantsController(AppDbContext context)
+        public TenantsController(
+            AppDbContext context,
+            IPayMongoPaymentService payMongo,
+            IOptions<PaymentAppOptions> paymentAppOptions,
+            ILogger<TenantsController> logger)
         {
             _context = context;
+            _payMongo = payMongo;
+            _paymentAppOptions = paymentAppOptions.Value;
+            _logger = logger;
         }
 
         /// <summary>Self-service org signup only. Super Admin cannot create tenants via API; use POST /api/Tenants/register.</summary>
         [HttpPost("register")]
         [AllowAnonymous]
-        public Task<ActionResult<Tenant>> RegisterTenant([FromBody] CreateTenantDto dto) =>
-            CreateTenantCoreAsync(dto);
+        public Task<IActionResult> RegisterTenant([FromBody] CreateTenantDto dto, CancellationToken cancellationToken) =>
+            CreateTenantCoreAsync(dto, isRegistration: true, cancellationToken: cancellationToken);
 
         /// <summary>Anonymous preflight: whether admin email (and optionally organization name) can be used for registration.</summary>
         [HttpGet("register/availability")]
@@ -68,7 +82,7 @@ namespace DFile.backend.Controllers
             return false;
         }
 
-        private async Task<ActionResult<Tenant>> CreateTenantCoreAsync(CreateTenantDto dto)
+        private async Task<IActionResult> CreateTenantCoreAsync(CreateTenantDto dto, bool isRegistration = false, CancellationToken cancellationToken = default)
         {
             var adminEmail = NormalizeEmail(dto.AdminEmail);
             var tenantName = string.IsNullOrWhiteSpace(dto.TenantName) ? string.Empty : dto.TenantName.Trim();
@@ -76,22 +90,55 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrEmpty(adminEmail))
                 return BadRequest(new { message = "A valid work email is required." });
 
-            if (await _context.Users.AnyAsync(u => u.Email == adminEmail))
+            if (await _context.Users.AnyAsync(u => u.Email == adminEmail, cancellationToken))
                 return BadRequest(new { message = "This email is already registered. Sign in instead." });
 
             if (string.IsNullOrEmpty(tenantName))
                 return BadRequest(new { message = "Organization name is required." });
 
-            if (await _context.Tenants.AnyAsync(t => t.Name == tenantName))
+            if (await _context.Tenants.AnyAsync(t => t.Name == tenantName, cancellationToken))
                 return BadRequest(new { message = "An organization with this name already exists." });
+
+            // Resolve plan from DB when PlanId is provided
+            Plan? plan = null;
+            if (dto.PlanId.HasValue)
+            {
+                plan = await _context.Plans
+                    .FirstOrDefaultAsync(p => p.Id == dto.PlanId.Value && !p.IsArchived && p.IsActive, cancellationToken);
+                if (plan == null)
+                    return BadRequest(new { message = "The selected plan is not available. Refresh the page and try again." });
+            }
 
             try
             {
-                var tenant = Tenant.Create(tenantName, dto.SubscriptionPlan);
-                tenant.BusinessAddress = dto.BusinessAddress?.Trim() ?? string.Empty;
+                // --- Build the Tenant ---
+                Tenant tenant;
+                if (plan != null)
+                {
+                    // Plan-based path: limits and features come from the DB plan record
+                    tenant = new Tenant
+                    {
+                        Name = tenantName,
+                        BusinessAddress = dto.BusinessAddress?.Trim() ?? string.Empty,
+                        PlanId = plan.Id,
+                        MaxRooms = plan.MaxRooms,
+                        MaxPersonnel = plan.MaxPersonnel,
+                        AssetTracking = plan.AssetTracking,
+                        Depreciation = plan.Depreciation,
+                        MaintenanceModule = plan.MaintenanceModule,
+                        // Paid plans start as PendingPayment; free plans are Active immediately
+                        Status = (isRegistration && plan.MonthlyCost > 0) ? "PendingPayment" : "Active"
+                    };
+                }
+                else
+                {
+                    // Legacy enum-based path (used by Super Admin without PlanId)
+                    tenant = Tenant.Create(tenantName, dto.SubscriptionPlan);
+                    tenant.BusinessAddress = dto.BusinessAddress?.Trim() ?? string.Empty;
+                }
 
                 _context.Tenants.Add(tenant);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
 
                 var adminUser = new User
                 {
@@ -105,8 +152,113 @@ namespace DFile.backend.Controllers
                 };
 
                 _context.Users.Add(adminUser);
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
 
+                // --- Free plan: activate subscription immediately ---
+                if (isRegistration && plan != null && plan.MonthlyCost == 0)
+                {
+                    if (tenant.HasUsedFreePlan)
+                        return UnprocessableEntity(new { message = "Free plan has already been used by this organization." });
+
+                    var now = DateTime.UtcNow;
+                    _context.TenantSubscriptions.Add(new TenantSubscription
+                    {
+                        TenantId = tenant.Id,
+                        PlanId = plan.Id,
+                        BillingCycle = BillingCycle.Monthly,
+                        StartDate = now,
+                        EndDate = now.AddDays(30),
+                        Status = SubscriptionStatus.Active,
+                        IsFreePlan = true
+                    });
+                    tenant.HasUsedFreePlan = true;
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id },
+                        new { tenantId = tenant.Id, requiresPayment = false });
+                }
+
+                // --- Paid plan: create PayMongo checkout session ---
+                if (isRegistration && plan != null && plan.MonthlyCost > 0)
+                {
+                    var billingCycle = string.Equals(dto.BillingCycle, "Yearly", StringComparison.OrdinalIgnoreCase)
+                        ? BillingCycle.Yearly
+                        : BillingCycle.Monthly;
+
+                    var amount = billingCycle == BillingCycle.Yearly
+                        ? (int)(plan.YearlyCost * 100)
+                        : (int)(plan.MonthlyCost * 100);
+
+                    if (amount <= 0)
+                    {
+                        _context.Users.Remove(adminUser);
+                        _context.Tenants.Remove(tenant);
+                        await _context.SaveChangesAsync(cancellationToken);
+                        return BadRequest(new { message = "Plan price is not configured. Contact support." });
+                    }
+
+                    var description = $"DFile {plan.Name} ({billingCycle}) – {tenantName}";
+                    var payment = new PaymentTransaction
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        TenantId = tenant.Id,
+                        PlanId = plan.Id,
+                        AmountCents = amount,
+                        Currency = "PHP",
+                        Description = description,
+                        SubscriptionPlanCode = plan.Name,
+                        BillingCycle = billingCycle.ToString(),
+                        Provider = "PayMongo",
+                        Status = "Pending",
+                        ReferenceNumber = $"DFile-Reg-{tenant.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..8]}"
+                    };
+
+                    _context.PaymentTransactions.Add(payment);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    var baseUrl = _paymentAppOptions.AppBaseUrl.TrimEnd('/');
+                    var successUrl = $"{baseUrl}/register/payment-return?paymentId={Uri.EscapeDataString(payment.Id)}&status=success";
+                    var cancelUrl = $"{baseUrl}/register/payment-return?paymentId={Uri.EscapeDataString(payment.Id)}&status=cancelled";
+
+                    var metadata = new Dictionary<string, string>
+                    {
+                        ["tenant_id"] = tenant.Id.ToString(CultureInfo.InvariantCulture),
+                        ["payment_transaction_id"] = payment.Id,
+                        ["plan_id"] = plan.Id.ToString(CultureInfo.InvariantCulture),
+                        ["billing_cycle"] = billingCycle.ToString(),
+                        ["is_registration"] = "true"
+                    };
+
+                    var result = await _payMongo.CreateCheckoutSessionAsync(
+                        amount, description, payment.ReferenceNumber,
+                        successUrl, cancelUrl, metadata, cancellationToken);
+
+                    if (!result.Ok || string.IsNullOrEmpty(result.CheckoutUrl))
+                    {
+                        // Roll back the newly created records so the user can retry
+                        _context.PaymentTransactions.Remove(payment);
+                        _context.Users.Remove(adminUser);
+                        _context.Tenants.Remove(tenant);
+                        await _context.SaveChangesAsync(cancellationToken);
+                        _logger.LogError("Registration checkout creation failed for tenant '{Name}': {Error}",
+                            tenantName, result.ErrorMessage);
+                        return BadRequest(new { message = "Could not connect to the payment gateway. Please try again." });
+                    }
+
+                    payment.CheckoutSessionId = result.CheckoutSessionId;
+                    payment.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    return StatusCode(202, new
+                    {
+                        tenantId = tenant.Id,
+                        requiresPayment = true,
+                        checkoutUrl = result.CheckoutUrl,
+                        paymentId = payment.Id
+                    });
+                }
+
+                // Legacy path (Super Admin, no PlanId) — return the full tenant
                 return CreatedAtAction(nameof(GetTenant), new { id = tenant.Id }, tenant);
             }
             catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
@@ -119,9 +271,9 @@ namespace DFile.backend.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Tenant>> CreateTenant([FromBody] CreateTenantDto dto)
+        public async Task<IActionResult> CreateTenant([FromBody] CreateTenantDto dto, CancellationToken cancellationToken)
         {
-            return await CreateTenantCoreAsync(dto);
+            return await CreateTenantCoreAsync(dto, isRegistration: false, cancellationToken: cancellationToken);
         }
 
         [HttpGet("{id}")]

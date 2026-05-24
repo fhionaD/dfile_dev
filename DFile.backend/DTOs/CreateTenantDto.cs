@@ -26,5 +26,15 @@ namespace DFile.backend.DTOs
 
         [Required]
         public SubscriptionPlanType SubscriptionPlan { get; set; }
+
+        /// <summary>
+        /// DB Plan.Id selected from /api/plans/public. When provided, overrides SubscriptionPlan and
+        /// triggers the plan-based creation path (free plan activates immediately; paid plan creates
+        /// a PayMongo checkout session and returns 202 with the checkout URL).
+        /// </summary>
+        public int? PlanId { get; set; }
+
+        /// <summary>"Monthly" or "Yearly" — used when PlanId is set and the plan is paid. Defaults to Monthly.</summary>
+        public string BillingCycle { get; set; } = "Monthly";
     }
 }

@@ -63,6 +63,18 @@ namespace DFile.backend.DTOs
         public string CheckoutUrl { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Minimal status response for the anonymous registration payment polling endpoint.
+    /// Contains only what the unauthenticated return page needs — no tenant PII.
+    /// </summary>
+    public class RegistrationPaymentStatusDto
+    {
+        public string Status { get; set; } = string.Empty;
+        public string PlanName { get; set; } = string.Empty;
+        public int AmountCents { get; set; }
+        public string Currency { get; set; } = "PHP";
+    }
+
     public class PaymentTransactionResponseDto
     {
         public string Id { get; set; } = string.Empty;
