@@ -122,7 +122,10 @@ jobs:
 
     # 4a. Create logs directory so stdoutLogEnabled=true does not crash the app
     - name: Create logs directory in publish output
-      run: mkdir -p ./publish/logs
+      run: |
+        mkdir -p ./publish/logs
+        # FTP deploy skips empty directories — placeholder ensures logs/ is transferred
+        echo "Log directory" > ./publish/logs/.logdir
 
     # 4. Verify publish output structure before upload
     - name: Verify publish output
