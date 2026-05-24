@@ -395,7 +395,7 @@ namespace DFile.backend.Controllers
                     email = user.Email,
                     role = user.Role,
                     tenantId = user.TenantId,
-                    fullName = user.FullName
+                    fullName = $"{user.FirstName} {user.LastName}".Trim()
                 }
             });
         }
