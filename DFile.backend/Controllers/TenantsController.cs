@@ -109,6 +109,11 @@ namespace DFile.backend.Controllers
                     return BadRequest(new { message = "The selected plan is not available. Refresh the page and try again." });
             }
 
+            // Self-service registration always requires a valid plan — the legacy
+            // (no-PlanId) path is for Super Admin only and bypasses payment entirely.
+            if (isRegistration && plan == null)
+                return BadRequest(new { message = "A subscription plan must be selected to create your organization." });
+
             try
             {
                 // --- Build the Tenant ---

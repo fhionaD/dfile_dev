@@ -191,6 +191,9 @@ export function TenantRegistrationWizard() {
                     canCreateFinanceManager: p.canCreateFinanceManager,
                     canCreateMaintenanceManager: p.canCreateMaintenanceManager,
                 }));
+                // Treat an empty response the same as a fetch failure —
+                // an empty Plans table must not silently enable the no-plan path.
+                if (fetched.length === 0) throw new Error("no_plans");
                 if (!ignore) {
                     setPlans(fetched);
                     setSelectedPlan(fetched[0]?.code ?? "");
