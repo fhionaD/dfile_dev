@@ -188,7 +188,7 @@ namespace DFile.backend.Controllers
             await _context.SaveChangesAsync();
 
             // Send activation email
-            var appBaseUrl = _configuration["Payment:AppBaseUrl"] ?? "https://yourdomain.com";
+            var appBaseUrl = $"{Request.Scheme}://{Request.Host}";
             var encodedToken = Uri.EscapeDataString(rawToken);
             var encodedEmail = Uri.EscapeDataString(dto.Email);
             var activationLink = $"{appBaseUrl}/setup-password?token={encodedToken}&email={encodedEmail}";

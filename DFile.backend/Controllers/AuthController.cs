@@ -605,10 +605,7 @@ namespace DFile.backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            var rawForgotAppBaseUrl = _configuration["Payment:AppBaseUrl"];
-            var appBaseUrl = !string.IsNullOrWhiteSpace(rawForgotAppBaseUrl)
-                ? rawForgotAppBaseUrl.TrimEnd('/')
-                : $"{Request.Scheme}://{Request.Host}";
+            var appBaseUrl = $"{Request.Scheme}://{Request.Host}";
             var encodedToken = Uri.EscapeDataString(rawToken);
             var encodedEmail = Uri.EscapeDataString(user.Email);
             var resetLink = $"{appBaseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
