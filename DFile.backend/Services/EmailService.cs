@@ -1,7 +1,8 @@
 ﻿using DFile.backend.Configuration;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Options;
-using System.Net;
-using System.Net.Mail;
+using MimeKit;
 
 namespace DFile.backend.Services
 {
@@ -26,24 +27,18 @@ namespace DFile.backend.Services
 
             try
             {
-                using var client = new SmtpClient(_smtp.Host, _smtp.Port)
-                {
-                    Credentials = new NetworkCredential(_smtp.Email, _smtp.Password),
-                    EnableSsl = true,
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    Timeout = 30_000 // 30 s — prevent indefinite thread-pool hold on SMTP unreachable
-                };
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress("DFile System", _smtp.Email));
+                message.To.Add(new MailboxAddress(string.Empty, recipient));
+                message.Subject = subject;
+                message.Body = new BodyBuilder { HtmlBody = html }.ToMessageBody();
 
-                using var message = new MailMessage
-                {
-                    From = new MailAddress(_smtp.Email, "DFile System"),
-                    Subject = subject,
-                    Body = html,
-                    IsBodyHtml = true
-                };
-                message.To.Add(recipient);
+                using var client = new SmtpClient();
+                await client.ConnectAsync(_smtp.Host, _smtp.Port, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync(_smtp.Email, _smtp.Password);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
 
-                await client.SendMailAsync(message);
                 _logger.LogInformation("Email sent to {Recipient} with subject '{Subject}'", recipient, subject);
             }
             catch (Exception ex)
