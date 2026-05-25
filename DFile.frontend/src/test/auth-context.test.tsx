@@ -38,21 +38,25 @@ vi.mock('@/components/query-provider', () => ({
     globalQueryClient: { clear: vi.fn() },
 }));
 
-// Mock axios so we can control isAxiosError
+// Mock axios so we can control isAxiosError.
+// Both default.isAxiosError and the named export must share the SAME vi.fn()
+// instance — auth-context imports the named export, tests call axios.isAxiosError.
 vi.mock('axios', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = await importOriginal() as typeof import('axios');
+    const sharedIsAxiosError = vi.fn();
     return {
         default: {
             ...actual.default,
-            isAxiosError: vi.fn(),
+            isAxiosError: sharedIsAxiosError,
         },
-        isAxiosError: vi.fn(),
+        isAxiosError: sharedIsAxiosError,
     };
 });
 
 import api from '@/lib/api';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import axios from 'axios';
+import { renderHook } from '@testing-library/react';
 
 const mockUser = {
     id: '1',
@@ -116,23 +120,10 @@ describe('AuthContext', () => {
             data: { user: mockUser, token: mockToken },
         });
 
-        let loginFn: ((email: string, password: string) => Promise<unknown>) | undefined;
-        function Capture() {
-            const { login } = useAuth();
-            loginFn = login;
-            return null;
-        }
+        const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
         await act(async () => {
-            render(
-                <AuthProvider>
-                    <Capture />
-                </AuthProvider>
-            );
-        });
-
-        await act(async () => {
-            await loginFn!('admin@dfile.local', 'Admin@123');
+            await result.current.login('admin@dfile.local', 'Admin@123');
         });
 
         expect(localStorageMock.getItem('dfile_token')).toBe(mockToken);
@@ -171,28 +162,15 @@ describe('AuthContext', () => {
             response: undefined,
             code: undefined,
         });
-        (axios.isAxiosError as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        (axios.isAxiosError as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
         (api.post as ReturnType<typeof vi.fn>).mockRejectedValueOnce(networkError);
 
-        let loginFn: ((email: string, password: string) => Promise<unknown>) | undefined;
-        function Capture() {
-            const { login } = useAuth();
-            loginFn = login;
-            return null;
-        }
-
-        await act(async () => {
-            render(
-                <AuthProvider>
-                    <Capture />
-                </AuthProvider>
-            );
-        });
+        const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
         let caughtError: Error | undefined;
         await act(async () => {
             try {
-                await loginFn!('user@example.com', 'password');
+                await result.current.login('user@example.com', 'password');
             } catch (e) {
                 caughtError = e as Error;
             }

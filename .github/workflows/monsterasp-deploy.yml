@@ -164,6 +164,8 @@ jobs:
             "PROD_SMTP_PORT":            "SMTPSETTINGS__PORT",
             "PROD_SMTP_EMAIL":           "SMTPSETTINGS__EMAIL",
             "PROD_SMTP_PASSWORD":        "SMTPSETTINGS__PASSWORD",
+            "PROD_PAYMONGO_SECRET_KEY":  "PAYMONGO__SECRETKEY",
+            "PROD_PAYMONGO_PUBLIC_KEY":  "PAYMONGO__PUBLICKEY",
         }
         missing = [secret_name for env_var, secret_name in required.items() if not os.environ.get(env_var)]
         if missing:

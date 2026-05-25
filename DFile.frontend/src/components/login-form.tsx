@@ -97,11 +97,16 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
       setError("Google sign-in is not configured.");
       return;
     }
+    if (!window.google?.accounts?.id) {
+      setError("Google sign-in is still loading. Please try again in a moment.");
+      return;
+    }
     setError(null);
-    window.google?.accounts.id.initialize({
+    setIsGoogleLoading(true);
+    window.google.accounts.id.initialize({
       client_id: clientId,
+      use_fedcm_for_prompt: false,
       callback: async (response: { credential: string }) => {
-        setIsGoogleLoading(true);
         try {
           const { data } = await api.post<{ token: string }>("/api/auth/google/token", {
             credential: response.credential,
@@ -119,7 +124,12 @@ export function LoginForm({ className, onLogin, ...props }: LoginFormProps) {
         }
       },
     });
-    window.google?.accounts.id.prompt();
+    window.google.accounts.id.prompt((notification: { isNotDisplayed(): boolean; isSkippedMoment(): boolean }) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        setIsGoogleLoading(false);
+        window.location.href = "/api/auth/google";
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
