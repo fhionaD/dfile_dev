@@ -55,7 +55,28 @@ function PaymentReturnContent() {
             }
         };
 
-        void load();
+        // When PayMongo redirects back with success, actively verify with PayMongo API
+        // rather than waiting solely for the webhook to fire.
+        const verify = async () => {
+            try {
+                const { data } = await api.post<RegistrationPaymentStatus>(
+                    `/api/Payments/registration/${encodeURIComponent(paymentId)}/verify`
+                );
+                if (cancelled) return;
+                setPayment(data);
+                if (data.status !== "Pending") stopPolling();
+            } catch {
+                // Verification call failed — fall through to the regular polling path
+                if (!cancelled) void load();
+            }
+        };
+
+        if (statusHint === "success") {
+            void verify();
+        } else {
+            void load();
+        }
+
         pollRef.current = setInterval(() => void load(), 2500);
         // Stop polling after 90 s — user may need to wait for webhook
         const timeout = setTimeout(stopPolling, 90_000);
@@ -65,7 +86,7 @@ function PaymentReturnContent() {
             clearTimeout(timeout);
             stopPolling();
         };
-    }, [paymentId]);
+    }, [paymentId, statusHint]);
 
     if (!paymentId) {
         return (

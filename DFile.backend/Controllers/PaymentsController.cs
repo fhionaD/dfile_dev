@@ -107,11 +107,15 @@ namespace DFile.backend.Controllers
                 };
             }
 
+            var hasActivePaidSubscription = activeSub != null && !activeSub.IsFreePlan
+                && (activeSub.Status == SubscriptionStatus.Active || activeSub.Status == SubscriptionStatus.Expiring);
+
             return Ok(new BillingPlansResponseDto
             {
                 CurrentPlanCode = currentPlanCode,
                 CurrentPlan = tenantEntity.PlanId ?? 0,
                 HasUsedFreePlan = tenantEntity.HasUsedFreePlan,
+                HasActivePaidSubscription = hasActivePaidSubscription,
                 CurrentSubscription = currentSubscription,
                 Plans = plans
             });
@@ -132,6 +136,15 @@ namespace DFile.backend.Controllers
 
             if (tenantEntity.HasUsedFreePlan)
                 return UnprocessableEntity(new { message = "Free plan has already been used by this organization. Please subscribe to a paid plan." });
+
+            // Block free activation when an active paid subscription exists
+            var hasPaidSub = await _db.TenantSubscriptions.AnyAsync(
+                s => s.TenantId == tenantId
+                    && !s.IsFreePlan
+                    && (s.Status == SubscriptionStatus.Active || s.Status == SubscriptionStatus.Expiring),
+                cancellationToken);
+            if (hasPaidSub)
+                return UnprocessableEntity(new { message = "Your organization has an active paid subscription. You cannot switch to the free plan while it is active." });
 
             var freePlan = await _db.Plans
                 .FirstOrDefaultAsync(p => p.MonthlyCost == 0 && !p.IsArchived && p.IsActive, cancellationToken);
@@ -535,6 +548,82 @@ namespace DFile.backend.Controllers
 
             if (tx == null)
                 return NotFound();
+
+            return Ok(new RegistrationPaymentStatusDto
+            {
+                Status = tx.Status,
+                PlanName = tx.SubscriptionPlanCode,
+                AmountCents = tx.AmountCents,
+                Currency = tx.Currency
+            });
+        }
+
+        /// <summary>
+        /// Anonymous endpoint: verify registration payment by querying PayMongo directly.
+        /// Called by the payment-return page after redirect from PayMongo checkout.
+        /// Idempotent — activates the subscription if PayMongo reports the session as paid
+        /// and the subscription has not yet been activated (e.g. webhook has not fired yet).
+        /// </summary>
+        [HttpPost("registration/{id}/verify")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VerifyRegistrationPayment(string id, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest();
+
+            var tx = await _db.PaymentTransactions
+                .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+
+            if (tx == null)
+                return NotFound();
+
+            // Already processed — return current status without re-querying PayMongo
+            if (!string.Equals(tx.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new RegistrationPaymentStatusDto
+                {
+                    Status = tx.Status,
+                    PlanName = tx.SubscriptionPlanCode,
+                    AmountCents = tx.AmountCents,
+                    Currency = tx.Currency
+                });
+            }
+
+            // No checkout session to verify against
+            if (string.IsNullOrEmpty(tx.CheckoutSessionId))
+            {
+                return Ok(new RegistrationPaymentStatusDto
+                {
+                    Status = tx.Status,
+                    PlanName = tx.SubscriptionPlanCode,
+                    AmountCents = tx.AmountCents,
+                    Currency = tx.Currency
+                });
+            }
+
+            var sessionResult = await _payMongo.GetCheckoutSessionStatusAsync(tx.CheckoutSessionId, cancellationToken);
+
+            if (sessionResult.Ok)
+            {
+                if (string.Equals(sessionResult.Status, "paid", StringComparison.OrdinalIgnoreCase))
+                {
+                    tx.Status = "Paid";
+                    tx.UpdatedAt = DateTime.UtcNow;
+                    await ActivateSubscriptionAsync(tx, cancellationToken);
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+                else if (string.Equals(sessionResult.Status, "expired", StringComparison.OrdinalIgnoreCase))
+                {
+                    tx.Status = "Expired";
+                    tx.UpdatedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("VerifyRegistrationPayment: PayMongo query failed for session {SessionId}: {Error}",
+                    tx.CheckoutSessionId, sessionResult.ErrorMessage);
+            }
 
             return Ok(new RegistrationPaymentStatusDto
             {

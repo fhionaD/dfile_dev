@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DFile – Access Control Matrix</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f4f6f9;
+      padding: 40px 24px;
+      color: #1a1a2e;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 28px;
+    }
+
+    .wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: #fff;
+      min-width: 860px;
+    }
+
+    /* ── Header row ── */
+    thead tr th {
+      background: #1e293b;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 14px 10px;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    thead tr th:first-child {
+      text-align: left;
+      padding-left: 20px;
+      width: 200px;
+      border-radius: 12px 0 0 0;
+    }
+
+    thead tr th:last-child {
+      border-radius: 0 12px 0 0;
+    }
+
+    /* ── Section header rows ── */
+    .section-row td {
+      background: #f1f5f9;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      padding: 8px 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* ── Data rows ── */
+    tbody tr td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 12.5px;
+      vertical-align: middle;
+    }
+
+    tbody tr td:first-child {
+      text-align: left;
+      padding-left: 20px;
+      font-weight: 500;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover td { background: #f8fafc; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-full {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-no {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-redirect {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-hidden {
+      background: #fef9c3;
+      color: #92400e;
+    }
+
+    /* ── Icons ── */
+    .icon-check::before { content: "✓ "; font-weight: 900; }
+    .icon-x::before     { content: "✕ "; font-weight: 900; }
+    .icon-arrow::before { content: "→ "; }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>DFile — Access Control Matrix</h1>
+  <p class="subtitle">Role-based page and module access for all user types</p>
+
+  <div class="wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Page / Module</th>
+          <th>Anonymous</th>
+          <th>Employee</th>
+          <th>Procurement</th>
+          <th>Maintenance</th>
+          <th>Finance</th>
+          <th>Admin</th>
+          <th>Super Admin</th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        <!-- PUBLIC -->
+        <tr class="section-row"><td colspan="8">Public</td></tr>
+
+        <tr>
+          <td>Login / Register</td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Password Reset</td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <!-- TENANT ADMIN -->
+        <tr class="section-row"><td colspan="8">Tenant Admin (Admin only)</td></tr>
+
+        <tr>
+          <td>Dashboard</td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Login</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+        </tr>
+
+        <tr>
+          <td>Users Management</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Billing (Tenant)</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Audit Logs</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Asset Registration &amp; Tagging</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Asset Allocation</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Asset Disposals</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Locations / Rooms</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Maintenance (Admin View)</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <!-- FINANCE -->
+        <tr class="section-row"><td colspan="8">Finance Module (Finance &amp; Admin)</td></tr>
+
+        <tr>
+          <td>Finance Dashboard</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-hidden"><span class="icon-x"></span>Hidden (Finance only)</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Assets (Finance View)</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Depreciation</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Finance Reports</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Finance Disposals</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Maintenance Requests</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-hidden"><span class="icon-x"></span>Hidden (Finance only)</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Maintenance Overview (Finance)</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <!-- MAINTENANCE -->
+        <tr class="section-row"><td colspan="8">Maintenance Module (Maintenance Manager only)</td></tr>
+
+        <tr>
+          <td>Maintenance Dashboard</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Maintenance Schedules</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Parts Ready</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Repair History</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Asset Condition</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <tr>
+          <td>Finance Overview (Maint. Cross-Module)</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-hidden"><span class="icon-x"></span>Hidden (Finance only)</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+        </tr>
+
+        <!-- SUPER ADMIN -->
+        <tr class="section-row"><td colspan="8">Super Admin Platform (Super Admin only)</td></tr>
+
+        <tr>
+          <td>Dashboard</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-redirect"><span class="icon-arrow"></span>Redirects to Own</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Tenant Oversight</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Audit Center</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Risk Monitor</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Platform Metrics</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Billing &amp; Plans</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+        <tr>
+          <td>Emergency Controls</td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-no"><span class="icon-x"></span>No</span></td>
+          <td><span class="badge badge-full"><span class="icon-check"></span>Full Access</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <span class="badge badge-full" style="font-size:11px;padding:3px 9px;"><span class="icon-check"></span>Full Access</span>
+      <span>Can view and perform all actions</span>
+    </div>
+    <div class="legend-item">
+      <span class="badge badge-no" style="font-size:11px;padding:3px 9px;"><span class="icon-x"></span>No</span>
+      <span>Access denied (401 / 403)</span>
+    </div>
+    <div class="legend-item">
+      <span class="badge badge-redirect" style="font-size:11px;padding:3px 9px;"><span class="icon-arrow"></span>Redirects</span>
+      <span>Automatically redirected to own dashboard</span>
+    </div>
+    <div class="legend-item">
+      <span class="badge badge-hidden" style="font-size:11px;padding:3px 9px;"><span class="icon-x"></span>Hidden</span>
+      <span>Nav item hidden by allowedRoles filter</span>
+    </div>
+  </div>
+
+</body>
+</html>

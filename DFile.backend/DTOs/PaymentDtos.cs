@@ -52,6 +52,8 @@ namespace DFile.backend.DTOs
         public int CurrentPlan { get; set; }
         /// <summary>True if the tenant has previously activated the free plan — blocks re-selection.</summary>
         public bool HasUsedFreePlan { get; set; }
+        /// <summary>True when the tenant currently holds an active or expiring paid subscription. Prevents downgrade to the free tier.</summary>
+        public bool HasActivePaidSubscription { get; set; }
         /// <summary>Active or expiring subscription detail for the countdown display. Null when no subscription exists.</summary>
         public SubscriptionStatusDto? CurrentSubscription { get; set; }
         public List<BillingPlanOptionDto> Plans { get; set; } = new();

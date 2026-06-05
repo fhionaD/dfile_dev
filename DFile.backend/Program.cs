@@ -383,6 +383,7 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
         results.Append($"google_base_url_configured:{(!string.IsNullOrWhiteSpace(cfg["Google:BackendBaseUrl"])).ToString().ToLowerInvariant()};");
     }
 
+
     try
     {
         using var scope = sp.CreateScope();

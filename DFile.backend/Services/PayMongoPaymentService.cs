@@ -17,9 +17,19 @@ namespace DFile.backend.Services
             string cancelUrl,
             IReadOnlyDictionary<string, string>? metadata,
             CancellationToken cancellationToken = default);
+
+        Task<PayMongoSessionStatusResult> GetCheckoutSessionStatusAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default);
     }
 
     public sealed record PayMongoCheckoutResult(bool Ok, string? CheckoutUrl, string? CheckoutSessionId, string? ErrorMessage);
+
+    /// <summary>
+    /// Result of querying a PayMongo checkout session.
+    /// Status is the PayMongo session status: "active" | "paid" | "expired".
+    /// </summary>
+    public sealed record PayMongoSessionStatusResult(bool Ok, string? Status, string? ErrorMessage);
 
     public class PayMongoPaymentService : IPayMongoPaymentService
     {
@@ -122,6 +132,45 @@ namespace DFile.backend.Services
             {
                 _logger.LogError(ex, "PayMongo checkout_sessions request failed.");
                 return new PayMongoCheckoutResult(false, null, null, "Payment processing failed. Please try again.");
+            }
+        }
+
+        public async Task<PayMongoSessionStatusResult> GetCheckoutSessionStatusAsync(
+            string sessionId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(_options.SecretKey))
+                return new PayMongoSessionStatusResult(false, null, "PayMongo is not configured.");
+
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"v1/checkout_sessions/{Uri.EscapeDataString(sessionId)}");
+            var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.SecretKey}:"));
+            req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
+
+            try
+            {
+                var resp = await _http.SendAsync(req, cancellationToken);
+                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("PayMongo GET checkout_sessions/{SessionId} failed: {Status} {Body}",
+                        sessionId, (int)resp.StatusCode, body);
+                    return new PayMongoSessionStatusResult(false, null, $"PayMongo error: {(int)resp.StatusCode}");
+                }
+
+                using var doc = JsonDocument.Parse(body);
+                var attributes = doc.RootElement
+                    .GetProperty("data")
+                    .GetProperty("attributes");
+                var status = attributes.GetProperty("status").GetString();
+
+                return new PayMongoSessionStatusResult(true, status, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PayMongo GET checkout_sessions/{SessionId} request failed.", sessionId);
+                return new PayMongoSessionStatusResult(false, null, "Payment verification failed. Please try again.");
             }
         }
     }

@@ -36,6 +36,7 @@ interface BillingPlansResponse {
     currentPlanCode: string;
     currentPlan: number;
     hasUsedFreePlan: boolean;
+    hasActivePaidSubscription: boolean;
     currentSubscription: SubscriptionStatus | null;
     plans: BillingPlanOption[];
 }
@@ -129,7 +130,8 @@ export default function TenantBillingPage() {
     };
 
     const isCheckoutDisabled = (plan: BillingPlanOption): boolean => {
-        if (plan.isFreePlan && billing?.hasUsedFreePlan) return true;
+        // Block free plan if already used or if an active paid subscription exists
+        if (plan.isFreePlan && (billing?.hasUsedFreePlan || billing?.hasActivePaidSubscription)) return true;
         if (plan.code === billing?.currentPlanCode && billing?.currentSubscription?.status !== "Expired") return true;
         return false;
     };
@@ -236,7 +238,7 @@ export default function TenantBillingPage() {
                             const isCurrent = p.code === billing.currentPlanCode;
                             const isSelected = p.code === selectedPlanCode;
                             const isDisabled = isCheckoutDisabled(p);
-                            const freeAlreadyUsed = p.isFreePlan && billing.hasUsedFreePlan;
+                            const freeAlreadyUsed = p.isFreePlan && (billing.hasUsedFreePlan || billing.hasActivePaidSubscription);
                             const displayPrice = p.isFreePlan
                                 ? 0
                                 : billingCycle === "Yearly"
@@ -283,7 +285,9 @@ export default function TenantBillingPage() {
                                     )}
                                     {freeAlreadyUsed && (
                                         <span className="inline-block mt-3 text-xs font-medium text-muted-foreground">
-                                            Free plan already used
+                                            {billing.hasActivePaidSubscription
+                                                ? "Not available on active paid plan"
+                                                : "Free plan already used"}
                                         </span>
                                     )}
                                 </button>
