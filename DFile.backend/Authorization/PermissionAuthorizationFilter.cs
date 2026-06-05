@@ -27,35 +27,51 @@ namespace DFile.backend.Authorization
             "Admin|PurchaseOrders|CanArchive",
             "Admin|Rooms|CanView",   "Admin|Rooms|CanCreate",
             "Admin|Rooms|CanEdit",   "Admin|Rooms|CanArchive",
-            "Admin|Categories|CanView",   "Admin|Categories|CanCreate",
-            "Admin|Categories|CanEdit",   "Admin|Categories|CanArchive",
+            "Admin|AssetCategories|CanView",   "Admin|AssetCategories|CanCreate",
+            "Admin|AssetCategories|CanEdit",   "Admin|AssetCategories|CanArchive",
+            "Admin|RoomCategories|CanView",    "Admin|RoomCategories|CanCreate",
+            "Admin|RoomCategories|CanEdit",    "Admin|RoomCategories|CanArchive",
+            "Admin|Tasks|CanView",   "Admin|Tasks|CanCreate",
+            "Admin|Tasks|CanEdit",   "Admin|Tasks|CanArchive",
             "Admin|Users|CanView",   "Admin|Users|CanCreate", "Admin|Users|CanEdit",
             "Admin|AuditLogs|CanView",
 
             // Finance: view + manage asset financial data; view maintenance costs
             "Finance|Assets|CanView",  "Finance|Assets|CanCreate", "Finance|Assets|CanEdit",
+            "Finance|AssetCategories|CanView",
+            "Finance|RoomCategories|CanView",
             "Finance|Maintenance|CanView",
             "Finance|MaintenanceRequests|CanView", "Finance|MaintenanceRequests|CanEdit",
             "Finance|Rooms|CanView",
             "Finance|PurchaseOrders|CanView",
+            "Finance|Tasks|CanView",
 
             // Maintenance: create and manage maintenance records; view assets
             "Maintenance|Maintenance|CanView",  "Maintenance|Maintenance|CanCreate",
             "Maintenance|Maintenance|CanEdit",
             "Maintenance|Assets|CanView",
+            "Maintenance|AssetCategories|CanView",
+            "Maintenance|RoomCategories|CanView",
             "Maintenance|Rooms|CanView",
             "Maintenance|PurchaseOrders|CanView",
+            "Maintenance|Tasks|CanView",
 
             // Procurement: full purchase order lifecycle; view assets
             "Procurement|PurchaseOrders|CanView",   "Procurement|PurchaseOrders|CanCreate",
             "Procurement|PurchaseOrders|CanEdit",   "Procurement|PurchaseOrders|CanApprove",
             "Procurement|PurchaseOrders|CanArchive",
             "Procurement|Assets|CanView",
+            "Procurement|AssetCategories|CanView",
+            "Procurement|RoomCategories|CanView",
             "Procurement|Rooms|CanView",
+            "Procurement|Tasks|CanView",
 
             // Employee: view-only on assets and rooms
             "Employee|Assets|CanView",
+            "Employee|AssetCategories|CanView",
+            "Employee|RoomCategories|CanView",
             "Employee|Rooms|CanView",
+            "Employee|Tasks|CanView",
         };
 
         private static bool HasPermission(string role, string moduleName, string action)
