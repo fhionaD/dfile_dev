@@ -65,6 +65,7 @@ builder.Services.Configure<SmtpSettings>(
 
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ILoginAuditService, LoginAuditService>();
+builder.Services.AddSingleton<DFile.backend.Services.IEmailEncryptionService, DFile.backend.Services.EmailEncryptionService>();
 
 // Database Context
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -199,6 +200,46 @@ else
     loggerFactory.CreateLogger("Program").LogWarning(
         "DFILE_SKIP_MIGRATIONS=1: skipping EF Core Migrate() at startup.");
 }
+
+// Encrypt any existing plaintext User.Email rows that have not yet been migrated
+// (EmailHash IS NULL means the row was created before encryption was introduced).
+_ = Task.Run(async () =>
+{
+    await Task.Delay(3000); // let the app fully initialise
+    try
+    {
+        using var encScope = app.Services.CreateScope();
+        var db = encScope.ServiceProvider.GetRequiredService<DFile.backend.Data.AppDbContext>();
+        var encSvc = encScope.ServiceProvider.GetRequiredService<DFile.backend.Services.IEmailEncryptionService>();
+        var encLogger = encScope.ServiceProvider.GetRequiredService<ILogger<DFile.backend.Data.AppDbContext>>();
+
+        var pending = await db.Users
+            .Where(u => u.EmailHash == null && u.Email != null && u.Email != string.Empty)
+            .ToListAsync();
+
+        if (pending.Count == 0)
+        {
+            encLogger.LogInformation("Email encryption migration: no unencrypted rows found.");
+            return;
+        }
+
+        encLogger.LogInformation("Email encryption migration: encrypting {Count} existing user email(s)...", pending.Count);
+        foreach (var u in pending)
+        {
+            var plain = u.Email.Trim().ToLowerInvariant();
+            u.Email = encSvc.Encrypt(plain);
+            u.EmailHash = encSvc.Hash(plain);
+        }
+        await db.SaveChangesAsync();
+        encLogger.LogInformation("Email encryption migration: completed successfully.");
+    }
+    catch (Exception ex)
+    {
+        var loggerFactory2 = app.Services.GetRequiredService<ILoggerFactory>();
+        loggerFactory2.CreateLogger("Program")
+            .LogError(ex, "Email encryption migration failed. Existing plaintext emails may remain unencrypted.");
+    }
+});
 
 // Seed initial test data — development only
 if (app.Environment.IsDevelopment())

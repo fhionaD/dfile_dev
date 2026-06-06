@@ -23,17 +23,20 @@ namespace DFile.backend.Controllers
         private readonly IPayMongoPaymentService _payMongo;
         private readonly PaymentAppOptions _paymentAppOptions;
         private readonly ILogger<TenantsController> _logger;
+        private readonly IEmailEncryptionService _emailEncryption;
 
         public TenantsController(
             AppDbContext context,
             IPayMongoPaymentService payMongo,
             IOptions<PaymentAppOptions> paymentAppOptions,
-            ILogger<TenantsController> logger)
+            ILogger<TenantsController> logger,
+            IEmailEncryptionService emailEncryption)
         {
             _context = context;
             _payMongo = payMongo;
             _paymentAppOptions = paymentAppOptions.Value;
             _logger = logger;
+            _emailEncryption = emailEncryption;
         }
 
         /// <summary>Self-service org signup only. Super Admin cannot create tenants via API; use POST /api/Tenants/register.</summary>
@@ -56,7 +59,7 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrEmpty(normEmail) || !new EmailAddressAttribute().IsValid(normEmail))
                 return BadRequest(new { message = "Enter a valid email address." });
 
-            if (await _context.Users.AnyAsync(u => u.Email == normEmail))
+            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(normEmail)))
                 return Ok(new RegisterAvailabilityDto(false, "This email is already registered. Sign in instead."));
 
             if (!string.IsNullOrWhiteSpace(tenantName))
@@ -90,7 +93,7 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrEmpty(adminEmail))
                 return BadRequest(new { message = "A valid work email is required." });
 
-            if (await _context.Users.AnyAsync(u => u.Email == adminEmail, cancellationToken))
+            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(adminEmail), cancellationToken))
                 return BadRequest(new { message = "This email is already registered. Sign in instead." });
 
             if (string.IsNullOrEmpty(tenantName))
@@ -149,7 +152,8 @@ namespace DFile.backend.Controllers
                 {
                     FirstName = (dto.AdminFirstName ?? string.Empty).Trim(),
                     LastName = (dto.AdminLastName ?? string.Empty).Trim(),
-                    Email = adminEmail,
+                    Email = _emailEncryption.Encrypt(adminEmail),
+                    EmailHash = _emailEncryption.Hash(adminEmail),
                     Role = "Admin",
                     RoleLabel = "Admin",
                     TenantId = tenant.Id,

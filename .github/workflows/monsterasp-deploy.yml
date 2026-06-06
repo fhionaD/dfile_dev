@@ -145,6 +145,7 @@ jobs:
         PROD_SMTP_PORT:               ${{ secrets.SMTPSETTINGS__PORT }}
         PROD_SMTP_EMAIL:              ${{ secrets.SMTPSETTINGS__EMAIL }}
         PROD_SMTP_PASSWORD:           ${{ secrets.SMTPSETTINGS__PASSWORD }}
+        PROD_EMAIL_ENCRYPTION_KEY:    ${{ secrets.EMAILENCRYPTION__KEY }}
       run: |
         python3 << 'PYEOF'
         import os, xml.sax.saxutils as saxutils, sys
@@ -166,6 +167,7 @@ jobs:
             "PROD_SMTP_PASSWORD":        "SMTPSETTINGS__PASSWORD",
             "PROD_PAYMONGO_SECRET_KEY":  "PAYMONGO__SECRETKEY",
             "PROD_PAYMONGO_PUBLIC_KEY":  "PAYMONGO__PUBLICKEY",
+            "PROD_EMAIL_ENCRYPTION_KEY": "EMAILENCRYPTION__KEY",
         }
         missing = [secret_name for env_var, secret_name in required.items() if not os.environ.get(env_var)]
         if missing:
@@ -199,6 +201,7 @@ jobs:
             f'          <environmentVariable name="SmtpSettings__Email" value="{e(os.environ["PROD_SMTP_EMAIL"])}" />\n'
             f'          <environmentVariable name="SmtpSettings__Password" value="{e(os.environ["PROD_SMTP_PASSWORD"])}" />\n'
             f'          <environmentVariable name="AllowedOrigins__Frontend" value="{e(app_base_url)}" />\n'
+            f'          <environmentVariable name="EmailEncryption__Key" value="{e(os.environ["PROD_EMAIL_ENCRYPTION_KEY"])}" />\n'
         )
 
         path = 'publish/web.config'

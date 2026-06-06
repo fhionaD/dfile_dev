@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
+
 namespace DFile.backend.Models
 {
     public class User
@@ -16,8 +17,13 @@ namespace DFile.backend.Models
         [Required]
         public string LastName { get; set; } = string.Empty;
 
+        /// <summary>AES-256-GCM encrypted email address (nonce.ciphertext.tag, base64). Never expose the raw ciphertext externally.</summary>
         [Required]
         public string Email { get; set; } = string.Empty;
+
+        /// <summary>HMAC-SHA256 hex of the normalized (lowercase) email. Used for indexed database lookups.</summary>
+        [MaxLength(64)]
+        public string? EmailHash { get; set; }
 
         [JsonIgnore]
         public string PasswordHash { get; set; } = string.Empty;

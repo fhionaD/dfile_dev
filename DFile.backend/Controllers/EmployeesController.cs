@@ -21,13 +21,15 @@ namespace DFile.backend.Controllers
         private readonly IAuditService _auditService;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
+        private readonly IEmailEncryptionService _emailEncryption;
 
-        public EmployeesController(AppDbContext context, IAuditService auditService, IEmailService emailService, IConfiguration configuration)
+        public EmployeesController(AppDbContext context, IAuditService auditService, IEmailService emailService, IConfiguration configuration, IEmailEncryptionService emailEncryption)
         {
             _context = context;
             _auditService = auditService;
             _emailService = emailService;
             _configuration = configuration;
+            _emailEncryption = emailEncryption;
         }
 
         private int? GetCurrentUserId()
@@ -128,7 +130,7 @@ namespace DFile.backend.Controllers
             if (await _context.Employees.AnyAsync(e => e.Email.ToLower() == dto.Email.ToLowerInvariant() && e.TenantId == (IsSuperAdmin() ? (int?)null : tenantId)))
                 return BadRequest(new { message = "An employee with this email already exists." });
 
-            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLowerInvariant()))
+            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant())))
                 return BadRequest(new { message = "A user account with this email already exists." });
 
             var employee = new Employee
@@ -159,7 +161,8 @@ namespace DFile.backend.Controllers
                 FirstName = dto.FirstName,
                 MiddleName = dto.MiddleName,
                 LastName = dto.LastName,
-                Email = dto.Email,
+                Email = _emailEncryption.Encrypt(dto.Email.Trim().ToLowerInvariant()),
+                EmailHash = _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant()),
                 Role = dto.Role,
                 RoleLabel = dto.Role,
                 ContactNumber = dto.ContactNumber,

@@ -15,12 +15,14 @@ namespace DFile.backend.Services
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
         private readonly ILogger<LoginAuditService> _logger;
+        private readonly IEmailEncryptionService _emailEncryption;
 
-        public LoginAuditService(AppDbContext context, IEmailService emailService, ILogger<LoginAuditService> logger)
+        public LoginAuditService(AppDbContext context, IEmailService emailService, ILogger<LoginAuditService> logger, IEmailEncryptionService emailEncryption)
         {
             _context = context;
             _emailService = emailService;
             _logger = logger;
+            _emailEncryption = emailEncryption;
         }
 
         public async Task<bool> IsLockedOutAsync(User user)
@@ -59,7 +61,7 @@ namespace DFile.backend.Services
             var audit = new UserLoginAudit
             {
                 UserId = user.Id,
-                Email = user.Email,
+                Email = _emailEncryption.Decrypt(user.Email),
                 AttemptStatus = isNowLocked ? "LOGIN_LOCKED" : (isSuspicious ? "SUSPICIOUS_LOGIN" : "LOGIN_FAILED"),
                 IpAddress = ipAddress,
                 UserAgent = userAgent,
@@ -77,12 +79,12 @@ namespace DFile.backend.Services
             {
                 try
                 {
-                    await _emailService.SendLoginSecurityAlertAsync(user.Email, user.FirstName, ipAddress, userAgent, user.FailedLoginAttempts);
+                    await _emailService.SendLoginSecurityAlertAsync(_emailEncryption.Decrypt(user.Email), user.FirstName, ipAddress, userAgent, user.FailedLoginAttempts);
                     securityAlertSent = true;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to send security alert email to {Email}", user.Email);
+                    _logger.LogError(ex, "Failed to send security alert email for user {UserId}", user.Id);
                 }
             }
 
@@ -103,7 +105,7 @@ namespace DFile.backend.Services
             var audit = new UserLoginAudit
             {
                 UserId = user.Id,
-                Email = user.Email,
+                Email = _emailEncryption.Decrypt(user.Email),
                 AttemptStatus = "LOGIN_SUCCESS",
                 IpAddress = ipAddress,
                 UserAgent = userAgent,

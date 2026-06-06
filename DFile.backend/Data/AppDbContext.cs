@@ -364,9 +364,14 @@ namespace DFile.backend.Data
             // ── User ───────────────────────────────────────────────
             modelBuilder.Entity<User>(e =>
             {
-                e.HasIndex(u => u.Email)
+                // Email column stores AES-256-GCM ciphertext — needs enough room for the encoded payload.
+                e.Property(u => u.Email).HasMaxLength(600);
+
+                // EmailHash is the indexed HMAC-SHA256 lookup column — replaces the old plaintext Email index.
+                e.HasIndex(u => u.EmailHash)
                     .IsUnique()
-                    .HasDatabaseName("IX_Users_Email");
+                    .HasFilter("[EmailHash] IS NOT NULL")
+                    .HasDatabaseName("IX_Users_EmailHash");
 
                 e.HasIndex(u => u.TenantId)
                     .HasDatabaseName("IX_Users_TenantId");

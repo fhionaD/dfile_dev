@@ -10,11 +10,13 @@ namespace DFile.backend.Services
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _email;
+        private readonly IEmailEncryptionService _emailEncryption;
 
-        public NotificationService(AppDbContext context, IEmailService email)
+        public NotificationService(AppDbContext context, IEmailService email, IEmailEncryptionService emailEncryption)
         {
             _context = context;
             _email = email;
+            _emailEncryption = emailEncryption;
         }
 
         public Task NotifyPurchaseOrderApprovedAsync(PurchaseOrder order, CancellationToken cancellationToken = default)
@@ -272,10 +274,11 @@ namespace DFile.backend.Services
 
         private async Task<string?> GetTenantAdminEmailAsync(int tenantId, CancellationToken cancellationToken)
         {
-            return await _context.Users
+            var encrypted = await _context.Users
                 .Where(u => u.TenantId == tenantId && u.Role == "Admin" && u.Status == "Active")
                 .Select(u => u.Email)
                 .FirstOrDefaultAsync(cancellationToken);
+            return encrypted == null ? null : _emailEncryption.Decrypt(encrypted);
         }
     }
 }

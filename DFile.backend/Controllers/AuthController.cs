@@ -28,8 +28,9 @@ namespace DFile.backend.Controllers
         private readonly IMemoryCache _cache;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILoginAuditService _loginAudit;
+        private readonly IEmailEncryptionService _emailEncryption;
 
-        public AuthController(AppDbContext context, IConfiguration configuration, ILogger<AuthController> logger, IEmailService emailService, IMemoryCache cache, IHttpClientFactory httpClientFactory, ILoginAuditService loginAudit)
+        public AuthController(AppDbContext context, IConfiguration configuration, ILogger<AuthController> logger, IEmailService emailService, IMemoryCache cache, IHttpClientFactory httpClientFactory, ILoginAuditService loginAudit, IEmailEncryptionService emailEncryption)
         {
             _context = context;
             _configuration = configuration;
@@ -38,6 +39,7 @@ namespace DFile.backend.Controllers
             _cache = cache;
             _httpClientFactory = httpClientFactory;
             _loginAudit = loginAudit;
+            _emailEncryption = emailEncryption;
         }
 
         [HttpPost("login")]
@@ -50,10 +52,11 @@ namespace DFile.backend.Controllers
                     return BadRequest(new { success = false, message = "Email and password are required." });
 
                 var emailNormalized = dto.Email.Trim().ToLowerInvariant();
+                var emailHash = _emailEncryption.Hash(emailNormalized);
                 var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
                 var userAgent = Request.Headers.UserAgent.ToString();
 
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == emailHash);
 
                 if (user == null)
                 {
@@ -158,13 +161,14 @@ namespace DFile.backend.Controllers
                     });
                 }
 
-                // Login succeeded â€” reset failed attempts
+                // Login succeeded - reset failed attempts
                 await _loginAudit.ResetFailedAttemptsAsync(user);
 
                 // Device recognition
                 var fingerprint = _loginAudit.GenerateDeviceFingerprint(userAgent, ipAddress);
                 var isKnownDevice = await _loginAudit.IsKnownDeviceAsync(user.Id, fingerprint);
                 bool emailNotificationSent = false;
+                var plainEmailForNotify = _emailEncryption.Decrypt(user.Email);
 
                 await _loginAudit.SaveTrustedDeviceAsync(user.Id, fingerprint, ipAddress, userAgent);
                 await _loginAudit.RecordSuccessAsync(user, ipAddress, userAgent);
@@ -175,7 +179,7 @@ namespace DFile.backend.Controllers
                     _context.UserLoginAudits.Add(new UserLoginAudit
                     {
                         UserId = user.Id,
-                        Email = user.Email,
+                        Email = plainEmailForNotify,
                         AttemptStatus = "NEW_DEVICE_LOGIN",
                         IpAddress = ipAddress,
                         UserAgent = userAgent,
@@ -187,7 +191,7 @@ namespace DFile.backend.Controllers
 
                     try
                     {
-                        await _emailService.SendNewDeviceLoginAlertAsync(user.Email, user.FirstName, ipAddress, userAgent);
+                        await _emailService.SendNewDeviceLoginAlertAsync(plainEmailForNotify, user.FirstName, ipAddress, userAgent);
                         emailNotificationSent = true;
                     }
                     catch (Exception ex)
@@ -199,7 +203,7 @@ namespace DFile.backend.Controllers
                 {
                     try
                     {
-                        await _emailService.SendLoginSuccessNotificationAsync(user.Email, user.FirstName, ipAddress, userAgent, false);
+                        await _emailService.SendLoginSuccessNotificationAsync(plainEmailForNotify, user.FirstName, ipAddress, userAgent, false);
                         emailNotificationSent = true;
                     }
                     catch (Exception ex)
@@ -208,7 +212,7 @@ namespace DFile.backend.Controllers
                     }
                 }
 
-                _logger.LogInformation("Login successful for user {UserId}: {Email}", user.Id, user.Email);
+                _logger.LogInformation("Login successful for user {UserId}", user.Id);
                 var token = GenerateJwtToken(user);
                 var userResponse = await MapToResponseWithPermissions(user);
 
@@ -247,7 +251,7 @@ namespace DFile.backend.Controllers
         [Authorize(Roles = "Super Admin,Admin")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant())))
                 return BadRequest(new { message = "User with this email already exists." });
 
             // Validate role
@@ -281,7 +285,8 @@ namespace DFile.backend.Controllers
                 FirstName = dto.FirstName,
                 MiddleName = dto.MiddleName,
                 LastName = dto.LastName,
-                Email = dto.Email,
+                Email = _emailEncryption.Encrypt(dto.Email.Trim().ToLowerInvariant()),
+                EmailHash = _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant()),
                 ContactNumber = dto.ContactNumber,
                 Address = dto.Address,
                 Role = dto.Role,
@@ -290,7 +295,7 @@ namespace DFile.backend.Controllers
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow
-            };
+            };;
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -306,7 +311,7 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Invalid request." });
 
             var emailNormalized = dto.Email.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == _emailEncryption.Hash(emailNormalized));
 
             if (user == null || user.Status != "PendingActivation")
                 return BadRequest(new { message = "Invalid or already used activation link." });
@@ -378,7 +383,7 @@ namespace DFile.backend.Controllers
             }
 
             var emailNormalized = googleEmail.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == _emailEncryption.Hash(emailNormalized));
 
             if (user == null)
                 return Unauthorized(new { message = "No DFile account found for your Google email. Contact your administrator." });
@@ -394,13 +399,14 @@ namespace DFile.backend.Controllers
             }
 
             var jwt = GenerateJwtToken(user);
+            var plainEmail = _emailEncryption.Decrypt(user.Email);
             return Ok(new
             {
                 token = jwt,
                 user = new
                 {
                     id = user.Id,
-                    email = user.Email,
+                    email = plainEmail,
                     role = user.Role,
                     tenantId = user.TenantId,
                     fullName = $"{user.FirstName} {user.LastName}".Trim()
@@ -510,7 +516,7 @@ namespace DFile.backend.Controllers
             }
 
             var emailNormalized = googleEmail.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == _emailEncryption.Hash(emailNormalized));
 
             if (user == null)
                 return Redirect($"{appBaseUrl}/google-callback?error=no_account");
@@ -545,7 +551,7 @@ namespace DFile.backend.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
-                new Claim(ClaimTypes.Email, user.Email ?? ""),
+                new Claim(ClaimTypes.Email, _emailEncryption.Decrypt(user.Email)),
                 new Claim(ClaimTypes.Role, authRole)
             };
 
@@ -570,7 +576,7 @@ namespace DFile.backend.Controllers
             return tokenHandler.WriteToken(token);
         }
 
-        private static async Task<UserResponseDto> MapToResponseWithPermissions(User user)
+        private async Task<UserResponseDto> MapToResponseWithPermissions(User user)
         {
             var response = new UserResponseDto
             {
@@ -578,7 +584,7 @@ namespace DFile.backend.Controllers
                 FirstName = user.FirstName,
                 MiddleName = user.MiddleName,
                 LastName = user.LastName,
-                Email = user.Email,
+                Email = _emailEncryption.Decrypt(user.Email),
                 ContactNumber = user.ContactNumber,
                 Address = user.Address,
                 Role = user.Role,
@@ -600,7 +606,7 @@ namespace DFile.backend.Controllers
             const string safeResponse = "If that email is registered, a password reset link has been sent.";
 
             var emailNormalized = dto.Email.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == _emailEncryption.Hash(emailNormalized));
 
             if (user == null || user.Status == "PendingActivation")
                 return Ok(new { message = safeResponse });
@@ -615,14 +621,15 @@ namespace DFile.backend.Controllers
 
             var appBaseUrl = $"{Request.Scheme}://{Request.Host}";
             var encodedToken = Uri.EscapeDataString(rawToken);
-            var encodedEmail = Uri.EscapeDataString(user.Email);
+            var plainEmail = _emailEncryption.Decrypt(user.Email);
+            var encodedEmail = Uri.EscapeDataString(plainEmail);
             var resetLink = $"{appBaseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
             var html = $"""
                 <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#ffffff;border-radius:8px;border:1px solid #e2e8f0">
                   <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Reset your DFile password</h2>
                   <p style="margin:0 0 24px;font-size:14px;color:#475569">
-                    We received a request to reset the password for your account (<strong>{user.Email}</strong>).
+                    We received a request to reset the password for your account (<strong>{plainEmail}</strong>).
                     Click the button below to choose a new password. This link expires in <strong>1 hour</strong>.
                   </p>
                   <a href="{resetLink}"
@@ -637,11 +644,11 @@ namespace DFile.backend.Controllers
 
             try
             {
-                await _emailService.SendEmailAsync(user.Email, "Reset Your DFile Password", html);
+                await _emailService.SendEmailAsync(plainEmail, "Reset Your DFile Password", html);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+                _logger.LogError(ex, "Failed to send password reset email to user {UserId}", user.Id);
                 // Do not expose send failure to the caller
             }
 
@@ -656,7 +663,7 @@ namespace DFile.backend.Controllers
                 return BadRequest(new { message = "Invalid request." });
 
             var emailNormalized = dto.Email.Trim().ToLowerInvariant();
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNormalized);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == _emailEncryption.Hash(emailNormalized));
 
             if (user == null || user.ActivationTokenHash == null || user.ActivationTokenExpiry == null)
                 return BadRequest(new { message = "This reset link is invalid or has already been used." });
