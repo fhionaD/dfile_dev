@@ -94,11 +94,18 @@ namespace DFile.backend.Controllers
                 if (string.IsNullOrWhiteSpace(user.PasswordHash))
                     return Unauthorized(new { success = false, message = "Invalid credentials.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
 
+                // Only block tenants that are explicitly deactivated or suspended.
+                // "PendingPayment" tenants must be allowed in so the admin can complete or retry payment.
+                string? tenantStatus = null;
                 if (user.TenantId.HasValue)
                 {
                     var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
-                    if (tenant != null && tenant.Status != "Active")
-                        return Unauthorized(new { success = false, message = "Your organization's account is inactive. Please contact support.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
+                    if (tenant != null)
+                    {
+                        tenantStatus = tenant.Status;
+                        if (tenant.Status == "Inactive" || tenant.Status == "Suspended" || tenant.Status == "Archived")
+                            return Unauthorized(new { success = false, message = "Your organization's account has been deactivated. Please contact support.", attemptsLeft = (int?)null, cooldownMinutes = 0 });
+                    }
                 }
 
                 bool passwordMatches;
@@ -211,7 +218,8 @@ namespace DFile.backend.Controllers
                     token,
                     user = userResponse,
                     newDeviceDetected = !isKnownDevice,
-                    emailNotificationSent
+                    emailNotificationSent,
+                    tenantStatus
                 });
             }
             catch (Exception ex)
@@ -513,7 +521,7 @@ namespace DFile.backend.Controllers
             if (user.TenantId.HasValue)
             {
                 var tenant = await _context.Tenants.FindAsync(user.TenantId.Value);
-                if (tenant != null && tenant.Status != "Active")
+                if (tenant != null && (tenant.Status == "Inactive" || tenant.Status == "Suspended" || tenant.Status == "Archived"))
                     return Redirect($"{appBaseUrl}/google-callback?error=tenant_inactive");
             }
 

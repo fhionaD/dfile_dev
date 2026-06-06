@@ -21,7 +21,7 @@ namespace DFile.backend.DTOs
         public string AdminEmail { get; set; } = string.Empty;
 
         [Required]
-        [MinLength(6)]
+        [MinLength(15)]
         public string AdminPassword { get; set; } = string.Empty;
 
         [Required]
