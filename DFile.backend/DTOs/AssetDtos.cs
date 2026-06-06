@@ -15,7 +15,6 @@ namespace DFile.backend.DTOs
 
         public LifecycleStatus LifecycleStatus { get; set; } = LifecycleStatus.Registered;
         public AssetCondition CurrentCondition { get; set; } = AssetCondition.Good;
-        [MaxLength(2000)]
         public string? Image { get; set; }
         [MaxLength(200)]
         public string? Manufacturer { get; set; }
@@ -70,7 +69,6 @@ namespace DFile.backend.DTOs
 
         public LifecycleStatus LifecycleStatus { get; set; } = LifecycleStatus.Registered;
         public AssetCondition CurrentCondition { get; set; } = AssetCondition.Good;
-        [MaxLength(2000)]
         public string? Image { get; set; }
         [MaxLength(200)]
         public string? Manufacturer { get; set; }

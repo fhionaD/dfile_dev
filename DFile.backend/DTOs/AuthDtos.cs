@@ -28,7 +28,7 @@ namespace DFile.backend.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+        [MinLength(15, ErrorMessage = "Password must be at least 15 characters.")]
         public string Password { get; set; } = string.Empty;
 
         // Role: "Finance Manager" or "Maintenance Manager" (for tenant users)
@@ -51,7 +51,7 @@ namespace DFile.backend.DTOs
         public string Token { get; set; } = string.Empty;
 
         [Required]
-        [MinLength(8)]
+        [MinLength(15)]
         public string NewPassword { get; set; } = string.Empty;
     }
 

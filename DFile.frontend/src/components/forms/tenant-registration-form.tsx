@@ -25,7 +25,7 @@ export default function EnhancedTenantForm() {
 
     // Password Validation Criteria
     const requirements = useMemo(() => [
-        { label: "8+ Chars", test: (p: string) => p.length >= 8 },
+        { label: "15+ Chars", test: (p: string) => p.length >= 15 },
         { label: "Uppercase", test: (p: string) => /[A-Z]/.test(p) },
         { label: "Number", test: (p: string) => /[0-9]/.test(p) },
         { label: "Special", test: (p: string) => /[^A-Za-z0-9]/.test(p) },

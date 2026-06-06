@@ -14,8 +14,8 @@ namespace DFile.backend.Helpers
             if (string.IsNullOrWhiteSpace(password))
                 return (false, "Password is required.");
 
-            if (password.Length < 8)
-                return (false, "Password must be at least 8 characters.");
+            if (password.Length < 15)
+                return (false, "Password must be at least 15 characters.");
 
             if (!UpperCase.IsMatch(password))
                 return (false, "Password must contain at least one uppercase letter.");

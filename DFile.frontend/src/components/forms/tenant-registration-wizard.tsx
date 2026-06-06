@@ -55,6 +55,7 @@ const STEPS = ["Account", "Organization", "Plan"] as const;
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const PASSWORD_REQUIREMENTS = [
+    { label: "At least 15 characters", test: /^.{15,}$/ },
     { label: "At least one uppercase letter", test: /[A-Z]/ },
     { label: "At least one lowercase letter", test: /[a-z]/ },
     { label: "At least one number", test: /[0-9]/ },
@@ -244,8 +245,8 @@ export function TenantRegistrationWizard() {
         if (!workEmail.trim()) next.workEmail = "Work email is required";
         if (!initialPassword) {
             next.initialPassword = "Password is required";
-        } else if (initialPassword.length < 6) {
-            next.initialPassword = "Password must be at least 6 characters";
+        } else if (initialPassword.length < 15) {
+            next.initialPassword = "Password must be at least 15 characters";
         } else if (!allPasswordMet) {
             next.initialPassword = "Password does not meet all requirements";
         }

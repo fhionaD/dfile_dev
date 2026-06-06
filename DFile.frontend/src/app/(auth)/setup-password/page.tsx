@@ -6,6 +6,7 @@ import { Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordRequirements, passwordMeetsPolicy } from "@/components/password-requirements";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -29,8 +30,8 @@ function SetupPasswordForm() {
 
         const newErrors: Record<string, string> = {};
 
-        if (newPassword.length < 8) {
-            newErrors.newPassword = "Password must be at least 8 characters.";
+        if (!passwordMeetsPolicy(newPassword)) {
+            newErrors.newPassword = "Password does not meet the requirements below.";
         }
         if (newPassword !== confirmPassword) {
             newErrors.confirmPassword = "Passwords do not match.";
@@ -103,7 +104,7 @@ function SetupPasswordForm() {
                                 required
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="Minimum 8 characters"
+                                placeholder="Minimum 15 characters"
                                 className={`h-11 pr-10 ${errors.newPassword ? "border-destructive focus-visible:ring-destructive" : ""}`}
                             />
                             <button
@@ -117,6 +118,7 @@ function SetupPasswordForm() {
                         {errors.newPassword && (
                             <p className="text-[11px] text-destructive font-medium">{errors.newPassword}</p>
                         )}
+                        <PasswordRequirements password={newPassword} />
                     </div>
 
                     <div className="space-y-2 relative">
