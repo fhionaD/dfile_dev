@@ -50,61 +50,70 @@ namespace DFile.backend.Services
         public async Task SendLoginSuccessNotificationAsync(string recipient, string firstName, string? ipAddress, string? userAgent, bool isNewDevice)
         {
             var deviceNote = isNewDevice
-                ? "<p style='color:#c0392b;font-weight:bold;'>âš ï¸ This was from an unrecognized device or location.</p>"
+                ? "<p style='color:#c0392b;font-weight:bold;'>This login originated from an unrecognized device or location.</p>"
                 : "";
 
             var html = $@"
-<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9f9f9;padding:24px;border-radius:8px;'>
-  <h2 style='color:#2c3e50;'>âœ… Successful Login â€” DFile</h2>
-  <p>Hi <strong>{firstName}</strong>,</p>
-  <p>A successful login was recorded on your account.</p>
+<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border-radius:4px;border:1px solid #d0d0d0;'>
+  <div style='border-bottom:2px solid #2c3e50;padding-bottom:16px;margin-bottom:24px;'>
+    <h2 style='color:#2c3e50;margin:0;font-size:18px;letter-spacing:0.5px;'>DFILE SECURITY NOTIFICATION</h2>
+    <p style='color:#7f8c8d;margin:4px 0 0;font-size:12px;'>Successful Login Alert</p>
+  </div>
+  <p>Dear <strong>{firstName}</strong>,</p>
+  <p>A successful login was recorded on your DFile account. Please review the details below.</p>
   {deviceNote}
-  <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
-    <tr><td style='padding:8px;background:#ecf0f1;font-weight:bold;width:40%;'>Time (UTC)</td><td style='padding:8px;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
-    <tr><td style='padding:8px;background:#ecf0f1;font-weight:bold;'>IP Address</td><td style='padding:8px;'>{ipAddress ?? "Unknown"}</td></tr>
-    <tr><td style='padding:8px;background:#ecf0f1;font-weight:bold;'>Device / Browser</td><td style='padding:8px;'>{TruncateUserAgent(userAgent)}</td></tr>
+  <table style='width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;'>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;width:40%;border:1px solid #d5d8dc;'>Time (UTC)</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>IP Address</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{ipAddress ?? "Unknown"}</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>Device / Browser</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{TruncateUserAgent(userAgent)}</td></tr>
   </table>
-  <p>If this was not you, please change your password immediately and contact support.</p>
-  <p style='font-size:12px;color:#7f8c8d;'>â€” DFile Security Team</p>
+  <p>If you did not initiate this login, change your password immediately and contact your system administrator.</p>
+  <p style='font-size:12px;color:#7f8c8d;margin-top:32px;border-top:1px solid #d0d0d0;padding-top:12px;'>This is an automated security notification from DFile. Please do not reply to this message.<br>DFile Security Team</p>
 </div>";
-            await SendEmailAsync(recipient, "DFile â€” Successful Login Detected", html);
+            await SendEmailAsync(recipient, "DFile - Successful Login Notification", html);
         }
 
         public async Task SendLoginSecurityAlertAsync(string recipient, string firstName, string? ipAddress, string? userAgent, int failedAttempts)
         {
             var html = $@"
-<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff3f3;padding:24px;border-radius:8px;border:2px solid #e74c3c;'>
-  <h2 style='color:#c0392b;'>ðŸš¨ Suspicious Login Activity â€” DFile</h2>
-  <p>Hi <strong>{firstName}</strong>,</p>
-  <p>We have detected <strong>{failedAttempts} failed login attempt(s)</strong> on your account. This may indicate unauthorized access.</p>
-  <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
-    <tr><td style='padding:8px;background:#fadbd8;font-weight:bold;width:40%;'>Time (UTC)</td><td style='padding:8px;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
-    <tr><td style='padding:8px;background:#fadbd8;font-weight:bold;'>IP Address</td><td style='padding:8px;'>{ipAddress ?? "Unknown"}</td></tr>
-    <tr><td style='padding:8px;background:#fadbd8;font-weight:bold;'>Device / Browser</td><td style='padding:8px;'>{TruncateUserAgent(userAgent)}</td></tr>
-    <tr><td style='padding:8px;background:#fadbd8;font-weight:bold;'>Failed Attempts</td><td style='padding:8px;'>{failedAttempts} of 5</td></tr>
+<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border-radius:4px;border:1px solid #d0d0d0;'>
+  <div style='border-bottom:2px solid #c0392b;padding-bottom:16px;margin-bottom:24px;'>
+    <h2 style='color:#c0392b;margin:0;font-size:18px;letter-spacing:0.5px;'>DFILE SECURITY ALERT</h2>
+    <p style='color:#7f8c8d;margin:4px 0 0;font-size:12px;'>Suspicious Login Activity Detected</p>
+  </div>
+  <p>Dear <strong>{firstName}</strong>,</p>
+  <p>We have detected <strong>{failedAttempts} failed login attempt(s)</strong> on your account. This may indicate an unauthorized access attempt.</p>
+  <table style='width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;'>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;width:40%;border:1px solid #d5d8dc;'>Time (UTC)</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>IP Address</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{ipAddress ?? "Unknown"}</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>Device / Browser</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{TruncateUserAgent(userAgent)}</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>Failed Attempts</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{failedAttempts} of 5</td></tr>
   </table>
-  <p><strong>If this was not you, secure your account immediately by resetting your password.</strong></p>
-  <p style='font-size:12px;color:#7f8c8d;'>â€” DFile Security Team</p>
+  <p><strong>If you did not initiate these attempts, secure your account immediately by resetting your password.</strong></p>
+  <p style='font-size:12px;color:#7f8c8d;margin-top:32px;border-top:1px solid #d0d0d0;padding-top:12px;'>This is an automated security notification from DFile. Please do not reply to this message.<br>DFile Security Team</p>
 </div>";
-            await SendEmailAsync(recipient, "DFile â€” Suspicious Login Activity Detected", html);
+            await SendEmailAsync(recipient, "DFile - Suspicious Login Activity Detected", html);
         }
 
         public async Task SendNewDeviceLoginAlertAsync(string recipient, string firstName, string? ipAddress, string? userAgent)
         {
             var html = $@"
-<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fffbe6;padding:24px;border-radius:8px;border:2px solid #f39c12;'>
-  <h2 style='color:#d68910;'>ðŸ”” New Device Login â€” DFile</h2>
-  <p>Hi <strong>{firstName}</strong>,</p>
-  <p>Your account was accessed from a new or unrecognized device.</p>
-  <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
-    <tr><td style='padding:8px;background:#fdebd0;font-weight:bold;width:40%;'>Time (UTC)</td><td style='padding:8px;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
-    <tr><td style='padding:8px;background:#fdebd0;font-weight:bold;'>IP Address</td><td style='padding:8px;'>{ipAddress ?? "Unknown"}</td></tr>
-    <tr><td style='padding:8px;background:#fdebd0;font-weight:bold;'>Device / Browser</td><td style='padding:8px;'>{TruncateUserAgent(userAgent)}</td></tr>
+<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border-radius:4px;border:1px solid #d0d0d0;'>
+  <div style='border-bottom:2px solid #1a5276;padding-bottom:16px;margin-bottom:24px;'>
+    <h2 style='color:#1a5276;margin:0;font-size:18px;letter-spacing:0.5px;'>DFILE SECURITY NOTIFICATION</h2>
+    <p style='color:#7f8c8d;margin:4px 0 0;font-size:12px;'>New Device Login Detected</p>
+  </div>
+  <p>Dear <strong>{firstName}</strong>,</p>
+  <p>Your DFile account was accessed from a new or unrecognized device. Please review the details below.</p>
+  <table style='width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;'>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;width:40%;border:1px solid #d5d8dc;'>Time (UTC)</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>IP Address</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{ipAddress ?? "Unknown"}</td></tr>
+    <tr><td style='padding:10px 12px;background:#f4f6f7;font-weight:bold;border:1px solid #d5d8dc;'>Device / Browser</td><td style='padding:10px 12px;border:1px solid #d5d8dc;'>{TruncateUserAgent(userAgent)}</td></tr>
   </table>
-  <p>If this was not you, please reset your password and contact support.</p>
-  <p style='font-size:12px;color:#7f8c8d;'>â€” DFile Security Team</p>
+  <p>If you did not initiate this login, reset your password immediately and notify your system administrator.</p>
+  <p style='font-size:12px;color:#7f8c8d;margin-top:32px;border-top:1px solid #d0d0d0;padding-top:12px;'>This is an automated security notification from DFile. Please do not reply to this message.<br>DFile Security Team</p>
 </div>";
-            await SendEmailAsync(recipient, "DFile â€” New Device Login Detected", html);
+            await SendEmailAsync(recipient, "DFile - New Device Login Detected", html);
         }
 
         private static string TruncateUserAgent(string? userAgent)
