@@ -286,7 +286,6 @@ export interface Employee {
     email: string;
     contactNumber: string;
     address?: string;
-    department: string;
     role: string;
     hireDate: string;
     status: "Active" | "Inactive" | "Archived";

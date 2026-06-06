@@ -89,7 +89,7 @@ export function RolesDashboard({ roles, employees, showArchived, onToggleArchive
         const fullNameB = `${b.firstName} ${b.middleName ? b.middleName + " " : ""}${b.lastName}`.toLowerCase();
         if (sortKey === "name") { av = fullNameA; bv = fullNameB; }
         else if (sortKey === "email") { av = a.email.toLowerCase(); bv = b.email.toLowerCase(); }
-        else if (sortKey === "department") { av = (a.department ?? "").toLowerCase(); bv = (b.department ?? "").toLowerCase(); }
+        else if (sortKey === "department") { av = ""; bv = ""; }
         else if (sortKey === "role") { av = (a.role ?? "").toLowerCase(); bv = (b.role ?? "").toLowerCase(); }
         else if (sortKey === "status") { av = (a.status ?? "").toLowerCase(); bv = (b.status ?? "").toLowerCase(); }
         if (av < bv) return sortDir === "asc" ? -1 : 1;
@@ -180,13 +180,6 @@ export function RolesDashboard({ roles, employees, showArchived, onToggleArchive
                                 </SortableTableHead>
                                 <SortableTableHead
                                     className="h-10 px-4 py-3 text-xs"
-                                    sorted={sorted("department")}
-                                    onSort={() => toggleSort("department")}
-                                >
-                                    Department
-                                </SortableTableHead>
-                                <SortableTableHead
-                                    className="h-10 px-4 py-3 text-xs"
                                     sorted={sorted("role")}
                                     onSort={() => toggleSort("role")}
                                 >
@@ -205,7 +198,7 @@ export function RolesDashboard({ roles, employees, showArchived, onToggleArchive
                         <TableBody>
                             {displayEmps.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
+                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-sm">
                                         {showArchived ? "No archived personnel yet" : "No personnel match your search"}
                                     </TableCell>
                                 </TableRow>
@@ -217,9 +210,6 @@ export function RolesDashboard({ roles, employees, showArchived, onToggleArchive
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {emp.email}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {emp.department}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {emp.role}

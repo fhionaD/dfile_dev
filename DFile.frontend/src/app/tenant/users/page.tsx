@@ -7,10 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Users, Plus, Search, Archive, RotateCcw, MoreHorizontal, Eye, Pencil, Shield } from "lucide-react";
+import { Users, Plus, Search, Archive, RotateCcw } from "lucide-react";
 import { useEmployees, useAddEmployee, useUpdateEmployee, useArchiveEmployee, useRestoreEmployee } from "@/hooks/use-organization";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Employee } from "@/types/asset";
@@ -39,8 +36,6 @@ export default function UsersPage() {
             return (
                 e.firstName.toLowerCase().includes(q) ||
                 e.lastName.toLowerCase().includes(q) ||
-                e.email.toLowerCase().includes(q) ||
-                e.department.toLowerCase().includes(q) ||
                 e.role.toLowerCase().includes(q)
             );
         }
@@ -66,7 +61,6 @@ export default function UsersPage() {
             email: emp.email,
             contactNumber: emp.contactNumber,
             address: emp.address,
-            department: emp.department,
             role: emp.role,
             hireDate: emp.hireDate,
         };
@@ -129,46 +123,39 @@ export default function UsersPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Department</TableHead>
                                 <TableHead>Role</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="w-[80px] text-center">Actions</TableHead>
+                                <TableHead className="w-[96px] text-center">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filtered.map(emp => (
-                                <TableRow key={emp.id}>
+                                <TableRow key={emp.id} className="cursor-pointer" onClick={() => handleEmployeeClick(emp)}>
                                     <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">{emp.email}</TableCell>
-                                    <TableCell>{emp.department}</TableCell>
                                     <TableCell>{emp.role}</TableCell>
                                     <TableCell><StatusText variant={statusVariant[emp.status] ?? "muted"}>{emp.status}</StatusText></TableCell>
-                                    <TableCell className="text-center">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-40">
-                                                <DropdownMenuItem onClick={() => handleEmployeeClick(emp)} className="gap-2 cursor-pointer">
-                                                    <Eye className="h-4 w-4" /> View
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleEdit(emp)} className="gap-2 cursor-pointer">
-                                                    <Pencil className="h-4 w-4" /> Edit
-                                                </DropdownMenuItem>
-                                                {emp.status !== "Archived" ? (
-                                                    <DropdownMenuItem onClick={() => setArchiveTarget(emp.id)} className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                        <Archive className="h-4 w-4" /> Archive
-                                                    </DropdownMenuItem>
-                                                ) : (
-                                                    <DropdownMenuItem onClick={() => restoreMutation.mutateAsync(emp.id)} className="gap-2 cursor-pointer">
-                                                        <RotateCcw className="h-4 w-4" /> Restore
-                                                    </DropdownMenuItem>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                    <TableCell className="text-center" onClick={(event) => event.stopPropagation()}>
+                                        {emp.status !== "Archived" ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                aria-label="Archive user"
+                                                onClick={() => setArchiveTarget(emp.id)}
+                                            >
+                                                <Archive className="h-4 w-4" />
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                aria-label="Restore user"
+                                                onClick={() => restoreMutation.mutateAsync(emp.id)}
+                                            >
+                                                <RotateCcw className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}

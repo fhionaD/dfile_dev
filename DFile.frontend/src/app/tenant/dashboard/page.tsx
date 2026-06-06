@@ -72,7 +72,7 @@ export default function TenantDashboardPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold truncate">{emp.firstName} {emp.lastName}</p>
-                                        <p className="text-xs text-muted-foreground">{emp.department} &middot; {emp.role}</p>
+                                        <p className="text-xs text-muted-foreground">{emp.role}</p>
                                     </div>
                                     <Badge variant="success">{emp.status}</Badge>
                                 </div>
