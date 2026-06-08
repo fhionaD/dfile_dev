@@ -298,14 +298,34 @@ jobs:
             try:
                 ftp = ftplib.FTP(server)
                 ftp.login(username, password)
+                
+                # Debug logging: show remote structure
                 try:
-                    ftp.delete('wwwroot/app_offline.htm')
-                    print('app_offline.htm deleted — site is online')
-                except ftplib.error_perm as e:
-                    # File may not exist if offline step was skipped; not fatal.
-                    print(f'Note: could not delete app_offline.htm: {e}')
+                    print("FTP working directory:", ftp.pwd())
+                    files = ftp.nlst()
+                    print("FTP files in current directory:", files)
+                    if 'wwwroot' in files:
+                        print("FTP files in wwwroot:", ftp.nlst('wwwroot'))
+                except Exception as list_ex:
+                    print(f"Could not list FTP files: {list_ex}")
+
+                # Try deleting from all potential paths
+                deleted = False
+                for target_path in ['wwwroot/app_offline.htm', 'app_offline.htm']:
+                    try:
+                        ftp.delete(target_path)
+                        print(f'Successfully deleted {target_path} — site is online')
+                        deleted = True
+                        break
+                    except ftplib.error_perm as e:
+                        print(f'Note: could not delete {target_path}: {e}')
+
                 ftp.quit()
-                sys.exit(0)
+                if deleted:
+                    sys.exit(0)
+                else:
+                    # If not deleted, retry or warning
+                    print("Warning: app_offline.htm was not deleted in this attempt.")
             except Exception as ex:
                 print(f'Attempt {attempt+1}/3 failed: {ex}')
                 if attempt < 2:
