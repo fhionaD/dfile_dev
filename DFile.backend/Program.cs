@@ -1,4 +1,4 @@
-﻿using DFile.backend.Configuration;
+using DFile.backend.Configuration;
 using DFile.backend.Data;
 using DFile.backend.Serialization;
 using DFile.backend.Models;
@@ -103,6 +103,22 @@ if (jwtKeyMissing)
             "Set the JWT__KEY GitHub secret and verify the workflow web.config injection step completed successfully. " +
             "Check /api/diag for jwt_key_len:0 to confirm the secret is missing.");
     }
+}
+
+// Email Encryption key guard — mirrors the Jwt:Key guard above.
+// A missing key causes every endpoint that touches User.Email/EmailHash to return HTTP 500.
+// Fix: ensure the EMAILENCRYPTION__KEY GitHub secret is set and the web.config injection step succeeded.
+var emailEncKey = builder.Configuration["EmailEncryption:Key"] ?? "";
+if (string.IsNullOrWhiteSpace(emailEncKey))
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException(
+            "FATAL: EmailEncryption:Key is not configured. " +
+            "Set the EMAILENCRYPTION__KEY GitHub secret and verify the workflow web.config injection step completed successfully. " +
+            "Check /api/diag for email_enc_configured:false to confirm the secret is missing.");
+    }
+    // Development: EmailEncryptionService already throws a descriptive error on its own — no extra guard needed.
 }
 var key = Encoding.ASCII.GetBytes(jwtKey);
 builder.Services.AddAuthentication(options =>
@@ -420,6 +436,7 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
     {
         results.Append($"jwt_configured:{(!string.IsNullOrWhiteSpace(cfg["Jwt:Key"])).ToString().ToLowerInvariant()};");
         results.Append($"db_configured:{(!string.IsNullOrWhiteSpace(cfg.GetConnectionString("DefaultConnection"))).ToString().ToLowerInvariant()};");
+        results.Append($"email_enc_configured:{(!string.IsNullOrWhiteSpace(cfg["EmailEncryption:Key"])).ToString().ToLowerInvariant()};");
         results.Append($"google_configured:{(!string.IsNullOrWhiteSpace(cfg["Google:ClientId"])).ToString().ToLowerInvariant()};");
         results.Append($"google_base_url_configured:{(!string.IsNullOrWhiteSpace(cfg["Google:BackendBaseUrl"])).ToString().ToLowerInvariant()};");
     }
