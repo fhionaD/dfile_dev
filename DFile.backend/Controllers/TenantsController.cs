@@ -59,17 +59,30 @@ namespace DFile.backend.Controllers
             if (string.IsNullOrEmpty(normEmail) || !new EmailAddressAttribute().IsValid(normEmail))
                 return BadRequest(new { message = "Enter a valid email address." });
 
-            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(normEmail)))
-                return Ok(new RegisterAvailabilityDto(false, "This email is already registered. Sign in instead."));
-
-            if (!string.IsNullOrWhiteSpace(tenantName))
+            try
             {
-                var trimmedName = tenantName.Trim();
-                if (trimmedName.Length > 0 && await _context.Tenants.AnyAsync(t => t.Name == trimmedName))
-                    return Ok(new RegisterAvailabilityDto(false, "An organization with this name already exists."));
-            }
+                if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(normEmail)))
+                    return Ok(new RegisterAvailabilityDto(false, "This email is already registered. Sign in instead."));
 
-            return Ok(new RegisterAvailabilityDto(true));
+                if (!string.IsNullOrWhiteSpace(tenantName))
+                {
+                    var trimmedName = tenantName.Trim();
+                    if (trimmedName.Length > 0 && await _context.Tenants.AnyAsync(t => t.Name == trimmedName))
+                        return Ok(new RegisterAvailabilityDto(false, "An organization with this name already exists."));
+                }
+
+                return Ok(new RegisterAvailabilityDto(true));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "GetRegisterAvailability failed for email='{Email}' tenantName='{TenantName}'. " +
+                    "Inner: {InnerType}: {InnerMsg}",
+                    normEmail, tenantName,
+                    ex.InnerException?.GetType().Name ?? "none",
+                    ex.InnerException?.Message ?? ex.Message);
+                return StatusCode(500, new { message = "Registration check failed. Please try again." });
+            }
         }
 
         private static string NormalizeEmail(string email) =>

@@ -468,6 +468,28 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
                 ? $"db_query_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"
                 : "db_query_err:true;");
         }
+
+        // Report pending migrations — helps diagnose schema mismatch 500s
+        try
+        {
+            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+            if (isDev)
+            {
+                results.Append($"pending_migrations:{pending.Count};");
+                if (pending.Count > 0)
+                    results.Append($"pending_names:{string.Join(',', pending)};");
+            }
+            else
+            {
+                results.Append($"pending_migrations:{pending.Count};");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.Append(isDev
+                ? $"migration_check_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"
+                : "migration_check_err:true;");
+        }
     }
     catch (Exception ex)
     {
