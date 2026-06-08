@@ -490,6 +490,27 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
                 ? $"migration_check_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"
                 : "migration_check_err:true;");
         }
+
+        // Probe the exact Tenants AnyAsync query used by the registration availability endpoint.
+        // Exposes the exception type and SQL error number to help diagnose the registration 500.
+        try
+        {
+            var tenantsOk = await db.Tenants.AnyAsync(t => t.Name == "diag-probe-does-not-exist");
+            results.Append($"tenants_query:ok(result={tenantsOk});");
+        }
+        catch (Exception ex)
+        {
+            // In production we expose type + inner SQL error number only — no raw SQL or user data.
+            var sqlEx = ex.InnerException as Microsoft.Data.SqlClient.SqlException
+                        ?? ex as Microsoft.Data.SqlClient.SqlException;
+            var sqlNum = sqlEx?.Number.ToString() ?? "n/a";
+            results.Append($"tenants_query_err:{ex.GetType().Name}(sql={sqlNum});");
+            // Expose the inner message in production — it is a SQL schema error, not a secret.
+            var msg = (ex.InnerException?.Message ?? ex.Message)
+                      .Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ');
+            if (msg.Length > 300) msg = msg[..300];
+            results.Append($"tenants_query_detail:{msg};");
+        }
     }
     catch (Exception ex)
     {
