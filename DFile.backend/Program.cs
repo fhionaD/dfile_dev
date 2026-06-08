@@ -419,7 +419,7 @@ app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 // Diagnostic endpoint — verifies secret injection and DB connectivity after deployment.
 // In Development: full detail including exception types and connection lengths.
 // In Production: boolean status only — no raw exception messages, no secret metadata.
-app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
+app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? rcsi = null, string? kill = null) =>
 {
     var isDev = app.Environment.IsDevelopment();
     var results = new System.Text.StringBuilder();
@@ -489,6 +489,136 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg) =>
             results.Append(isDev
                 ? $"migration_check_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};"
                 : "migration_check_err:true;");
+        }
+
+        // Check RCSI status
+        try
+        {
+            using (var cmd = db.Database.GetDbConnection().CreateCommand())
+            {
+                cmd.CommandText = "SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name = DB_NAME()";
+                if (cmd.Connection.State != System.Data.ConnectionState.Open)
+                    await cmd.Connection.OpenAsync();
+                var status = Convert.ToBoolean(await cmd.ExecuteScalarAsync());
+                results.Append($"rcsi_status:{status.ToString().ToLowerInvariant()};");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.Append($"rcsi_check_err:{ex.GetType().Name};");
+        }
+
+        // Enable RCSI if requested
+        if (string.Equals(rcsi, "1", StringComparison.Ordinal) || string.Equals(rcsi, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE");
+                results.Append("rcsi_action:enabled_successfully;");
+            }
+            catch (Exception ex)
+            {
+                results.Append($"rcsi_action_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};");
+            }
+        }
+
+        // Kill active process if requested
+        if (int.TryParse(kill, out var sidToKill) && sidToKill > 0)
+        {
+            try
+            {
+                var killSql = $"KILL {sidToKill}";
+                await db.Database.ExecuteSqlRawAsync(killSql);
+                results.Append($"kill_action:killed_{sidToKill};");
+            }
+            catch (Exception ex)
+            {
+                results.Append($"kill_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};");
+            }
+        }
+
+        // Query active locks
+        try
+        {
+            var locks = new List<string>();
+            using (var cmd = db.Database.GetDbConnection().CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT 
+                        request_session_id,
+                        resource_type,
+                        request_mode,
+                        request_status
+                    FROM sys.dm_tran_locks 
+                    WHERE resource_database_id = DB_ID()";
+                if (cmd.Connection.State != System.Data.ConnectionState.Open)
+                    await cmd.Connection.OpenAsync();
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var sid = reader.GetInt32(0);
+                        var type = reader.GetString(1);
+                        var mode = reader.GetString(2);
+                        var status = reader.GetString(3);
+                        locks.Add($"{sid}:{type}:{mode}:{status}");
+                    }
+                }
+            }
+            if (locks.Count > 0)
+            {
+                results.Append($"db_locks:{string.Join(',', locks.Take(10))};");
+            }
+            else
+            {
+                results.Append("db_locks:none;");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.Append($"locks_err:{ex.GetType().Name};");
+        }
+
+        // Query active blocks
+        try
+        {
+            var blocks = new List<string>();
+            using (var cmd = db.Database.GetDbConnection().CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT 
+                        session_id,
+                        blocking_session_id,
+                        wait_type,
+                        wait_time
+                    FROM sys.dm_exec_requests 
+                    WHERE blocking_session_id <> 0";
+                if (cmd.Connection.State != System.Data.ConnectionState.Open)
+                    await cmd.Connection.OpenAsync();
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var sid = reader.GetInt16(0);
+                        var bid = reader.GetInt16(1);
+                        var wt = reader.GetString(2);
+                        var wtime = reader.GetInt32(3);
+                        blocks.Add($"{sid}<-{bid}({wt}:{wtime}ms)");
+                    }
+                }
+            }
+            if (blocks.Count > 0)
+            {
+                results.Append($"db_blocks:{string.Join(',', blocks)};");
+            }
+            else
+            {
+                results.Append("db_blocks:none;");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.Append($"blocks_err:{ex.GetType().Name};");
         }
 
         // Probe the exact Tenants AnyAsync query used by the registration availability endpoint.
