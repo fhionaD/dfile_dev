@@ -1,4 +1,4 @@
-﻿using DFile.backend.Authorization;
+using DFile.backend.Authorization;
 using DFile.backend.Data;
 using DFile.backend.DTOs;
 using DFile.backend.Models;
@@ -132,6 +132,9 @@ namespace DFile.backend.Controllers
             if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant())))
                 return BadRequest(new { message = "A user account with this email already exists." });
 
+            if (dto.HireDate > DateTime.UtcNow.AddDays(1))
+                return BadRequest(new { message = "Hire date cannot be in the future." });
+
             var employee = new Employee
             {
                 Id = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
@@ -248,6 +251,9 @@ namespace DFile.backend.Controllers
 
             if (existing == null) return NotFound();
             if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
+
+            if (dto.HireDate > DateTime.UtcNow.AddDays(1))
+                return BadRequest(new { message = "Hire date cannot be in the future." });
 
             var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Role, existing.HireDate, existing.Status });
 

@@ -63,6 +63,12 @@ export function AddEmployeeModal({ open, onOpenChange, onAddEmployee, initialDat
         setErrors({});
     }, [open, initialData]);
 
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayString = `${yyyy}-${mm}-${dd}`;
+
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
         setErrors({});
@@ -73,6 +79,9 @@ export function AddEmployeeModal({ open, onOpenChange, onAddEmployee, initialDat
         }
         if (formData.contactNumber && formData.contactNumber.length !== 11) {
             newErrors.contactNumber = "Contact number must be exactly 11 digits (e.g., 09123456789)";
+        }
+        if (formData.hireDate && formData.hireDate > todayString) {
+            newErrors.hireDate = "Hire date cannot be in the future.";
         }
 
         if (Object.keys(newErrors).length > 0) {
@@ -188,7 +197,15 @@ export function AddEmployeeModal({ open, onOpenChange, onAddEmployee, initialDat
                             <Label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                                 <CalendarClock size={12} /> Hire Date <span className="text-destructive">*</span>
                             </Label>
-                            <Input type="date" required value={formData.hireDate} onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })} className="h-10 bg-background text-sm" />
+                            <Input
+                                type="date"
+                                required
+                                max={todayString}
+                                value={formData.hireDate}
+                                onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                                className={`h-10 bg-background text-sm ${errors.hireDate ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                            />
+                            {errors.hireDate && <p className="text-xs text-destructive mt-1">{errors.hireDate}</p>}
                         </div>
                     </div>
                 </form>
