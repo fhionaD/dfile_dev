@@ -169,6 +169,8 @@ namespace DFile.backend.DTOs
 
         /// <summary>Replacement / not repairable path: explanation from Maintenance.</summary>
         public string? NotRepairableExplanation { get; set; }
+
+        public string? RepairType { get; set; }
     }
 
     /// <summary>

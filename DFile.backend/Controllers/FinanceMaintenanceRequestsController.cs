@@ -69,9 +69,29 @@ namespace DFile.backend.Controllers
                 await _context.SaveChangesAsync();
                 return null;
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                return Conflict(new { message = "This maintenance request was modified by another user. Refresh and try again." });
+                foreach (var entry in ex.Entries)
+                {
+                    var databaseValues = await entry.GetDatabaseValuesAsync();
+                    if (databaseValues == null)
+                    {
+                        return Conflict(new { message = "The record was deleted by another user. Refresh and try again." });
+                    }
+
+                    // Refresh the original values to match the database state
+                    entry.OriginalValues.SetValues(databaseValues);
+                }
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    return null;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    return Conflict(new { message = "This maintenance request was modified by another user. Refresh and try again." });
+                }
             }
         }
 
@@ -213,6 +233,7 @@ namespace DFile.backend.Controllers
                 dto.RepairDescription = string.IsNullOrWhiteSpace(record.QuotationNotes) ? null : record.QuotationNotes.Trim();
                 dto.EstimatedRepairCost = record.Cost;
                 dto.DamagedPartImageUrls = FilterMaintenanceImageAttachments(record.Attachments);
+                dto.RepairType = record.RepairType;
             }
             else
             {

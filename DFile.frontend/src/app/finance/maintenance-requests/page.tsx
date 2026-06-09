@@ -22,7 +22,7 @@ import {
     useFinanceApproveRepairFinancialImpact,
 } from "@/hooks/use-maintenance";
 import { useCategories } from "@/hooks/use-categories";
-import { useAddAsset, useAssets } from "@/hooks/use-assets";
+import { useAddAsset, useAsset, useAssets } from "@/hooks/use-assets";
 import { AddAssetModal } from "@/components/modals/add-asset-modal";
 import { MaintenanceDetailsModal } from "@/components/modals/maintenance-details-modal";
 import { FinanceRepairApprovalModal } from "@/components/modals/finance-repair-approval-modal";
@@ -105,6 +105,15 @@ export default function FinanceMaintenanceRequestsPage() {
         isLoading: financeSubmissionLoading,
         isError: financeSubmissionIsError,
     } = useFinanceMaintenanceSubmissionDetail(detailRecord?.id, detailOpen && !!detailRecord);
+
+    const { data: assetDetail, isLoading: assetLoading } = useAsset(
+        financialDecisionTarget?.assetId ?? "",
+        { enabled: financialDecisionOpen && !!financialDecisionTarget?.assetId }
+    );
+    const { data: submissionDetail, isLoading: submissionLoading } = useFinanceMaintenanceSubmissionDetail(
+        financialDecisionTarget?.id,
+        financialDecisionOpen && !!financialDecisionTarget
+    );
 
     const replacementContext: ReplacementRegistrationContext | null = useMemo(() => {
         if (!replacementTarget) return null;
@@ -356,15 +365,26 @@ export default function FinanceMaintenanceRequestsPage() {
                             setFinancialDecisionTarget(null);
                         }
                     }}
+                    isLoading={assetLoading || submissionLoading}
+                    assetDetails={assetDetail ? {
+                        assetName: assetDetail.desc,
+                        assetCode: assetDetail.assetCode,
+                        bookValue: assetDetail.currentBookValue,
+                        usefulLifeYears: assetDetail.usefulLifeYears,
+                        purchasePrice: assetDetail.purchasePrice,
+                        currentBookValue: assetDetail.currentBookValue,
+                        accumulatedDepreciation: assetDetail.accumulatedDepreciation,
+                        monthlyDepreciation: assetDetail.monthlyDepreciation,
+                    } : undefined}
                     maintenanceRecord={{
                         id: financialDecisionTarget.id,
                         requestId: financialDecisionTarget.requestId,
                         assetId: financialDecisionTarget.assetId,
                         assetName: financialDecisionTarget.assetName,
                         assetCode: financialDecisionTarget.assetCode,
-                        cost: financialDecisionTarget.cost,
-                        repairType: undefined,
-                        quotationNotes: undefined,
+                        cost: submissionDetail?.estimatedRepairCost ?? financialDecisionTarget.cost,
+                        repairType: (submissionDetail?.repairType as "Minor" | "Major" | null) ?? undefined,
+                        quotationNotes: submissionDetail?.repairDescription ?? undefined,
                     } as MaintenanceRecord}
                     onApproveWithDecision={async (payload) => {
                         try {

@@ -32,6 +32,7 @@ export interface Asset {
     purchasePrice?: number;
     currentBookValue?: number;
     monthlyDepreciation?: number;
+    accumulatedDepreciation?: number;
     salvagePercentage?: number;
     salvageValue?: number;
     isSalvageOverride?: boolean;
@@ -248,6 +249,7 @@ export interface FinanceMaintenanceSubmissionDetail {
     estimatedRepairCost?: number | null;
     damagedPartImageUrls?: string[];
     notRepairableExplanation?: string | null;
+    repairType?: string | null;
 }
 
 /** Context when registering a replacement asset from Finance maintenance workflow. */
