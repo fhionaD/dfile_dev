@@ -641,7 +641,7 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? 
             if (msg.Length > 300) msg = msg[..300];
             results.Append($"tenants_query_detail:{msg};");
         }
-
+        // Trigger redeploy due to FTP timeout
         if (!string.IsNullOrEmpty(dryrun))
         {
             try
