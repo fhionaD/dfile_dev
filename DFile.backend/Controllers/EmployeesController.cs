@@ -71,7 +71,17 @@ namespace DFile.backend.Controllers
 
                 foreach (var u in users)
                 {
-                    if (seenEmails.Contains(u.Email))
+                    string decryptedEmail;
+                    try
+                    {
+                        decryptedEmail = _emailEncryption.Decrypt(u.Email);
+                    }
+                    catch
+                    {
+                        decryptedEmail = u.Email;
+                    }
+
+                    if (seenEmails.Contains(decryptedEmail))
                         continue;
 
                     if (showArchived)
@@ -89,14 +99,14 @@ namespace DFile.backend.Controllers
                         EmployeeCode = $"USR-{u.Id:D4}",
                         FirstName = u.FirstName,
                         LastName = u.LastName,
-                        Email = u.Email,
-                        ContactNumber = "â€”",
+                        Email = decryptedEmail,
+                        ContactNumber = "—",
                         Role = string.IsNullOrWhiteSpace(u.RoleLabel) ? u.Role : u.RoleLabel,
                         HireDate = u.CreatedAt,
                         Status = u.Status == "Archived" ? "Archived" : (u.Status == "Inactive" ? "Inactive" : "Active"),
                         TenantId = u.TenantId
                     });
-                    seenEmails.Add(u.Email);
+                    seenEmails.Add(decryptedEmail);
                 }
             }
 
@@ -123,95 +133,107 @@ namespace DFile.backend.Controllers
         [Authorize]
         public async Task<ActionResult<Employee>> PostEmployee(CreateEmployeeDto dto)
         {
-            var tenantId = GetCurrentTenantId();
-            var userId = GetCurrentUserId();
-
-            if (await _context.Employees.AnyAsync(e => e.Email.ToLower() == dto.Email.ToLowerInvariant() && e.TenantId == (IsSuperAdmin() ? (int?)null : tenantId)))
-                return BadRequest(new { message = "An employee with this email already exists." });
-
-            if (await _context.Users.AnyAsync(u => u.EmailHash == _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant())))
-                return BadRequest(new { message = "A user account with this email already exists." });
-
-            if (dto.HireDate > DateTime.UtcNow.AddDays(1))
-                return BadRequest(new { message = "Hire date cannot be in the future." });
-
-            var employee = new Employee
-            {
-                Id = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-                EmployeeCode = await RecordCodeGenerator.GenerateEmployeeCodeAsync(_context),
-                FirstName = dto.FirstName,
-                MiddleName = dto.MiddleName,
-                LastName = dto.LastName,
-                Email = dto.Email,
-                ContactNumber = dto.ContactNumber,
-                Role = dto.Role,
-                HireDate = dto.HireDate,
-                Status = "Active",
-                TenantId = IsSuperAdmin() ? null : tenantId
-            };
-
-            _context.Employees.Add(employee);
-
-            // Generate a secure single-use activation token
-            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
-            var tokenHash = ComputeTokenHash(rawToken);
-            var tokenExpiry = DateTime.UtcNow.AddHours(24);
-
-            var user = new User
-            {
-                FirstName = dto.FirstName,
-                MiddleName = dto.MiddleName,
-                LastName = dto.LastName,
-                Email = _emailEncryption.Encrypt(dto.Email.Trim().ToLowerInvariant()),
-                EmailHash = _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant()),
-                Role = dto.Role,
-                RoleLabel = dto.Role,
-                ContactNumber = dto.ContactNumber,
-                Address = dto.Address,
-                HireDate = dto.HireDate,
-                TenantId = IsSuperAdmin() ? null : tenantId,
-                PasswordHash = string.Empty,
-                Status = "PendingActivation",
-                ActivationTokenHash = tokenHash,
-                ActivationTokenExpiry = tokenExpiry,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.Users.Add(user);
-
-            _auditService.Add(HttpContext, new AuditLog
-            {
-                Action = "Create",
-                EntityType = "Employee",
-                EntityId = employee.Id,
-                Module = "Personnel",
-                UserId = userId,
-                TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate }),
-            });
-
-            await _context.SaveChangesAsync();
-
-            // Send activation email
-            var appBaseUrl = $"{Request.Scheme}://{Request.Host}";
-            var encodedToken = Uri.EscapeDataString(rawToken);
-            var encodedEmail = Uri.EscapeDataString(dto.Email);
-            var activationLink = $"{appBaseUrl}/setup-password?token={encodedToken}&email={encodedEmail}";
-
-            var fullName = $"{dto.FirstName} {dto.LastName}";
-            var emailHtml = BuildActivationEmailHtml(fullName, activationLink);
-
             try
             {
-                await _emailService.SendEmailAsync(dto.Email, "Activate Your DFile Account", emailHtml);
+                var tenantId = GetCurrentTenantId();
+                var userId = GetCurrentUserId();
+
+                var searchEmail = dto.Email.Trim().ToLowerInvariant();
+
+                if (await _context.Employees.AnyAsync(e => e.Email.ToLower() == searchEmail && e.TenantId == (IsSuperAdmin() ? (int?)null : tenantId)))
+                    return BadRequest(new { message = "An employee with this email already exists." });
+
+                var emailHash = _emailEncryption.Hash(searchEmail);
+                if (await _context.Users.AnyAsync(u => u.EmailHash == emailHash))
+                    return BadRequest(new { message = "A user account with this email already exists." });
+
+                if (dto.HireDate.Date > DateTime.UtcNow.AddHours(14).Date)
+                    return BadRequest(new { message = "Hire date cannot be in the future." });
+
+                var employee = new Employee
+                {
+                    Id = $"EMP-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+                    EmployeeCode = await RecordCodeGenerator.GenerateEmployeeCodeAsync(_context),
+                    FirstName = dto.FirstName,
+                    MiddleName = dto.MiddleName,
+                    LastName = dto.LastName,
+                    Email = dto.Email,
+                    ContactNumber = dto.ContactNumber,
+                    Role = dto.Role,
+                    HireDate = dto.HireDate,
+                    Status = "Active",
+                    TenantId = IsSuperAdmin() ? null : tenantId
+                };
+
+                _context.Employees.Add(employee);
+
+                // Generate a secure single-use activation token
+                var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+                var tokenHash = ComputeTokenHash(rawToken);
+                var tokenExpiry = DateTime.UtcNow.AddHours(24);
+
+                var user = new User
+                {
+                    FirstName = dto.FirstName,
+                    MiddleName = dto.MiddleName,
+                    LastName = dto.LastName,
+                    Email = _emailEncryption.Encrypt(searchEmail),
+                    EmailHash = emailHash,
+                    Role = dto.Role,
+                    RoleLabel = dto.Role,
+                    ContactNumber = dto.ContactNumber,
+                    Address = dto.Address,
+                    HireDate = dto.HireDate,
+                    TenantId = IsSuperAdmin() ? null : tenantId,
+                    PasswordHash = string.Empty,
+                    Status = "PendingActivation",
+                    ActivationTokenHash = tokenHash,
+                    ActivationTokenExpiry = tokenExpiry,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Users.Add(user);
+
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Create",
+                    EntityType = "Employee",
+                    EntityId = employee.Id,
+                    Module = "Personnel",
+                    UserId = userId,
+                    TenantId = tenantId,
+                    NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate }),
+                });
+
+                await _context.SaveChangesAsync();
+
+                // Send activation email
+                var appBaseUrl = $"{Request.Scheme}://{Request.Host}";
+                var encodedToken = Uri.EscapeDataString(rawToken);
+                var encodedEmail = Uri.EscapeDataString(dto.Email);
+                var activationLink = $"{appBaseUrl}/setup-password?token={encodedToken}&email={encodedEmail}";
+
+                var fullName = $"{dto.FirstName} {dto.LastName}";
+                var emailHtml = BuildActivationEmailHtml(fullName, activationLink);
+
+                try
+                {
+                    await _emailService.SendEmailAsync(dto.Email, "Activate Your DFile Account", emailHtml);
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but don't fail the creation — admin can resend
+                    var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
+                    logger?.LogError(ex, "Failed to send activation email to {Email}", dto.Email);
+                }
+
+                return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
             }
             catch (Exception ex)
             {
-                // Log the error but don't fail the creation â€” admin can resend
                 var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
-                logger?.LogError(ex, "Failed to send activation email to {Email}", dto.Email);
+                logger?.LogError(ex, "Error creating employee");
+                return StatusCode(500, new { message = ex.Message, details = ex.InnerException?.Message });
             }
-
-            return CreatedAtAction("GetEmployee", new { id = employee.Id }, employee);
         }
 
         private static string ComputeTokenHash(string token)
@@ -245,97 +267,156 @@ namespace DFile.backend.Controllers
         [Authorize]
         public async Task<IActionResult> PutEmployee(string id, UpdateEmployeeDto dto)
         {
-            var tenantId = GetCurrentTenantId();
-            var userId = GetCurrentUserId();
-            var existing = await _context.Employees.FindAsync(id);
-
-            if (existing == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
-
-            if (dto.HireDate > DateTime.UtcNow.AddDays(1))
-                return BadRequest(new { message = "Hire date cannot be in the future." });
-
-            var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Role, existing.HireDate, existing.Status });
-
-            existing.FirstName = dto.FirstName;
-            existing.MiddleName = dto.MiddleName;
-            existing.LastName = dto.LastName;
-            existing.Email = dto.Email;
-            existing.ContactNumber = dto.ContactNumber;
-            existing.Role = dto.Role;
-            existing.HireDate = dto.HireDate;
-            existing.Status = dto.Status;
-
-            _auditService.Add(HttpContext, new AuditLog
+            try
             {
-                Action = "Update",
-                EntityType = "Employee",
-                EntityId = id,
-                Module = "Personnel",
-                UserId = userId,
-                TenantId = tenantId,
-                OldValues = oldValues,
-                NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate, dto.Status }),
-            });
+                var tenantId = GetCurrentTenantId();
+                var userId = GetCurrentUserId();
+                var existing = await _context.Employees.FindAsync(id);
 
-            await _context.SaveChangesAsync();
-            return NoContent();
+                if (existing == null) return NotFound();
+                if (!IsSuperAdmin() && tenantId.HasValue && existing.TenantId != tenantId) return NotFound();
+
+                if (dto.HireDate.Date > DateTime.UtcNow.AddHours(14).Date)
+                    return BadRequest(new { message = "Hire date cannot be in the future." });
+
+                var oldValues = JsonSerializer.Serialize(new { existing.FirstName, existing.LastName, existing.Email, existing.Role, existing.HireDate, existing.Status });
+
+                // Find corresponding user by hashing old email
+                var oldEmailHash = _emailEncryption.Hash(existing.Email.Trim().ToLowerInvariant());
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == oldEmailHash);
+
+                existing.FirstName = dto.FirstName;
+                existing.MiddleName = dto.MiddleName;
+                existing.LastName = dto.LastName;
+                existing.Email = dto.Email;
+                existing.ContactNumber = dto.ContactNumber;
+                existing.Role = dto.Role;
+                existing.HireDate = dto.HireDate;
+                existing.Status = dto.Status;
+
+                if (user != null)
+                {
+                    user.FirstName = dto.FirstName;
+                    user.MiddleName = dto.MiddleName;
+                    user.LastName = dto.LastName;
+                    user.Email = _emailEncryption.Encrypt(dto.Email.Trim().ToLowerInvariant());
+                    user.EmailHash = _emailEncryption.Hash(dto.Email.Trim().ToLowerInvariant());
+                    user.ContactNumber = dto.ContactNumber;
+                    user.Role = dto.Role;
+                    user.RoleLabel = dto.Role;
+                    user.HireDate = dto.HireDate;
+                    user.Status = dto.Status == "Active" ? (user.Status == "PendingActivation" ? "PendingActivation" : "Active") : dto.Status;
+                }
+
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Update",
+                    EntityType = "Employee",
+                    EntityId = id,
+                    Module = "Personnel",
+                    UserId = userId,
+                    TenantId = tenantId,
+                    OldValues = oldValues,
+                    NewValues = JsonSerializer.Serialize(new { dto.FirstName, dto.LastName, dto.Email, dto.Role, dto.HireDate, dto.Status }),
+                });
+
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
+                logger?.LogError(ex, "Error updating employee");
+                return StatusCode(500, new { message = ex.Message, details = ex.InnerException?.Message });
+            }
         }
 
         [HttpPut("archive/{id}")]
         [Authorize]
         public async Task<IActionResult> ArchiveEmployee(string id)
         {
-            var tenantId = GetCurrentTenantId();
-            var userId = GetCurrentUserId();
-            var employee = await _context.Employees.FindAsync(id);
-
-            if (employee == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
-
-            employee.Status = "Archived";
-
-            _auditService.Add(HttpContext, new AuditLog
+            try
             {
-                Action = "Archive",
-                EntityType = "Employee",
-                EntityId = id,
-                Module = "Personnel",
-                UserId = userId,
-                TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Archived" }),
-            });
+                var tenantId = GetCurrentTenantId();
+                var userId = GetCurrentUserId();
+                var employee = await _context.Employees.FindAsync(id);
 
-            await _context.SaveChangesAsync();
-            return NoContent();
+                if (employee == null) return NotFound();
+                if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
+
+                employee.Status = "Archived";
+
+                var oldEmailHash = _emailEncryption.Hash(employee.Email.Trim().ToLowerInvariant());
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == oldEmailHash);
+                if (user != null)
+                {
+                    user.Status = "Archived";
+                }
+
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Archive",
+                    EntityType = "Employee",
+                    EntityId = id,
+                    Module = "Personnel",
+                    UserId = userId,
+                    TenantId = tenantId,
+                    NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Archived" }),
+                });
+
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
+                logger?.LogError(ex, "Error archiving employee");
+                return StatusCode(500, new { message = ex.Message, details = ex.InnerException?.Message });
+            }
         }
 
         [HttpPut("restore/{id}")]
         [Authorize]
         public async Task<IActionResult> RestoreEmployee(string id)
         {
-            var tenantId = GetCurrentTenantId();
-            var userId = GetCurrentUserId();
-            var employee = await _context.Employees.FindAsync(id);
-
-            if (employee == null) return NotFound();
-            if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
-
-            employee.Status = "Active";
-
-            _auditService.Add(HttpContext, new AuditLog
+            try
             {
-                Action = "Restore",
-                EntityType = "Employee",
-                EntityId = id,
-                Module = "Personnel",
-                UserId = userId,
-                TenantId = tenantId,
-                NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Active" }),
-            });
+                var tenantId = GetCurrentTenantId();
+                var userId = GetCurrentUserId();
+                var employee = await _context.Employees.FindAsync(id);
 
-            await _context.SaveChangesAsync();
-            return NoContent();
+                if (employee == null) return NotFound();
+                if (!IsSuperAdmin() && tenantId.HasValue && employee.TenantId != tenantId) return NotFound();
+
+                employee.Status = "Active";
+
+                var oldEmailHash = _emailEncryption.Hash(employee.Email.Trim().ToLowerInvariant());
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailHash == oldEmailHash);
+                if (user != null)
+                {
+                    user.Status = string.IsNullOrEmpty(user.PasswordHash) ? "PendingActivation" : "Active";
+                }
+
+                _auditService.Add(HttpContext, new AuditLog
+                {
+                    Action = "Restore",
+                    EntityType = "Employee",
+                    EntityId = id,
+                    Module = "Personnel",
+                    UserId = userId,
+                    TenantId = tenantId,
+                    NewValues = JsonSerializer.Serialize(new { employee.FirstName, employee.LastName, Status = "Active" }),
+                });
+
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                var logger = HttpContext.RequestServices.GetService<ILogger<EmployeesController>>();
+                logger?.LogError(ex, "Error restoring employee");
+                return StatusCode(500, new { message = ex.Message, details = ex.InnerException?.Message });
+            }
         }
     }
 }
