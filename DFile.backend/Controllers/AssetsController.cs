@@ -306,138 +306,147 @@ namespace DFile.backend.Controllers
         [RequirePermissionOrRoles("Assets", "CanCreate", UserRoleConstants.Finance)]
         public async Task<ActionResult<AssetResponseDto>> PostAsset(CreateAssetDto dto)
         {
-            var tenantId = GetCurrentTenantId();
-            var userId = GetCurrentUserId();
-            var effectiveTenantId = IsSuperAdmin() ? null : tenantId;
-
-            var replacementRecordId = dto.ReplacementMaintenanceRecordId?.Trim();
-            if (!string.IsNullOrEmpty(replacementRecordId))
+            try
             {
-                if (!await CanRegisterFinanceReplacementAsync(userId, tenantId))
-                    return StatusCode(403, new { message = "You do not have permission to register a replacement asset for maintenance." });
+                var tenantId = GetCurrentTenantId();
+                var userId = GetCurrentUserId();
+                var effectiveTenantId = IsSuperAdmin() ? null : tenantId;
 
-                var outcome = await _replacementRegistrationService.RegisterReplacementAssetAsync(
-                    dto,
-                    replacementRecordId,
-                    tenantId,
-                    userId,
-                    IsSuperAdmin());
+                var replacementRecordId = dto.ReplacementMaintenanceRecordId?.Trim();
+                if (!string.IsNullOrEmpty(replacementRecordId))
+                {
+                    if (!await CanRegisterFinanceReplacementAsync(userId, tenantId))
+                        return StatusCode(403, new { message = "You do not have permission to register a replacement asset for maintenance." });
 
-                if (!outcome.Success)
-                    return StatusCode(outcome.StatusCode, new { message = outcome.ErrorMessage });
+                    var outcome = await _replacementRegistrationService.RegisterReplacementAssetAsync(
+                        dto,
+                        replacementRecordId,
+                        tenantId,
+                        userId,
+                        IsSuperAdmin());
 
-                var ra = outcome.NewAsset!;
-                var rcat = outcome.Category!;
+                    if (!outcome.Success)
+                        return StatusCode(outcome.StatusCode, new { message = outcome.ErrorMessage });
+
+                    var ra = outcome.NewAsset!;
+                    var rcat = outcome.Category!;
+                    _auditService.Add(HttpContext, new AuditLog
+                    {
+                        Action = "Create",
+                        EntityType = "Asset",
+                        EntityId = ra.Id,
+                        Module = "Asset Management",
+                        UserId = userId,
+                        TenantId = effectiveTenantId,
+                        Description = $"Replacement asset registered: {ra.AssetName} ({ra.AssetCode}) via maintenance {replacementRecordId}.",
+                        NewValues = JsonSerializer.Serialize(new { ra.AssetName, ra.AssetCode, ra.CategoryId, Status = StatusLabels.GetValueOrDefault(ra.LifecycleStatus, "Unknown") }),
+                    });
+
+                    return CreatedAtAction("GetAsset", new { id = ra.Id }, AssetResponseMapper.ToDto(ra, rcat, new Dictionary<int, string>(), null));
+                }
+
+                // Regular asset registration — Admin and Super Admin only
+                if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
+                    return StatusCode(403, new { message = "Only Admins can register new assets." });
+
+                var category = await _context.AssetCategories.FindAsync(dto.CategoryId);
+                if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
+                if (category.IsArchived) return BadRequest(new { message = "The selected asset category is archived and cannot be used." });
+
+                if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
+                    return BadRequest(new { message = "Purchase date cannot be in the future." });
+
+                var normalizedSerial = NormalizeSerial(dto.SerialNumber);
+                if (!string.IsNullOrEmpty(normalizedSerial))
+                {
+                    var serialExists = await _context.Assets.AnyAsync(a =>
+                        a.SerialNumber != null &&
+                        a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
+                        ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
+                    if (serialExists)
+                    {
+                        return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
+                    }
+                }
+
+                var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
+                    ? dto.SalvagePercentage.Value
+                    : category.SalvagePercentage;
+                var computedSalvageValue = Math.Round(dto.AcquisitionCost * effectiveSalvagePct / 100m, 2);
+
+                var asset = new Asset
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
+                    AssetName = dto.AssetName,
+                    CategoryId = dto.CategoryId,
+                    LifecycleStatus = LifecycleStatus.Registered,
+                    CurrentCondition = dto.CurrentCondition,
+                    HandlingTypeSnapshot = category.HandlingType.ToString(),
+                    Image = dto.Image,
+                    Manufacturer = dto.Manufacturer,
+                    Model = dto.Model,
+                    SerialNumber = normalizedSerial,
+                    PurchaseDate = dto.PurchaseDate,
+                    Vendor = dto.Vendor,
+                    AcquisitionCost = dto.AcquisitionCost,
+                    TotalLifeMonths = dto.TotalLifeMonths,
+                    UsedMonths = 0,
+                    PurchasePrice = dto.PurchasePrice,
+                    ResidualValue = dto.ResidualValue,
+                    SalvagePercentage = effectiveSalvagePct,
+                    SalvageValue = computedSalvageValue,
+                    IsSalvageOverride = dto.IsSalvageOverride,
+                    CurrentBookValue = dto.PurchasePrice,
+                    AccumulatedDepreciation = 0,
+                    MonthlyDepreciation = dto.TotalLifeMonths > 0
+                        ? Math.Round((dto.PurchasePrice - computedSalvageValue) / dto.TotalLifeMonths, 2)
+                        : 0,
+                    TenantId = effectiveTenantId.HasValue ? effectiveTenantId.Value : null,
+                    WarrantyExpiry = dto.WarrantyExpiry,
+                    Notes = dto.Notes,
+                    Documents = dto.Documents,
+                    IsArchived = false,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    CreatedBy = userId,
+                    UpdatedBy = userId
+                };
+
+                _context.Assets.Add(asset);
+
                 _auditService.Add(HttpContext, new AuditLog
                 {
                     Action = "Create",
                     EntityType = "Asset",
-                    EntityId = ra.Id,
+                    EntityId = asset.Id,
                     Module = "Asset Management",
                     UserId = userId,
                     TenantId = effectiveTenantId,
-                    Description = $"Replacement asset registered: {ra.AssetName} ({ra.AssetCode}) via maintenance {replacementRecordId}.",
-                    NewValues = JsonSerializer.Serialize(new { ra.AssetName, ra.AssetCode, ra.CategoryId, Status = StatusLabels.GetValueOrDefault(ra.LifecycleStatus, "Unknown") }),
+                    Description = $"Asset registered: {asset.AssetName} ({asset.AssetCode}).",
+                    NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, asset.CategoryId, Status = StatusLabels.GetValueOrDefault(asset.LifecycleStatus, "Unknown") }),
                 });
 
-                return CreatedAtAction("GetAsset", new { id = ra.Id }, AssetResponseMapper.ToDto(ra, rcat, new Dictionary<int, string>(), null));
-            }
+                if (User.IsInRole(UserRoleConstants.Finance))
+                    await _notificationService.NotifyAdminFinanceRegisteredNewAssetAsync(asset);
 
-            // Regular asset registration — Admin and Super Admin only
-            if (!IsSuperAdmin() && !User.IsInRole(UserRoleConstants.Admin))
-                return StatusCode(403, new { message = "Only Admins can register new assets." });
-
-            var category = await _context.AssetCategories.FindAsync(dto.CategoryId);
-            if (category == null) return BadRequest(new { message = "Invalid CategoryId." });
-            if (category.IsArchived) return BadRequest(new { message = "The selected asset category is archived and cannot be used." });
-
-            if (dto.PurchaseDate.HasValue && dto.PurchaseDate.Value > DateTime.UtcNow)
-                return BadRequest(new { message = "Purchase date cannot be in the future." });
-
-            var normalizedSerial = NormalizeSerial(dto.SerialNumber);
-            if (!string.IsNullOrEmpty(normalizedSerial))
-            {
-                var serialExists = await _context.Assets.AnyAsync(a =>
-                    a.SerialNumber != null &&
-                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
-                    ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
-                if (serialExists)
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
                 {
                     return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
                 }
+
+                return CreatedAtAction("GetAsset", new { id = asset.Id }, AssetResponseMapper.ToDto(asset, category, new Dictionary<int, string>(), null));
             }
-
-            var effectiveSalvagePct = dto.IsSalvageOverride && dto.SalvagePercentage.HasValue
-                ? dto.SalvagePercentage.Value
-                : category.SalvagePercentage;
-            var computedSalvageValue = Math.Round(dto.AcquisitionCost * effectiveSalvagePct / 100m, 2);
-
-            var asset = new Asset
+            catch (Exception ex)
             {
-                Id = Guid.NewGuid().ToString(),
-                AssetCode = await RecordCodeGenerator.GenerateAssetCodeAsync(_context, effectiveTenantId),
-                AssetName = dto.AssetName,
-                CategoryId = dto.CategoryId,
-                LifecycleStatus = LifecycleStatus.Registered,
-                CurrentCondition = dto.CurrentCondition,
-                HandlingTypeSnapshot = category.HandlingType.ToString(),
-                Image = dto.Image,
-                Manufacturer = dto.Manufacturer,
-                Model = dto.Model,
-                SerialNumber = normalizedSerial,
-                PurchaseDate = dto.PurchaseDate,
-                Vendor = dto.Vendor,
-                AcquisitionCost = dto.AcquisitionCost,
-                TotalLifeMonths = dto.TotalLifeMonths,
-                UsedMonths = 0,
-                PurchasePrice = dto.PurchasePrice,
-                ResidualValue = dto.ResidualValue,
-                SalvagePercentage = effectiveSalvagePct,
-                SalvageValue = computedSalvageValue,
-                IsSalvageOverride = dto.IsSalvageOverride,
-                CurrentBookValue = dto.PurchasePrice,
-                AccumulatedDepreciation = 0,
-                MonthlyDepreciation = dto.TotalLifeMonths > 0
-                    ? Math.Round((dto.PurchasePrice - computedSalvageValue) / dto.TotalLifeMonths, 2)
-                    : 0,
-                TenantId = effectiveTenantId.HasValue ? effectiveTenantId.Value : null,
-                WarrantyExpiry = dto.WarrantyExpiry,
-                Notes = dto.Notes,
-                Documents = dto.Documents,
-                IsArchived = false,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                CreatedBy = userId,
-                UpdatedBy = userId
-            };
-
-            _context.Assets.Add(asset);
-
-            _auditService.Add(HttpContext, new AuditLog
-            {
-                Action = "Create",
-                EntityType = "Asset",
-                EntityId = asset.Id,
-                Module = "Asset Management",
-                UserId = userId,
-                TenantId = effectiveTenantId,
-                Description = $"Asset registered: {asset.AssetName} ({asset.AssetCode}).",
-                NewValues = JsonSerializer.Serialize(new { asset.AssetName, asset.AssetCode, asset.CategoryId, Status = StatusLabels.GetValueOrDefault(asset.LifecycleStatus, "Unknown") }),
-            });
-
-            if (User.IsInRole(UserRoleConstants.Finance))
-                await _notificationService.NotifyAdminFinanceRegisteredNewAssetAsync(asset);
-
-            try
-            {
-                await _context.SaveChangesAsync();
+                var msg = ex.Message;
+                if (ex.InnerException != null) msg += " | Inner: " + ex.InnerException.Message;
+                return StatusCode(500, new { message = $"Internal Server Error: {msg}" });
             }
-            catch (DbUpdateException ex) when (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
-            {
-                return Conflict(new { message = "Serial Number already exists. Please use a unique Serial Number." });
-            }
-
-            return CreatedAtAction("GetAsset", new { id = asset.Id }, AssetResponseMapper.ToDto(asset, category, new Dictionary<int, string>(), null));
         }
 
         [HttpPut("{id}")]
