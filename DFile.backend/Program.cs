@@ -419,7 +419,7 @@ app.MapGet("/api/health", () => Results.Ok("API is Healthy"));
 // Diagnostic endpoint — verifies secret injection and DB connectivity after deployment.
 // In Development: full detail including exception types and connection lengths.
 // In Production: boolean status only — no raw exception messages, no secret metadata.
-app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? rcsi = null, string? kill = null) =>
+app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? rcsi = null, string? kill = null, string? dryrun = null) =>
 {
     var isDev = app.Environment.IsDevelopment();
     var results = new System.Text.StringBuilder();
@@ -640,6 +640,94 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? 
                       .Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ');
             if (msg.Length > 300) msg = msg[..300];
             results.Append($"tenants_query_detail:{msg};");
+        }
+
+        if (!string.IsNullOrEmpty(dryrun))
+        {
+            try
+            {
+                results.Append("dryrun_start;");
+                using var tx = await db.Database.BeginTransactionAsync();
+                
+                var emailEncryption = scope.ServiceProvider.GetRequiredService<IEmailEncryptionService>();
+                var tenant = await db.Tenants.FirstOrDefaultAsync();
+                int? testTenantId = tenant?.Id;
+                
+                results.Append($"dryrun_tenant_id:{testTenantId};");
+                
+                var dummyEmail = "dryrun_employee_" + Guid.NewGuid().ToString("N")[..8] + "@example.com";
+                var employee = new Employee
+                {
+                    Id = $"EMP-DRYRUN-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
+                    EmployeeCode = "DRYRUN-1234",
+                    FirstName = "Dry",
+                    MiddleName = "Run",
+                    LastName = "Test",
+                    Email = dummyEmail,
+                    ContactNumber = "123456789",
+                    Role = "Finance Manager",
+                    HireDate = DateTime.UtcNow.Date,
+                    Status = "Active",
+                    TenantId = testTenantId
+                };
+                db.Employees.Add(employee);
+                results.Append("dryrun_emp_added;");
+                
+                var searchEmail = dummyEmail.Trim().ToLowerInvariant();
+                var emailHash = emailEncryption.Hash(searchEmail);
+                var tokenHash = "dryrunhash123";
+                var tokenExpiry = DateTime.UtcNow.AddHours(24);
+
+                var user = new User
+                {
+                    FirstName = "Dry",
+                    MiddleName = "Run",
+                    LastName = "Test",
+                    Email = emailEncryption.Encrypt(searchEmail),
+                    EmailHash = emailHash,
+                    Role = "Finance Manager",
+                    RoleLabel = "Finance Manager",
+                    ContactNumber = "123456789",
+                    Address = "Dry Run Address",
+                    HireDate = DateTime.UtcNow.Date,
+                    TenantId = testTenantId,
+                    PasswordHash = string.Empty,
+                    Status = "PendingActivation",
+                    ActivationTokenHash = tokenHash,
+                    ActivationTokenExpiry = tokenExpiry,
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.Users.Add(user);
+                results.Append("dryrun_user_added;");
+                
+                var audit = new AuditLog
+                {
+                    Action = "Create",
+                    EntityType = "Employee",
+                    EntityId = employee.Id,
+                    Module = "Personnel",
+                    UserId = null,
+                    TenantId = testTenantId,
+                    NewValues = "{}",
+                    CreatedAt = DateTime.UtcNow,
+                    IpAddress = "127.0.0.1",
+                    UserAgent = "DiagProbe"
+                };
+                db.AuditLogs.Add(audit);
+                results.Append("dryrun_audit_added;");
+                
+                await db.SaveChangesAsync();
+                results.Append("dryrun_save_changes_ok;");
+                
+                await tx.RollbackAsync();
+                results.Append("dryrun_rolled_back;");
+            }
+            catch (Exception ex)
+            {
+                var msg = ex.ToString().Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ');
+                if (msg.Length > 2000) msg = msg[..2000];
+                results.Append($"dryrun_err:{ex.GetType().Name}:{msg};");
+            }
         }
     }
     catch (Exception ex)
