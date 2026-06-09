@@ -274,6 +274,7 @@ jobs:
         # IIS holds locks on running DLLs — a clean-slate delete will fail mid-transfer.
         # Instead rely on overwrite semantics: existing files are replaced, new files are added.
         dangerous-clean-slate: false
+        timeout: 180000
         exclude: |
           **/.git*
           **/.git*/**
