@@ -361,7 +361,7 @@ namespace DFile.backend.Controllers
                 {
                     var serialExists = await _context.Assets.AnyAsync(a =>
                         a.SerialNumber != null &&
-                        a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
+                        a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
                         ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
                     if (serialExists)
                     {
@@ -477,7 +477,7 @@ namespace DFile.backend.Controllers
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.Id != id &&
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
                     ((existing.TenantId == null && a.TenantId == null) || a.TenantId == existing.TenantId));
                 if (serialExists)
                 {

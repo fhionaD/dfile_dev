@@ -259,7 +259,7 @@ namespace DFile.backend.Controllers
             {
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
                     ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId));
                 if (serialExists)
                     return Conflict(new { message = "Serial Number already exists for an asset in this tenant." });

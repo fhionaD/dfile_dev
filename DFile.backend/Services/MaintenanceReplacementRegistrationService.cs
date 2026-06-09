@@ -66,7 +66,7 @@ namespace DFile.backend.Services
             {
                 var serialExists = await _context.Assets.AnyAsync(a =>
                     a.SerialNumber != null &&
-                    a.SerialNumber.ToUpperInvariant() == normalizedSerial.ToUpperInvariant() &&
+                    a.SerialNumber.ToUpper() == normalizedSerial.ToUpper() &&
                     ((effectiveTenantId == null && a.TenantId == null) || a.TenantId == effectiveTenantId),
                     cancellationToken);
                 if (serialExists)
