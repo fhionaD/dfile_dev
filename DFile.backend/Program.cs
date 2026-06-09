@@ -662,7 +662,7 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? 
                     var employee = new Employee
                     {
                         Id = $"EMP-DRYRUN-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-                        EmployeeCode = "DRYRUN-1234",
+                        EmployeeCode = "USR-9999",
                         FirstName = "Dry",
                         MiddleName = "Run",
                         LastName = "Test",
