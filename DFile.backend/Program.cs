@@ -649,6 +649,35 @@ app.MapGet("/api/diag", async (IServiceProvider sp, IConfiguration cfg, string? 
             : "scope_err:true;");
     }
 
+    // Check logs directory for stdout logs to diagnose 500 errors
+    try
+    {
+        var logsPath = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+        if (Directory.Exists(logsPath))
+        {
+            var files = Directory.GetFiles(logsPath);
+            results.Append($"logs_dir_exists:true;logs_files_count:{files.Length};");
+            var latestFile = files.Select(f => new FileInfo(f)).OrderByDescending(fi => fi.LastWriteTime).FirstOrDefault();
+            if (latestFile != null)
+            {
+                results.Append($"latest_log_file:{latestFile.Name};latest_log_size:{latestFile.Length};");
+                using var fs = new FileStream(latestFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                var content = await reader.ReadToEndAsync();
+                var lastPart = content.Length > 2000 ? content[^2000..] : content;
+                results.Append($"latest_log_tail:{lastPart.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ')};");
+            }
+        }
+        else
+        {
+            results.Append("logs_dir_exists:false;");
+        }
+    }
+    catch (Exception ex)
+    {
+        results.Append($"logs_check_err:{ex.GetType().Name}:{ex.Message.Replace(';', ',')};");
+    }
+
     return Results.Ok(results.ToString());
 });
 
