@@ -31,7 +31,7 @@ export function AddAssetModal({
     const isReplacement = !!replacementContext && mode === "create";
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[72rem] w-[95vw] rounded-2xl border-border p-0 overflow-hidden h-[90vh] flex flex-col">
+            <DialogContent className="max-h-[90vh] max-w-[72rem] w-[95vw] rounded-2xl border-border p-0 overflow-hidden flex flex-col">
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10  text-primary"><Package size={20} /></div>

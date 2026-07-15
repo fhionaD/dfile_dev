@@ -23,7 +23,7 @@ export function AssetStats({ cardClassName = "" }: AssetStatsProps) {
     }
 
     const totalAssets = activeAssets.length;
-    const pendingReviewCount = activeAssets.filter(a => a.status === "Available" && (a.room === "—" || !a.room)).length;
+    const pendingReviewCount = activeAssets.filter(a => a.allocationState === "Unallocated" && a.status !== "Disposed" && a.status !== "Archived").length;
     const originalValue = assets.reduce((sum, a) => sum + (a.purchasePrice || a.value || 0), 0);
     const bookValue = assets.reduce((sum, a) => sum + (a.currentBookValue || a.value || 0), 0);
 

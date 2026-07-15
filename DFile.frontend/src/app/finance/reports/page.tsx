@@ -118,7 +118,7 @@ export default function ReportsPage() {
                 <Card>
                     <div className="p-5 space-y-3">
                         <p className="text-sm font-medium text-muted-foreground">Purchase Orders (Approved)</p>
-                        {isLoading ? <Skeleton className="h-8 w-16" /> : <p className="text-2xl font-bold">{approvedOrders.length}</p>}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalProcurementSpend} className="text-2xl font-bold" />}
                     </div>
                 </Card>
             </section>
