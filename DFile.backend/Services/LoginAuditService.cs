@@ -74,18 +74,15 @@ namespace DFile.backend.Services
             try { await _context.SaveChangesAsync(); }
             catch (Exception ex) { _logger.LogError(ex, "Failed to save login audit record for user {UserId}", user.Id); }
 
-            // Send security alert on suspicious threshold
-            if (isSuspicious)
+            // Send security alert on EVERY failed attempt (not just after suspicious threshold)
+            try
             {
-                try
-                {
-                    await _emailService.SendLoginSecurityAlertAsync(_emailEncryption.Decrypt(user.Email), user.FirstName, ipAddress, userAgent, user.FailedLoginAttempts);
-                    securityAlertSent = true;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to send security alert email for user {UserId}", user.Id);
-                }
+                await _emailService.SendLoginSecurityAlertAsync(_emailEncryption.Decrypt(user.Email), user.FirstName, ipAddress, userAgent, user.FailedLoginAttempts);
+                securityAlertSent = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send security alert email for user {UserId}", user.Id);
             }
 
             int attemptsLeft = Math.Max(0, MaxFailedAttempts - user.FailedLoginAttempts);
