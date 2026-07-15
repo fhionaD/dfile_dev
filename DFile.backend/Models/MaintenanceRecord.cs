@@ -59,6 +59,10 @@ namespace DFile.backend.Models
         /// <summary>Timestamp when repair was approved by Finance.</summary>
         public DateTime? ApprovedAt { get; set; }
 
+        /// <summary>Replacement cost entered by Finance when approving a replacement request. This becomes the Procurement Spend.</summary>
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? ReplacementCost { get; set; }
+
         public string? LinkedPurchaseOrderId { get; set; }
 
         public string? ReplacementRegisteredAssetId { get; set; }

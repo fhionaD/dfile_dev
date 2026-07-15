@@ -191,6 +191,8 @@ export interface MaintenanceRecord {
     adjustmentValue?: number | null;
     approvedBy?: string | null;
     approvedAt?: string | null;
+    /** Replacement cost entered by Finance when approving a replacement request. Becomes the Procurement Spend. */
+    replacementCost?: number | null;
     scheduleSeriesId?: string | null;
 }
 

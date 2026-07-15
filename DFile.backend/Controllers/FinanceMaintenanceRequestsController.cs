@@ -363,10 +363,18 @@ namespace DFile.backend.Controllers
 
         [HttpPatch("{id}/approve-replacement")]
         [RequirePermissionOrRoles("Assets", "CanApprove", "Finance")]
-        public async Task<IActionResult> ApproveReplacement(string id)
+        public async Task<IActionResult> ApproveReplacement(string id, [FromBody] ApproveReplacementDto dto)
         {
             var forbid = ForbidMaintenanceOnFinanceEndpoints();
             if (forbid != null) return forbid;
+
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(kv => kv.Value?.Errors.Count > 0)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
+                return BadRequest(new { message = "Validation failed.", errors });
+            }
 
             var tenantId = GetCurrentTenantId();
             var userId = GetCurrentUserId();
@@ -385,6 +393,9 @@ namespace DFile.backend.Controllers
 
             var asset = record.Asset;
             if (asset == null) return BadRequest(new { message = "Associated asset not found." });
+
+            // Store the replacement cost entered by Finance
+            record.ReplacementCost = dto.ReplacementCost;
 
             asset.LifecycleStatus = LifecycleStatus.ForReplacement;
             asset.UpdatedAt = DateTime.UtcNow;
@@ -406,6 +417,8 @@ namespace DFile.backend.Controllers
                     po.ApprovedBy = userId;
                     po.ApprovedAt = DateTime.UtcNow;
                     po.UpdatedAt = DateTime.UtcNow;
+                    // Copy the replacement cost from Finance approval to the purchase order price
+                    po.PurchasePrice = dto.ReplacementCost;
                 }
             }
 
@@ -414,7 +427,7 @@ namespace DFile.backend.Controllers
             record.UpdatedAt = DateTime.UtcNow;
 
             _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Approve", "MaintenanceRecord", id,
-                $"Finance approved replacement for {record.RequestId ?? id}; original asset marked for replacement pending new asset registration.");
+                $"Finance approved replacement for {record.RequestId ?? id} with replacement cost {dto.ReplacementCost:C}; original asset marked for replacement pending new asset registration.");
 
             var saveReplacement = await TrySaveMaintenanceFinanceAsync();
             if (saveReplacement != null) return saveReplacement;

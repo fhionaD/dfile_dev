@@ -25,7 +25,7 @@ interface FinanceRepairApprovalModalProps {
         monthlyDepreciation?: number;
     };
     isLoading?: boolean;
-    onApproveWithDecision?: (payload: ApproveRepairFinancialImpactPayload) => Promise<void>;
+    onApproveWithDecision?: (payload: ApproveRepairFinancialImpactPayload | ApproveReplacementPayload) => Promise<void>;
 }
 
 interface ApproveRepairFinancialImpactPayload {
@@ -33,6 +33,11 @@ interface ApproveRepairFinancialImpactPayload {
     financeDecision: "Expense" | "IncreaseValue" | "ExtendLife" | "Both";
     adjustmentValue?: number;
     addedLifeMonths?: number;
+}
+
+interface ApproveReplacementPayload {
+    maintenanceRecordId: string;
+    replacementCost: number;
 }
 
 function formatMoneyPhp(n: number | undefined): string {
@@ -53,12 +58,16 @@ export function FinanceRepairApprovalModal({
     const [decision, setDecision] = useState<FinanceDecision>("");
     const [adjustmentValue, setAdjustmentValue] = useState<string>("");
     const [addedLifeMonths, setAddedLifeMonths] = useState<string>("");
+    const [replacementCost, setReplacementCost] = useState<string>("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const isReplacement = maintenanceRecord?.financeRequestType === "Replacement";
 
     const reset = () => {
         setDecision("");
         setAdjustmentValue("");
         setAddedLifeMonths("");
+        setReplacementCost("");
     };
 
     const handleClose = (v: boolean) => {
@@ -67,8 +76,15 @@ export function FinanceRepairApprovalModal({
     };
 
     const canSubmit = (): boolean => {
-        if (!decision || !maintenanceRecord?.id) return false;
+        if (!maintenanceRecord?.id) return false;
 
+        // For replacement requests: need replacement cost
+        if (isReplacement) {
+            return replacementCost.trim() !== "" && parseFloat(replacementCost) > 0;
+        }
+
+        // For repair requests: need decision and conditional fields
+        if (!decision) return false;
         if (decision === "IncreaseValue" || decision === "Both") {
             if (!adjustmentValue || parseFloat(adjustmentValue) <= 0) return false;
         }
@@ -79,16 +95,25 @@ export function FinanceRepairApprovalModal({
     };
 
     const handleSubmit = async () => {
-        if (!canSubmit() || !maintenanceRecord?.id || !decision || !onApproveWithDecision) return;
+        if (!canSubmit() || !maintenanceRecord?.id || !onApproveWithDecision) return;
 
         setIsSubmitting(true);
         try {
-            await onApproveWithDecision({
-                maintenanceRecordId: maintenanceRecord.id,
-                financeDecision: decision as "Expense" | "IncreaseValue" | "ExtendLife" | "Both",
-                adjustmentValue: decision === "IncreaseValue" || decision === "Both" ? parseFloat(adjustmentValue) : undefined,
-                addedLifeMonths: decision === "ExtendLife" || decision === "Both" ? parseInt(addedLifeMonths) : undefined,
-            });
+            if (isReplacement) {
+                // Replacement workflow: submit replacement cost
+                await onApproveWithDecision({
+                    maintenanceRecordId: maintenanceRecord.id,
+                    replacementCost: parseFloat(replacementCost),
+                } as ApproveReplacementPayload);
+            } else {
+                // Repair workflow: submit financial decision
+                await onApproveWithDecision({
+                    maintenanceRecordId: maintenanceRecord.id,
+                    financeDecision: decision as "Expense" | "IncreaseValue" | "ExtendLife" | "Both",
+                    adjustmentValue: decision === "IncreaseValue" || decision === "Both" ? parseFloat(adjustmentValue) : undefined,
+                    addedLifeMonths: decision === "ExtendLife" || decision === "Both" ? parseInt(addedLifeMonths) : undefined,
+                } as ApproveRepairFinancialImpactPayload);
+            }
             reset();
         } catch {
             // Error handled by caller
@@ -107,10 +132,12 @@ export function FinanceRepairApprovalModal({
                 <DialogHeader className="p-6 bg-muted/40 border-b border-border shrink-0">
                     <DialogTitle className="flex items-center gap-2">
                         <CheckCircle className="h-5 w-5 text-primary" />
-                        Approve Repair Financial Impact
+                        {isReplacement ? "Approve Asset Replacement" : "Approve Repair Financial Impact"}
                     </DialogTitle>
                     <DialogDescription>
-                        {repairType === "Minor"
+                        {isReplacement
+                            ? "Enter the replacement cost for the new asset. This will be recorded as Procurement Spend."
+                            : repairType === "Minor"
                             ? "Review and approve the minor repair. Typically no depreciation changes needed."
                             : "Review and approve the repair financial impact. Choose how depreciation will be adjusted."}
                     </DialogDescription>
@@ -176,7 +203,8 @@ export function FinanceRepairApprovalModal({
                             </div>
                         )}
 
-                        {/* Finance Decision Options */}
+                        {/* Finance Decision Options - For Repairs Only */}
+                        {!isReplacement && (
                         <div className="space-y-3 border-t pt-4">
                             <Label className="text-sm">Financial Impact Decision</Label>
                             <div className="space-y-2">
@@ -267,9 +295,28 @@ export function FinanceRepairApprovalModal({
                                 </button>
                             </div>
                         </div>
+                        )}
+
+                        {/* Replacement Cost Input - For Replacements Only */}
+                        {isReplacement && (
+                            <div className="space-y-3 border-t pt-4">
+                                <Label htmlFor="replacement-cost" className="text-sm">Replacement Asset Cost (PHP)</Label>
+                                <Input
+                                    id="replacement-cost"
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    value={replacementCost}
+                                    onChange={(e) => setReplacementCost(e.target.value)}
+                                    placeholder="Enter the cost of the replacement asset"
+                                    className="h-10"
+                                />
+                                <p className="text-xs text-muted-foreground">This amount will be recorded as Procurement Spend and used as the purchase price for the new asset.</p>
+                            </div>
+                        )}
 
                         {/* Conditional Input Fields */}
-                        {(decision === "IncreaseValue" || decision === "Both") && (
+                        {!isReplacement && (
                             <div className="space-y-2">
                                 <Label htmlFor="adjustment-value" className="text-sm">Amount to Increase Asset Value (PHP)</Label>
                                 <Input
@@ -301,6 +348,7 @@ export function FinanceRepairApprovalModal({
                                 />
                             </div>
                         )}
+                        )}
                     </div>
                 </div>
 
@@ -313,7 +361,7 @@ export function FinanceRepairApprovalModal({
                         disabled={!canSubmit() || isSubmitting}
                         className="gap-2"
                     >
-                        {isSubmitting ? "Approving..." : "Apply Decision"}
+                        {isSubmitting ? "Processing..." : (isReplacement ? "Approve Replacement" : "Apply Decision")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

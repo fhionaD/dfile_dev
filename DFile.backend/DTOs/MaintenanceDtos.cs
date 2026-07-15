@@ -112,6 +112,9 @@ namespace DFile.backend.DTOs
         /// <summary>Dollar amount to adjust asset value (for IncreaseValue decisions).</summary>
         public decimal? AdjustmentValue { get; set; }
 
+        /// <summary>Replacement cost entered by Finance when approving a replacement request. This becomes the Procurement Spend.</summary>
+        public decimal? ReplacementCost { get; set; }
+
         /// <summary>User ID who approved the repair (Finance user).</summary>
         public string? ApprovedBy { get; set; }
 
@@ -176,6 +179,14 @@ namespace DFile.backend.DTOs
     /// <summary>
     /// Finance decision for repair financial impact (used for major repairs approval).
     /// </summary>
+    public class ApproveReplacementDto
+    {
+        /// <summary>Replacement cost entered by Finance. This becomes the Procurement Spend when copying to PurchaseOrder.PurchasePrice.</summary>
+        [Required]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Replacement cost must be greater than 0")]
+        public decimal ReplacementCost { get; set; }
+    }
+
     public class ApproveRepairFinancialImpactDto
     {
         /// <summary>Expense | IncreaseValue | ExtendLife | Both</summary>

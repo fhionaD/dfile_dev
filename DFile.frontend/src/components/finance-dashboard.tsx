@@ -1,14 +1,13 @@
 import { useState, useMemo } from "react";
 import {
     TrendingDown, AlertTriangle, PhilippinePeso,
-    Wrench, BarChart3, Package
+    Wrench, BarChart3
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAssets } from "@/hooks/use-assets";
-import { usePurchaseOrders } from "@/hooks/use-procurement";
 import { useMaintenanceRecords } from "@/hooks/use-maintenance";
 
 interface FinanceDashboardProps {
@@ -21,7 +20,6 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
     const isFull = variant === "full";
     const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(false, { enabled: isFull });
-    const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders(false, { enabled: isFull });
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(amount);
@@ -96,19 +94,19 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         return { totalMaintenanceCost, completedCost, pendingCost, costByPriority, costByStatus, sortedMonths, maxMonthlyCost };
     }, [records]);
 
-    // ── Vendor Spend ──
-    const vendorStats = useMemo(() => {
-        const map: Record<string, number> = {};
+    // ── Procurement Spend (Replacement Costs) ──
+    const procurementStats = useMemo(() => {
+        // Procurement Spend = sum of all approved replacement costs
         let total = 0;
-        orders.forEach(o => {
-            if (o.status === "Cancelled") return;
-            const cost = o.purchasePrice || 0;
-            total += cost;
-            map[o.vendor] = (map[o.vendor] || 0) + cost;
+        records.forEach(r => {
+            if (r.financeRequestType === "Replacement" && 
+                (r.financeWorkflowStatus === "Approved" || r.financeWorkflowStatus === "Replacement Completed") &&
+                r.replacementCost) {
+                total += r.replacementCost;
+            }
         });
-        const sorted = Object.entries(map).map(([vendor, amount]) => ({ vendor, amount })).sort((a, b) => b.amount - a.amount).slice(0, 5);
-        return { total, sorted };
-    }, [orders]);
+        return { total };
+    }, [records]);
 
     // ── Alerts ──
     const alerts = useMemo(() => {
@@ -121,7 +119,7 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         return { eol, warranty };
     }, [assets]);
 
-    const isLoading = isLoadingAssets || (isFull && (isLoadingRecords || isLoadingOrders));
+    const isLoading = isLoadingAssets || (isFull && isLoadingRecords);
 
     if (isLoading) {
         const skeletonKpis = isFull ? 4 : 2;
@@ -213,11 +211,11 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
                         <Card className={`relative overflow-hidden ${cardClassName}`}>
                             <div className="p-5 space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement</p>
-                                    <Package className="h-4 w-4 text-purple-600" />
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement Spend</p>
+                                    <Wrench className="h-4 w-4 text-purple-600" />
                                 </div>
-                                <p className="text-2xl font-bold tracking-tight">{formatShort(vendorStats.total)}</p>
-                                <p className="text-xs text-muted-foreground">{orders.length} purchase orders</p>
+                                <p className="text-2xl font-bold tracking-tight">{formatShort(procurementStats.total)}</p>
+                                <p className="text-xs text-muted-foreground">From approved replacements</p>
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-300" />
                         </Card>
@@ -348,43 +346,6 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
                                 );
                             })}
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Top Vendor Spend */}
-                <Card className={cardClassName}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Top Vendor Spend</CardTitle>
-                            <Badge variant="outline" className="text-xs font-mono">{vendorStats.sorted.length} vendors</Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {vendorStats.sorted.length === 0 ? (
-                            <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">No procurement data</div>
-                        ) : (
-                            <div className="space-y-2.5">
-                                {vendorStats.sorted.map((v, i) => {
-                                    const pct = vendorStats.total > 0 ? (v.amount / vendorStats.total) * 100 : 0;
-                                    return (
-                                        <div key={v.vendor} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
-                                                {i + 1}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-sm font-medium truncate">{v.vendor}</span>
-                                                    <span className="font-mono text-xs text-muted-foreground ml-2">{formatCurrency(v.amount)}</span>
-                                                </div>
-                                                <div className="h-1 rounded-full bg-muted overflow-hidden">
-                                                    <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
             </div>

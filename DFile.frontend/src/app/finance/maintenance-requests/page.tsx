@@ -95,6 +95,8 @@ export default function FinanceMaintenanceRequestsPage() {
     const approveFinancialImpact = useFinanceApproveRepairFinancialImpact();
 
     const [replacementTarget, setReplacementTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [replacementApprovalTarget, setReplacementApprovalTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
+    const [replacementApprovalOpen, setReplacementApprovalOpen] = useState(false);
     const [detailRecord, setDetailRecord] = useState<FinanceMaintenanceQueueRow | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [rejectionTarget, setRejectionTarget] = useState<FinanceMaintenanceQueueRow | null>(null);
@@ -250,7 +252,10 @@ export default function FinanceMaintenanceRequestsPage() {
                                                         <Button
                                                             size="sm"
                                                             className="gap-1"
-                                                            onClick={() => approveReplacement.mutate(r.id)}
+                                                            onClick={() => {
+                                                                setReplacementApprovalTarget(r);
+                                                                setReplacementApprovalOpen(true);
+                                                            }}
                                                             disabled={busy}
                                                         >
                                                             <CheckCircle2 className="h-3.5 w-3.5" /> Approve replacement
@@ -355,6 +360,50 @@ export default function FinanceMaintenanceRequestsPage() {
                     </div>
                 )}
             </Card>
+
+            {replacementApprovalOpen && replacementApprovalTarget && (
+                <FinanceRepairApprovalModal
+                    open={replacementApprovalOpen}
+                    onOpenChange={(open) => {
+                        setReplacementApprovalOpen(open);
+                        if (!open) {
+                            setReplacementApprovalTarget(null);
+                        }
+                    }}
+                    isLoading={assetLoading || submissionLoading}
+                    assetDetails={assetDetail ? {
+                        assetName: assetDetail.desc,
+                        assetCode: assetDetail.assetCode,
+                        bookValue: assetDetail.currentBookValue,
+                        usefulLifeYears: assetDetail.usefulLifeYears,
+                        purchasePrice: assetDetail.purchasePrice,
+                        currentBookValue: assetDetail.currentBookValue,
+                        accumulatedDepreciation: assetDetail.accumulatedDepreciation,
+                        monthlyDepreciation: assetDetail.monthlyDepreciation,
+                    } : undefined}
+                    maintenanceRecord={{
+                        id: replacementApprovalTarget.id,
+                        requestId: replacementApprovalTarget.requestId,
+                        assetId: replacementApprovalTarget.assetId,
+                        assetName: replacementApprovalTarget.assetName,
+                        assetCode: replacementApprovalTarget.assetCode,
+                        financeRequestType: "Replacement",
+                    } as MaintenanceRecord}
+                    onApproveWithDecision={async (payload) => {
+                        try {
+                            // Approve replacement with cost
+                            await approveReplacement.mutateAsync({
+                                id: replacementApprovalTarget.id,
+                                payload: payload as { replacementCost: number },
+                            });
+                            setReplacementApprovalOpen(false);
+                            setReplacementApprovalTarget(null);
+                        } catch {
+                            // Error handled by mutation
+                        }
+                    }}
+                />
+            )}
 
             {financialDecisionOpen && financialDecisionTarget && (
                 <FinanceRepairApprovalModal

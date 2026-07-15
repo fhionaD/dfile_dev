@@ -441,19 +441,27 @@ export function useFinanceMarkPartsReady() {
     });
 }
 
+export interface ApproveReplacementPayload {
+    maintenanceRecordId: string;
+    replacementCost: number;
+}
+
 export function useFinanceApproveReplacement() {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (id: string) => {
-            await api.patch(`/api/finance/maintenance-requests/${id}/approve-replacement`);
+        mutationFn: async ({ id, payload }: { id: string; payload: { replacementCost: number } }) => {
+            await api.patch(`/api/finance/maintenance-requests/${id}/approve-replacement`, {
+                replacementCost: payload.replacementCost,
+            });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-submission'] });
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            toast.success('Replacement approved; register the new asset when ready. Original is marked for replacement.');
+            toast.success('Replacement approved with cost recorded; register the new asset when ready. Original is marked for replacement.');
         },
         onError: (error: unknown) => {
             toast.error(maintenanceErrorMessage(error, 'Failed to approve replacement'));
