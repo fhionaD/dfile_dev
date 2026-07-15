@@ -1,16 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileBarChart, Package, DollarSign, TrendingDown, ShoppingCart, Calculator } from "lucide-react";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
 import { useFinanceKpi } from "@/hooks/use-finance-reports";
+import { KpiDetailsModal } from "@/components/modals/kpi-details-modal";
 
 export default function ReportsPage() {
     const { data: assets = [], isLoading: assetsLoading } = useAssets();
     const { data: kpi, isLoading: kpiLoading } = useFinanceKpi();
+
+    const [kpiDetailOpen, setKpiDetailOpen] = useState(false);
+    const [kpiDetailType, setKpiDetailType] = useState<"repairs" | "replacements" | "all">("all");
+    const [kpiDetailTitle, setKpiDetailTitle] = useState("KPI Details");
 
     const isLoading = assetsLoading || kpiLoading;
 
@@ -35,6 +40,12 @@ export default function ReportsPage() {
             .map(([name, data]) => ({ name, ...data }));
     }, [activeAssets]);
 
+    const openKpiDetail = (type: "repairs" | "replacements" | "all", title: string) => {
+        setKpiDetailType(type);
+        setKpiDetailTitle(title);
+        setKpiDetailOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -49,7 +60,7 @@ export default function ReportsPage() {
 
             {/* Key Financial Metrics */}
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("repairs", "Total Estimated Cost - Maintenance Records")}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Total Estimated Cost</p>
@@ -59,9 +70,10 @@ export default function ReportsPage() {
                         <p className="text-xs text-muted-foreground">
                             {kpi?.approvedMaintenanceCount ?? 0} approved maintenance items
                         </p>
+                        <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("all", "Purchase Orders - Approved Orders")}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Purchase Orders (Approved)</p>
@@ -71,9 +83,10 @@ export default function ReportsPage() {
                         <p className="text-xs text-muted-foreground">
                             {kpi?.approvedPurchaseOrderCount ?? 0} approved orders
                         </p>
+                        <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("replacements", "Replacement Asset Cost - Approved Replacements")}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Replacement Asset Cost</p>
@@ -83,9 +96,10 @@ export default function ReportsPage() {
                         <p className="text-xs text-muted-foreground">
                             {kpi?.approvedReplacementCount ?? 0} approved replacements
                         </p>
+                        <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
                 </Card>
-                <Card>
+                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("all", "Total Procurement Spend - All Procurement Items")}>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Total Procurement Spend</p>
@@ -95,6 +109,7 @@ export default function ReportsPage() {
                         <p className="text-xs text-muted-foreground">
                             PO + Replacement costs
                         </p>
+                        <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
                 </Card>
             </section>
@@ -161,6 +176,14 @@ export default function ReportsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* KPI Details Modal */}
+            <KpiDetailsModal
+                open={kpiDetailOpen}
+                onOpenChange={setKpiDetailOpen}
+                type={kpiDetailType}
+                title={kpiDetailTitle}
+            />
         </div>
     );
 }
