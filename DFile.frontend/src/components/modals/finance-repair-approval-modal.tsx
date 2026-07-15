@@ -348,7 +348,6 @@ export function FinanceRepairApprovalModal({
                                 />
                             </div>
                         )}
-                        )}
                     </div>
                 </div>
 
