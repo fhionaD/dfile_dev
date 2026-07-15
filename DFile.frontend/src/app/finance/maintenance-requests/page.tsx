@@ -113,6 +113,10 @@ export default function FinanceMaintenanceRequestsPage() {
         financialDecisionTarget?.assetId ?? "",
         { enabled: financialDecisionOpen && !!financialDecisionTarget?.assetId }
     );
+    const { data: replacementApprovalAssetDetail, isLoading: replacementApprovalAssetLoading } = useAsset(
+        replacementApprovalTarget?.assetId ?? "",
+        { enabled: replacementApprovalOpen && !!replacementApprovalTarget?.assetId }
+    );
     const { data: submissionDetail, isLoading: submissionLoading } = useFinanceMaintenanceSubmissionDetail(
         financialDecisionTarget?.id,
         financialDecisionOpen && !!financialDecisionTarget
@@ -371,16 +375,16 @@ export default function FinanceMaintenanceRequestsPage() {
                             setReplacementApprovalTarget(null);
                         }
                     }}
-                    isLoading={assetLoading || submissionLoading}
-                    assetDetails={assetDetail ? {
-                        assetName: assetDetail.desc,
-                        assetCode: assetDetail.assetCode,
-                        bookValue: assetDetail.currentBookValue,
-                        usefulLifeYears: assetDetail.usefulLifeYears,
-                        purchasePrice: assetDetail.purchasePrice,
-                        currentBookValue: assetDetail.currentBookValue,
-                        accumulatedDepreciation: assetDetail.accumulatedDepreciation,
-                        monthlyDepreciation: assetDetail.monthlyDepreciation,
+                    isLoading={replacementApprovalAssetLoading || submissionLoading}
+                    assetDetails={replacementApprovalAssetDetail ? {
+                        assetName: replacementApprovalAssetDetail.desc,
+                        assetCode: replacementApprovalAssetDetail.assetCode,
+                        bookValue: replacementApprovalAssetDetail.currentBookValue,
+                        usefulLifeYears: replacementApprovalAssetDetail.usefulLifeYears,
+                        purchasePrice: replacementApprovalAssetDetail.purchasePrice,
+                        currentBookValue: replacementApprovalAssetDetail.currentBookValue,
+                        accumulatedDepreciation: replacementApprovalAssetDetail.accumulatedDepreciation,
+                        monthlyDepreciation: replacementApprovalAssetDetail.monthlyDepreciation,
                     } : undefined}
                     maintenanceRecord={{
                         id: replacementApprovalTarget.id,
