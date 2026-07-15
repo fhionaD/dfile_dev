@@ -384,7 +384,7 @@ export function useFinanceApproveRepairFinancialImpact() {
             // Invalidate related queries to force refetch
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-submission'] });
-            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'], exact: false });
             // This should match all assets queries (e.g., ['assets', false, false])
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             
@@ -393,6 +393,10 @@ export function useFinanceApproveRepairFinancialImpact() {
                 queryKey: ['assets', false, false],
                 exact: false // Allow partial matches
             });
+            
+            // Invalidate finance KPI calculations (Reports dashboard)
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
+            queryClient.invalidateQueries({ queryKey: ['replacement-procurement-details'] });
             
             toast.success('Repair financial impact approved');
         },
@@ -457,10 +461,13 @@ export function useFinanceApproveReplacement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-requests'] });
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-submission'] });
-            queryClient.invalidateQueries({ queryKey: ['maintenance'] });
+            queryClient.invalidateQueries({ queryKey: ['maintenance'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
             // Invalidate all purchase order queries (with any showArchived value)
             queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
+            // Invalidate finance KPI calculations (Reports dashboard)
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
+            queryClient.invalidateQueries({ queryKey: ['replacement-procurement-details'] });
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             toast.success('Replacement approved with cost recorded; register the new asset when ready. Original is marked for replacement.');
         },

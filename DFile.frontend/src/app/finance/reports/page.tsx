@@ -3,44 +3,22 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileBarChart, Package, DollarSign, TrendingDown, ShoppingCart } from "lucide-react";
+import { FileBarChart, Package, DollarSign, TrendingDown, ShoppingCart, Calculator } from "lucide-react";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
-import { usePurchaseOrders } from "@/hooks/use-procurement";
-import { useMaintenanceRecords } from "@/hooks/use-maintenance";
+import { useFinanceKpi } from "@/hooks/use-finance-reports";
 
 export default function ReportsPage() {
     const { data: assets = [], isLoading: assetsLoading } = useAssets();
-    const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders();
-    const { data: records = [], isLoading: maintLoading } = useMaintenanceRecords();
+    const { data: kpi, isLoading: kpiLoading } = useFinanceKpi();
 
-    const isLoading = assetsLoading || ordersLoading || maintLoading;
+    const isLoading = assetsLoading || kpiLoading;
 
     const activeAssets = useMemo(() => assets.filter(a => !a.archived), [assets]);
     const totalAcquisitionCost = useMemo(() => activeAssets.reduce((sum, a) => sum + (a.purchasePrice ?? a.value ?? 0), 0), [activeAssets]);
     const totalCurrentValue = useMemo(() => activeAssets.reduce((sum, a) => sum + (a.currentBookValue ?? a.value ?? 0), 0), [activeAssets]);
     const totalDepreciation = totalAcquisitionCost - totalCurrentValue;
     const depreciationRate = totalAcquisitionCost > 0 ? ((totalDepreciation / totalAcquisitionCost) * 100) : 0;
-
-    const approvedOrders = useMemo(() => orders.filter(o => o.status === "Approved" || o.status === "Delivered"), [orders]);
-    const purchaseOrderSpend = useMemo(() => approvedOrders.reduce((sum, o) => sum + o.purchasePrice, 0), [approvedOrders]);
-
-    // Include replacement costs from approved replacements in procurement spend
-    // (covers replacements awaiting asset registration after Finance approval)
-    const approvedReplacementCosts = useMemo(() => records
-        .filter(r => 
-            r.financeRequestType === "Replacement" && 
-            (r.financeWorkflowStatus === "Waiting for Replacement" || r.financeWorkflowStatus === "Approved") &&
-            r.replacementCost && 
-            r.replacementCost > 0
-        )
-        .reduce((sum, r) => sum + (r.replacementCost ?? 0), 0), [records]);
-
-    const totalProcurementSpend = useMemo(() => purchaseOrderSpend + approvedReplacementCosts, [purchaseOrderSpend, approvedReplacementCosts]);
-
-    const totalMaintenanceCost = useMemo(() => records
-        .filter(r => r.financeWorkflowStatus === "Approved")
-        .reduce((sum, r) => sum + (r.cost ?? 0), 0), [records]);
 
     // Category breakdown
     const categoryBreakdown = useMemo(() => {
@@ -74,64 +52,76 @@ export default function ReportsPage() {
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Total Acquisition Cost</p>
+                            <p className="text-sm font-medium text-muted-foreground">Total Estimated Cost</p>
                             <DollarSign className="h-4 w-4 text-blue-600" />
                         </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalAcquisitionCost} className="text-2xl font-bold" />}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.totalEstimatedCost ?? 0} className="text-2xl font-bold" />}
+                        <p className="text-xs text-muted-foreground">
+                            {kpi?.approvedMaintenanceCount ?? 0} approved maintenance items
+                        </p>
                     </div>
                 </Card>
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Current Book Value</p>
-                            <Package className="h-4 w-4 text-emerald-600" />
+                            <p className="text-sm font-medium text-muted-foreground">Purchase Orders (Approved)</p>
+                            <ShoppingCart className="h-4 w-4 text-emerald-600" />
                         </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalCurrentValue} className="text-2xl font-bold text-emerald-600" />}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.approvedPurchaseOrderAmount ?? 0} className="text-2xl font-bold text-emerald-600" />}
+                        <p className="text-xs text-muted-foreground">
+                            {kpi?.approvedPurchaseOrderCount ?? 0} approved orders
+                        </p>
                     </div>
                 </Card>
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Total Depreciation</p>
-                            <TrendingDown className="h-4 w-4 text-amber-600" />
+                            <p className="text-sm font-medium text-muted-foreground">Replacement Asset Cost</p>
+                            <Package className="h-4 w-4 text-orange-600" />
                         </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : (
-                            <div>
-                                <CurrencyCell value={totalDepreciation} className="text-2xl font-bold text-amber-600" />
-                                <p className="text-xs text-muted-foreground mt-1">{depreciationRate.toFixed(1)}% of acquisition cost</p>
-                            </div>
-                        )}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.replacementAssetCost ?? 0} className="text-2xl font-bold text-orange-600" />}
+                        <p className="text-xs text-muted-foreground">
+                            {kpi?.approvedReplacementCount ?? 0} approved replacements
+                        </p>
                     </div>
                 </Card>
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Procurement Spend</p>
-                            <ShoppingCart className="h-4 w-4 text-violet-600" />
+                            <p className="text-sm font-medium text-muted-foreground">Total Procurement Spend</p>
+                            <Calculator className="h-4 w-4 text-violet-600" />
                         </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalProcurementSpend} className="text-2xl font-bold" />}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.totalProcurementSpend ?? 0} className="text-2xl font-bold text-violet-600" />}
+                        <p className="text-xs text-muted-foreground">
+                            PO + Replacement costs
+                        </p>
                     </div>
                 </Card>
             </section>
 
-            {/* Additional Summary */}
+            {/* Asset Summary */}
             <section className="grid gap-4 sm:grid-cols-3">
                 <Card>
                     <div className="p-5 space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground">Active Assets</p>
-                        {isLoading ? <Skeleton className="h-8 w-16" /> : <p className="text-2xl font-bold">{activeAssets.length}</p>}
+                        <p className="text-sm font-medium text-muted-foreground">Total Acquisition Cost</p>
+                        {assetsLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalAcquisitionCost} className="text-2xl font-bold" />}
                     </div>
                 </Card>
                 <Card>
                     <div className="p-5 space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground">Total Maintenance Cost</p>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalMaintenanceCost} className="text-2xl font-bold" />}
+                        <p className="text-sm font-medium text-muted-foreground">Current Book Value</p>
+                        {assetsLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalCurrentValue} className="text-2xl font-bold text-emerald-600" />}
                     </div>
                 </Card>
                 <Card>
                     <div className="p-5 space-y-3">
-                        <p className="text-sm font-medium text-muted-foreground">Purchase Orders (Approved)</p>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalProcurementSpend} className="text-2xl font-bold" />}
+                        <p className="text-sm font-medium text-muted-foreground">Total Depreciation</p>
+                        {assetsLoading ? <Skeleton className="h-8 w-24" /> : (
+                            <div>
+                                <CurrencyCell value={totalDepreciation} className="text-2xl font-bold text-amber-600" />
+                                <p className="text-xs text-muted-foreground mt-1">{depreciationRate.toFixed(1)}%</p>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </section>
@@ -140,10 +130,10 @@ export default function ReportsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Asset Value by Category</CardTitle>
-                    <CardDescription>Breakdown of asset values across categories</CardDescription>
+                    <CardDescription>Breakdown of asset values across categories ({activeAssets.length} total active assets)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
+                    {assetsLoading ? (
                         <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
                     ) : categoryBreakdown.length === 0 ? (
                         <p className="text-center py-8 text-muted-foreground">No asset data available</p>

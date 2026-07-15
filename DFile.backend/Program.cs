@@ -51,6 +51,7 @@ builder.Services.AddScoped<DFile.backend.Controllers.RequireTenantFilter>();
 builder.Services.AddScoped<DFile.backend.Services.IAuditService, DFile.backend.Services.AuditService>();
 builder.Services.AddScoped<DFile.backend.Services.INotificationService, DFile.backend.Services.NotificationService>();
 builder.Services.AddScoped<DFile.backend.Services.IMaintenanceReplacementRegistrationService, DFile.backend.Services.MaintenanceReplacementRegistrationService>();
+builder.Services.AddScoped<DFile.backend.Services.FinanceKpiService>();
 builder.Services.AddHostedService<DFile.backend.Services.DepreciationReconciliationService>();
 builder.Services.AddHostedService<DFile.backend.Services.MaintenanceDueReminderService>();
 builder.Services.AddHostedService<DFile.backend.Services.SubscriptionExpirationService>();

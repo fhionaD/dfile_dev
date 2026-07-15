@@ -49,7 +49,8 @@ export function useCreateOrder() {
             return data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
             toast.success('Procurement order initiated');
         },
         onError: (error: Error) => {
@@ -69,7 +70,8 @@ export function useUpdateOrder() {
             return data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
             toast.success('Order updated');
         },
         onError: (error: Error) => {
@@ -88,7 +90,8 @@ export function useArchiveOrder() {
             await api.put(`/api/PurchaseOrders/archive/${id}`);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
             toast.success('Order archived');
         },
         onError: () => {
@@ -105,7 +108,8 @@ export function useRestoreOrder() {
             await api.put(`/api/PurchaseOrders/restore/${id}`);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
             toast.success('Order restored');
         },
         onError: () => {
@@ -126,8 +130,9 @@ export function useReceiveOrder() {
             return data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            queryClient.invalidateQueries({ queryKey: ['finance-kpi'] });
             toast.success('Purchase order received. Asset created.');
         },
         onError: (error: Error) => {
