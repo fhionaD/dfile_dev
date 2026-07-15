@@ -459,7 +459,8 @@ export function useFinanceApproveReplacement() {
             queryClient.invalidateQueries({ queryKey: ['finance-maintenance-submission'] });
             queryClient.invalidateQueries({ queryKey: ['maintenance'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
-            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+            // Invalidate all purchase order queries (with any showArchived value)
+            queryClient.invalidateQueries({ queryKey: ['purchaseOrders'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             toast.success('Replacement approved with cost recorded; register the new asset when ready. Original is marked for replacement.');
         },

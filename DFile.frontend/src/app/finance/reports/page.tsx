@@ -23,7 +23,20 @@ export default function ReportsPage() {
     const depreciationRate = totalAcquisitionCost > 0 ? ((totalDepreciation / totalAcquisitionCost) * 100) : 0;
 
     const approvedOrders = useMemo(() => orders.filter(o => o.status === "Approved" || o.status === "Delivered"), [orders]);
-    const totalProcurementSpend = useMemo(() => approvedOrders.reduce((sum, o) => sum + o.purchasePrice, 0), [approvedOrders]);
+    const purchaseOrderSpend = useMemo(() => approvedOrders.reduce((sum, o) => sum + o.purchasePrice, 0), [approvedOrders]);
+
+    // Include replacement costs from approved replacements in procurement spend
+    // (covers replacements awaiting asset registration after Finance approval)
+    const approvedReplacementCosts = useMemo(() => records
+        .filter(r => 
+            r.financeRequestType === "Replacement" && 
+            (r.financeWorkflowStatus === "Waiting for Replacement" || r.financeWorkflowStatus === "Approved") &&
+            r.replacementCost && 
+            r.replacementCost > 0
+        )
+        .reduce((sum, r) => sum + (r.replacementCost ?? 0), 0), [records]);
+
+    const totalProcurementSpend = useMemo(() => purchaseOrderSpend + approvedReplacementCosts, [purchaseOrderSpend, approvedReplacementCosts]);
 
     const totalMaintenanceCost = useMemo(() => records
         .filter(r => r.financeWorkflowStatus === "Approved")
