@@ -60,6 +60,61 @@ function calculateAssetDepreciation(asset: Asset) {
     };
 }
 
+function generateCSV(assets: any[]): string {
+    if (assets.length === 0) return "";
+
+    const headers = [
+        "Asset Code",
+        "Description",
+        "Category",
+        "Room",
+        "Purchase Date",
+        "Cost Basis",
+        "Useful Life (Years)",
+        "Monthly Depreciation",
+        "Accumulated Depreciation",
+        "Book Value",
+        "Remaining Years",
+        "End Date",
+        "Status",
+    ];
+
+    const rows = assets.map((asset) => [
+        asset.assetCode || asset.id || "",
+        asset.desc || "",
+        asset.categoryName || "",
+        asset.room || "Unassigned",
+        asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "",
+        asset.cost || "0",
+        asset.usefulLifeYears || "0",
+        asset.monthlyDepreciation?.toFixed(2) || "0",
+        asset.accumulatedDepreciation?.toFixed(2) || "0",
+        asset.currentBookValue?.toFixed(2) || "0",
+        asset.remainingYears || "0",
+        asset.endDate ? asset.endDate.toLocaleDateString() : "",
+        asset.isFullyDepreciated ? "Fully Depreciated" : asset.isNearEndOfLife ? "Expiring Soon" : "Depreciating",
+    ]);
+
+    const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n");
+
+    return csvContent;
+}
+
+function downloadCSV(csv: string, filename: string = "depreciation-report.csv") {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
     const { data: assets = [], isLoading } = useAssets();
     const [searchQuery, setSearchQuery] = useState("");
@@ -174,7 +229,17 @@ export function DepreciationView({ onAssetClick }: DepreciationViewProps) {
                 </div>
 
                 <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
-                    <Button variant="outline" size="sm" className="h-10 px-4 gap-2" type="button">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-4 gap-2"
+                        type="button"
+                        onClick={() => {
+                            const csv = generateCSV(filteredAssets);
+                            const timestamp = new Date().toISOString().split("T")[0];
+                            downloadCSV(csv, `depreciation-report-${timestamp}.csv`);
+                        }}
+                    >
                         <Download className="w-4 h-4" /> Export
                     </Button>
                 </div>

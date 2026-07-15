@@ -6,7 +6,7 @@ import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Search, Package, DollarSign } from "lucide-react";
+import { Trash2, Search, Package } from "lucide-react";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
 
@@ -62,7 +62,7 @@ export default function TenantDisposalsPage() {
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Original value</p>
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-lg font-bold text-muted-foreground">₱</span>
                         </div>
                         {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalOriginalValue} className="text-2xl font-bold" />}
                     </div>
@@ -71,7 +71,7 @@ export default function TenantDisposalsPage() {
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Write-off amount</p>
-                            <DollarSign className="h-4 w-4 text-red-600" />
+                            <span className="text-lg font-bold text-red-600">₱</span>
                         </div>
                         {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalWriteOff} className="text-2xl font-bold text-red-600" />}
                     </div>
