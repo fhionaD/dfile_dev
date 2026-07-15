@@ -35,10 +35,13 @@ namespace DFile.backend.Services
 
             // Calculate approved maintenance costs
             // Include both repairs (with Cost field) and replacements (with ReplacementCost field)
+            // Status values: "Approved" for repairs, "Waiting for Replacement" or "Replacement Completed" for replacements
             var maintenanceMetrics = await maintenanceQuery
                 .Where(m => 
                     !m.IsArchived &&
-                    m.FinanceWorkflowStatus == "Approved")
+                    (m.FinanceWorkflowStatus == "Approved" ||
+                     m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                     m.FinanceWorkflowStatus == "Replacement Completed"))
                 .Select(m => new
                 {
                     m.Cost,
@@ -108,7 +111,8 @@ namespace DFile.backend.Services
                 .Where(m =>
                     !m.IsArchived &&
                     m.FinanceRequestType == "Replacement" &&
-                    m.FinanceWorkflowStatus == "Approved" &&
+                    (m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                     m.FinanceWorkflowStatus == "Replacement Completed") &&
                     m.ReplacementCost.HasValue &&
                     m.ReplacementCost > 0)
                 .Select(m => new ReplacementProcurementDetailDto
