@@ -20,6 +20,7 @@ import {
     useFinanceApproveReplacement,
     useFinanceMarkPartsReady,
     useFinanceApproveRepairFinancialImpact,
+    ApproveRepairFinancialImpactPayload,
 } from "@/hooks/use-maintenance";
 import { useCategories } from "@/hooks/use-categories";
 import { useAddAsset, useAsset, useAssets } from "@/hooks/use-assets";
@@ -437,8 +438,13 @@ export default function FinanceMaintenanceRequestsPage() {
                     } as MaintenanceRecord}
                     onApproveWithDecision={async (payload) => {
                         try {
+                            // Check if this is a replacement payload (has replacementCost) or repair payload (has financeDecision)
+                            if ('replacementCost' in payload) {
+                                // This shouldn't happen in the financial decision modal, but type-guard it
+                                return;
+                            }
                             // Apply the financial decision
-                            await approveFinancialImpact.mutateAsync(payload);
+                            await approveFinancialImpact.mutateAsync(payload as ApproveRepairFinancialImpactPayload);
                             // Then mark parts as ready
                             await markPartsReady.mutateAsync(financialDecisionTarget.id);
                             setFinancialDecisionOpen(false);
