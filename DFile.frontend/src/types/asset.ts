@@ -411,13 +411,13 @@ export interface Notification {
     message: string;
     isRead: boolean;
     createdAt: string;
-    /** Optional explicit link provided by backend — used for direct navigation */
-    link?: string;
-    /** Module name (Asset, Maintenance, Procurement, etc.) */
+    /** Exact route to navigate to when clicked (e.g., /maintenance/work-orders/123) */
+    route?: string;
+    /** Module name (Asset, Maintenance, Procurement, Billing, etc.) */
     module?: string;
-    /** Entity type for dynamic routing (MaintenanceRecord, Room, Asset, Category, etc.) */
+    /** Entity type for fallback routing (MaintenanceRecord, Room, Asset, Category, etc.) */
     entityType?: string;
-    /** Entity ID for dynamic routing — combined with entityType to build URL */
+    /** Entity ID for fallback routing — combined with entityType to build URL */
     entityId?: string;
 }
 export interface AssetAllocation { id: string; assetId: string; roomId: string; allocatedBy: string; allocatedDate: string; remarks?: string; assetName?: string; roomName?: string; roomCode?: string; }

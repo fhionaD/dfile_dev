@@ -21,88 +21,16 @@ const typeConfig: Record<NotificationType, { icon: typeof Info; className: strin
 };
 
 /**
- * Maps notification data to target route
- * Priority order:
- * 1. Explicit link (backend-provided)
- * 2. Entity-based routing (MaintenanceRecord -> /maintenance/work-orders/{id}, etc.)
- * 3. Module-based routing (Maintenance -> /maintenance/work-orders, etc.)
- * 4. Role-based dashboard fallback
+ * Navigate to the route specified in the notification
+ * Falls back to role-based dashboard if no route is available
  */
 function getNotificationRoute(notification: Notification, userRole?: string): string | null {
-    // Prefer explicit link from backend
-    if (notification.link) {
-        return notification.link;
+    // Use backend-provided route first
+    if (notification.route) {
+        return notification.route;
     }
 
-    const { entityType, entityId, module } = notification;
-
-    // Entity-based routing: use entityType + entityId to build specific route
-    if (entityType && entityId) {
-        switch (entityType) {
-            case 'MaintenanceRecord':
-                return `/maintenance/work-orders/${entityId}`;
-            case 'Room':
-                return `/rooms/${entityId}`;
-            case 'Asset':
-                return `/assets/${entityId}`;
-            case 'Category':
-            case 'AssetCategory':
-                return `/asset-categories/${entityId}`;
-            case 'MaintenanceSchedule':
-                return `/maintenance/schedules/${entityId}`;
-            case 'PurchaseOrder':
-                return `/finance/purchase-orders/${entityId}`;
-            case 'RoomCategory':
-                return `/room-categories/${entityId}`;
-            // For Finance/Procurement specific entities
-            case 'MaintenanceRequest':
-                if (userRole === 'Finance') {
-                    return `/finance/maintenance-requests/${entityId}`;
-                }
-                return `/maintenance/work-orders/${entityId}`;
-            default:
-                break; // Fall through to module-based routing
-        }
-    }
-
-    // Module-based routing: generic module navigation
-    if (module) {
-        if (userRole === 'Finance') {
-            if (module === 'Maintenance' || module === 'Asset' || module === 'MaintenanceRequest') {
-                return `/finance/maintenance-requests`;
-            }
-            if (module === 'Procurement' || module === 'PurchaseOrder') {
-                return `/finance/procurement-approvals`;
-            }
-            return `/finance/dashboard`;
-        }
-
-        if (userRole === 'Maintenance') {
-            if (module === 'Maintenance' || module === 'Parts' || module === 'MaintenanceRecord') {
-                return `/maintenance/work-orders`;
-            }
-            if (module === 'Schedule' || module === 'MaintenanceSchedule') {
-                return `/maintenance/schedules`;
-            }
-            return `/maintenance/dashboard`;
-        }
-
-        if (userRole === 'Super Admin') {
-            return `/superadmin/dashboard`;
-        }
-
-        if (userRole === 'Admin' || userRole === 'Procurement' || userRole === 'Employee') {
-            if (module === 'Maintenance' || module === 'MaintenanceRecord') {
-                return `/tenant/dashboard`;
-            }
-            if (module === 'Asset') {
-                return `/tenant/inventory`;
-            }
-            return `/tenant/dashboard`;
-        }
-    }
-
-    // Role-based dashboard fallback
+    // Fallback to role-based dashboard only as last resort
     if (userRole === 'Finance') {
         return `/finance/dashboard`;
     }

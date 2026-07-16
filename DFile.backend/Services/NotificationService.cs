@@ -28,6 +28,7 @@ namespace DFile.backend.Services
                 Module = "PurchaseOrders",
                 EntityType = "PurchaseOrder",
                 EntityId = order.Id,
+                Route = $"/finance/purchase-orders/{order.Id}",
                 TargetRole = UserRoleConstants.Procurement,
                 TenantId = order.TenantId,
             });
@@ -40,9 +41,10 @@ namespace DFile.backend.Services
             {
                 Message = $"Asset '{asset.AssetName}' ({asset.AssetCode}) has been marked as beyond repair and needs replacement.",
                 Type = "Warning",
-                Module = "Maintenance",
+                Module = "Replacements",
                 EntityType = "Asset",
                 EntityId = asset.Id,
+                Route = $"/tenant/inventory",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });
@@ -61,6 +63,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = notice.RecordId,
+                Route = $"/maintenance/work-orders/{notice.RecordId}",
                 TargetRole = UserRoleConstants.Maintenance,
                 TenantId = notice.RecordTenantId ?? notice.AssetTenantId,
             });
@@ -78,6 +81,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
+                Route = $"/maintenance/work-orders/{record.Id}",
                 TargetRole = UserRoleConstants.Maintenance,
                 TenantId = tenantId,
             });
@@ -96,6 +100,7 @@ namespace DFile.backend.Services
                 Module = "Finance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
+                Route = $"/finance/maintenance-requests",
                 TargetRole = UserRoleConstants.Finance,
                 TenantId = tenantId,
             });
@@ -113,6 +118,7 @@ namespace DFile.backend.Services
                 Module = "Finance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
+                Route = $"/finance/maintenance-requests",
                 TargetRole = UserRoleConstants.Finance,
                 TenantId = tenantId,
             });
@@ -129,6 +135,7 @@ namespace DFile.backend.Services
                 Module = "Assets",
                 EntityType = "Asset",
                 EntityId = newAsset.Id,
+                Route = $"/tenant/inventory",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = maintenanceRecord.TenantId ?? newAsset.TenantId,
             });
@@ -146,6 +153,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
+                Route = $"/maintenance/work-orders/{record.Id}",
                 TargetRole = UserRoleConstants.Maintenance,
                 TenantId = tenantId,
             });
@@ -161,6 +169,7 @@ namespace DFile.backend.Services
                 Module = "Assets",
                 EntityType = "Asset",
                 EntityId = asset.Id,
+                Route = $"/tenant/inventory",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = asset.TenantId,
             });
@@ -179,6 +188,7 @@ namespace DFile.backend.Services
                 Module = "Maintenance",
                 EntityType = "MaintenanceRecord",
                 EntityId = record.Id,
+                Route = $"/maintenance/work-orders/{record.Id}",
                 TargetRole = UserRoleConstants.Maintenance,
                 TenantId = tenantId,
             });
@@ -196,6 +206,7 @@ namespace DFile.backend.Services
                 Type = "Success",
                 Module = "Billing",
                 EntityType = "Subscription",
+                Route = "/tenant/billing",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });
@@ -218,6 +229,7 @@ namespace DFile.backend.Services
                 Type = "Warning",
                 Module = "Billing",
                 EntityType = "Subscription",
+                Route = "/tenant/billing",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });
@@ -239,6 +251,7 @@ namespace DFile.backend.Services
                 Type = "Error",
                 Module = "Billing",
                 EntityType = "Subscription",
+                Route = "/tenant/billing",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });
@@ -260,6 +273,7 @@ namespace DFile.backend.Services
                 Type = "Error",
                 Module = "Billing",
                 EntityType = "Payment",
+                Route = "/tenant/billing",
                 TargetRole = UserRoleConstants.Admin,
                 TenantId = tenantId,
             });

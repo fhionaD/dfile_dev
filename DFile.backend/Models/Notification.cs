@@ -24,6 +24,10 @@ namespace DFile.backend.Models
 
         public string? EntityId { get; set; }
 
+        /// <summary>Navigation route to the relevant page (e.g., /maintenance/work-orders/123, /finance/disposals, /finance/purchase-orders/456).</summary>
+        [MaxLength(500)]
+        public string? Route { get; set; }
+
         public int? UserId { get; set; }
 
         [ForeignKey("UserId")]

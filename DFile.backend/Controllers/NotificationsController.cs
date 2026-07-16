@@ -81,6 +81,7 @@ namespace DFile.backend.Controllers
                     n.Module,
                     n.EntityType,
                     n.EntityId,
+                    n.Route,
                     n.IsRead,
                     n.CreatedAt,
                     n.ReadAt,
