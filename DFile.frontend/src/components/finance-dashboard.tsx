@@ -53,51 +53,19 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
 
     // ── Maintenance Cost Analytics (FROM DATABASE) ──
     const maintenanceStats = useMemo(() => {
-        // Use actual maintenance spend from KPI (Expense decisions only)
-        // Plus other analytics for monthly trends
-        let totalMaintenanceCost = kpi?.maintenanceSpendCost || 0;
-        let completedCost = 0;
-        let pendingCost = 0;
+        // Use actual maintenance spend directly from KPI (all Expense decisions)
+        const totalMaintenanceCost = kpi?.maintenanceSpendCost || 0;
+        
+        // Cost by Priority (for KPI display context only)
         const costByPriority: Record<string, number> = { High: 0, Medium: 0, Low: 0 };
-        const costByStatus: Record<string, number> = {};
-        const monthlyCosts: Record<string, number> = {};
-
         records.forEach(r => {
-            // For analytics, use expense records
-            if (r.financeDecision !== "Expense" || !r.maintenanceSpendCost) {
-                return;
-            }
-
-            const cost = r.maintenanceSpendCost || 0;
-            if (r.status === "Completed") completedCost += cost;
-            else pendingCost += cost;
-
-            // By priority
-            if (r.priority && costByPriority[r.priority] !== undefined) {
-                costByPriority[r.priority] += cost;
-            }
-            // By status
-            if (!costByStatus[r.status]) costByStatus[r.status] = 0;
-            costByStatus[r.status] += cost;
-
-            // Monthly trend (last 6 months)
-            if (r.approvedAt) {
-                const d = new Date(r.approvedAt);
-                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-                if (!monthlyCosts[key]) monthlyCosts[key] = 0;
-                monthlyCosts[key] += cost;
+            if (r.financeDecision === "Expense" && r.maintenanceSpendCost && r.priority && costByPriority[r.priority] !== undefined) {
+                costByPriority[r.priority] += r.maintenanceSpendCost;
             }
         });
 
-        // Sort monthly and take last 6
-        const sortedMonths = Object.entries(monthlyCosts)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .slice(-6);
-
-        const maxMonthlyCost = Math.max(...sortedMonths.map(([, v]) => v), 1);
-
-        return { totalMaintenanceCost, completedCost, pendingCost, costByPriority, costByStatus, sortedMonths, maxMonthlyCost };
-    }, [records, kpi]);
+        return { totalMaintenanceCost, costByPriority };
+    }, [kpi, records]);
 
     // ── Procurement Spend (Replacement Costs) ──
     const procurementStats = useMemo(() => {
@@ -253,82 +221,7 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
             )}
 
             {isFull ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                {/* Monthly Cost Trend - Bar Chart */}
-                <Card className={cardClassName}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Monthly Maintenance Cost</CardTitle>
-                            <Badge variant="outline" className="text-xs font-mono">Last 6 months</Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {maintenanceStats.sortedMonths.length === 0 ? (
-                            <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No cost data available</div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="flex items-end gap-2 h-40">
-                                    {maintenanceStats.sortedMonths.map(([month, cost]) => {
-                                        const height = Math.max(8, (cost / maintenanceStats.maxMonthlyCost) * 100);
-                                        const label = new Date(month + "-01").toLocaleDateString("en", { month: "short" });
-                                        return (
-                                            <div key={month} className="flex-1 flex flex-col items-center gap-1" title={`${label}: ${formatCurrency(cost)}`}>
-                                                <span className="text-[10px] text-muted-foreground font-mono">{formatShort(cost)}</span>
-                                                <div
-                                                    className="w-full rounded-t-md bg-gradient-to-t from-blue-600 to-blue-400 transition-all duration-500 hover:from-blue-500 hover:to-blue-300 min-h-[4px]"
-                                                    style={{ height: `${height}%` }}
-                                                />
-                                                <span className="text-[11px] text-muted-foreground font-medium">{label}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Cost by Status - Horizontal bars */}
-                <Card className={cardClassName}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Cost Breakdown by Status</CardTitle>
-                            <Badge variant="outline" className="text-xs font-mono">{formatShort(maintenanceStats.totalMaintenanceCost)}</Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {Object.keys(maintenanceStats.costByStatus).length === 0 ? (
-                            <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">No cost data</div>
-                        ) : (
-                            <div className="space-y-3">
-                                {Object.entries(maintenanceStats.costByStatus)
-                                    .sort(([, a], [, b]) => b - a)
-                                    .map(([status, cost]) => {
-                                        const pct = maintenanceStats.totalMaintenanceCost > 0 ? (cost / maintenanceStats.totalMaintenanceCost) * 100 : 0;
-                                        return (
-                                            <div key={status} className="space-y-1.5">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`h-2.5 w-2.5 rounded-full ${statusColors[status] || "bg-gray-400"}`} />
-                                                        <span className="font-medium">{status}</span>
-                                                    </div>
-                                                    <span className="font-mono text-muted-foreground">{formatCurrency(cost)}</span>
-                                                </div>
-                                                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-500 ${statusColors[status] || "bg-gray-400"}`}
-                                                        style={{ width: `${Math.max(2, pct)}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
+            <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
                 {/* Cost by Priority */}
                 <Card className={cardClassName}>
                     <CardHeader className="pb-3">

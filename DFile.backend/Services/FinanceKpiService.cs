@@ -37,43 +37,59 @@ namespace DFile.backend.Services
             // Include both repairs (with Cost field) and replacements (with ReplacementCost field)
             // Status values: "Approved" for repairs, "Waiting for Replacement" or "Replacement Completed" for replacements
             var maintenanceMetrics = await maintenanceQuery
-                .Where(m => 
-                    !m.IsArchived &&
-                    (m.FinanceWorkflowStatus == "Approved" ||
-                     m.FinanceWorkflowStatus == "Waiting for Replacement" ||
-                     m.FinanceWorkflowStatus == "Replacement Completed"))
+                .Where(m => !m.IsArchived)
                 .Select(m => new
                 {
                     m.Cost,
                     m.ReplacementCost,
                     m.FinanceRequestType,
+                    m.FinanceWorkflowStatus,
                     m.MaintenanceSpendCost,
                     m.FinanceDecision
                 })
                 .ToListAsync();
 
-            // Sum all approved maintenance costs
+            // Sum all approved maintenance costs (estimated costs, not actual spend)
             var totalEstimatedCost = maintenanceMetrics
+                .Where(m =>
+                    m.FinanceWorkflowStatus == "Approved" ||
+                    m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                    m.FinanceWorkflowStatus == "Replacement Completed")
                 .Sum(m => m.Cost ?? 0);
 
             // Sum only replacement costs (these become Procurement Spend)
             var replacementAssetCost = maintenanceMetrics
-                .Where(m => m.FinanceRequestType == "Replacement")
+                .Where(m =>
+                    (m.FinanceWorkflowStatus == "Approved" ||
+                     m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                     m.FinanceWorkflowStatus == "Replacement Completed") &&
+                    m.FinanceRequestType == "Replacement")
                 .Sum(m => m.ReplacementCost ?? 0);
 
-            // Sum maintenance spend costs (for "Treat as Expense" financial decisions)
+            // Sum maintenance spend costs (for "Treat as Expense" financial decisions - not filtered by workflow status)
             var maintenanceSpendCost = maintenanceMetrics
-                .Where(m => m.FinanceDecision == "Expense")
-                .Sum(m => m.MaintenanceSpendCost ?? 0);
+                .Where(m => m.FinanceDecision == "Expense" && m.MaintenanceSpendCost.HasValue && m.MaintenanceSpendCost > 0)
+                .Sum(m => m.MaintenanceSpendCost.Value);
 
             // Count approved maintenance and replacements
-            var approvedMaintenanceCount = maintenanceMetrics.Count;
+            var approvedMaintenanceCount = maintenanceMetrics
+                .Where(m =>
+                    m.FinanceWorkflowStatus == "Approved" ||
+                    m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                    m.FinanceWorkflowStatus == "Replacement Completed")
+                .Count();
             var approvedReplacementCount = maintenanceMetrics
-                .Count(m => m.FinanceRequestType == "Replacement");
+                .Where(m =>
+                    (m.FinanceWorkflowStatus == "Approved" ||
+                     m.FinanceWorkflowStatus == "Waiting for Replacement" ||
+                     m.FinanceWorkflowStatus == "Replacement Completed") &&
+                    m.FinanceRequestType == "Replacement")
+                .Count();
 
             // Count maintenance records treated as expenses
             var maintenanceExpenseCount = maintenanceMetrics
-                .Count(m => m.FinanceDecision == "Expense");
+                .Where(m => m.FinanceDecision == "Expense" && m.MaintenanceSpendCost.HasValue && m.MaintenanceSpendCost > 0)
+                .Count();
 
             // Calculate approved purchase order metrics
             var purchaseOrderMetrics = await purchaseOrderQuery
