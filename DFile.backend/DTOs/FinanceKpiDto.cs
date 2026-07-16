@@ -18,6 +18,9 @@ namespace DFile.backend.DTOs
         /// <summary>Total Procurement Spend = ReplacementAssetCost + ApprovedPurchaseOrderAmount.</summary>
         public decimal TotalProcurementSpend { get; set; }
 
+        /// <summary>Sum of all actual maintenance spend costs (for "Treat as Expense" financial decisions).</summary>
+        public decimal MaintenanceSpendCost { get; set; }
+
         /// <summary>Count of approved maintenance records (repairs + replacements).</summary>
         public int ApprovedMaintenanceCount { get; set; }
 
@@ -26,5 +29,8 @@ namespace DFile.backend.DTOs
 
         /// <summary>Count of approved replacements with costs recorded.</summary>
         public int ApprovedReplacementCount { get; set; }
+
+        /// <summary>Count of maintenance records treated as expenses.</summary>
+        public int MaintenanceExpenseCount { get; set; }
     }
 }

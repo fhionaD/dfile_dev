@@ -15,6 +15,9 @@ export interface FinanceKpi {
   /** Total Procurement Spend = replacementAssetCost + approvedPurchaseOrderAmount */
   totalProcurementSpend: number;
 
+  /** Sum of all actual maintenance spend costs (for "Treat as Expense" financial decisions) */
+  maintenanceSpendCost: number;
+
   /** Count of approved maintenance records (repairs + replacements) */
   approvedMaintenanceCount: number;
 
@@ -23,6 +26,9 @@ export interface FinanceKpi {
 
   /** Count of approved replacements with costs recorded */
   approvedReplacementCount: number;
+
+  /** Count of maintenance records treated as expenses */
+  maintenanceExpenseCount: number;
 }
 
 /**

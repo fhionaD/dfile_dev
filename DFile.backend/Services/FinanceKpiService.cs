@@ -46,7 +46,9 @@ namespace DFile.backend.Services
                 {
                     m.Cost,
                     m.ReplacementCost,
-                    m.FinanceRequestType
+                    m.FinanceRequestType,
+                    m.MaintenanceSpendCost,
+                    m.FinanceDecision
                 })
                 .ToListAsync();
 
@@ -59,10 +61,19 @@ namespace DFile.backend.Services
                 .Where(m => m.FinanceRequestType == "Replacement")
                 .Sum(m => m.ReplacementCost ?? 0);
 
+            // Sum maintenance spend costs (for "Treat as Expense" financial decisions)
+            var maintenanceSpendCost = maintenanceMetrics
+                .Where(m => m.FinanceDecision == "Expense")
+                .Sum(m => m.MaintenanceSpendCost ?? 0);
+
             // Count approved maintenance and replacements
             var approvedMaintenanceCount = maintenanceMetrics.Count;
             var approvedReplacementCount = maintenanceMetrics
                 .Count(m => m.FinanceRequestType == "Replacement");
+
+            // Count maintenance records treated as expenses
+            var maintenanceExpenseCount = maintenanceMetrics
+                .Count(m => m.FinanceDecision == "Expense");
 
             // Calculate approved purchase order metrics
             var purchaseOrderMetrics = await purchaseOrderQuery
@@ -86,9 +97,11 @@ namespace DFile.backend.Services
                 ApprovedPurchaseOrderAmount = approvedPurchaseOrderAmount,
                 ReplacementAssetCost = replacementAssetCost,
                 TotalProcurementSpend = totalProcurementSpend,
+                MaintenanceSpendCost = maintenanceSpendCost,
                 ApprovedMaintenanceCount = approvedMaintenanceCount,
                 ApprovedPurchaseOrderCount = approvedPurchaseOrderCount,
-                ApprovedReplacementCount = approvedReplacementCount
+                ApprovedReplacementCount = approvedReplacementCount,
+                MaintenanceExpenseCount = maintenanceExpenseCount
             };
         }
 

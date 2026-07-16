@@ -198,6 +198,9 @@ namespace DFile.backend.DTOs
 
         /// <summary>Additional months to extend useful life (required if FinanceDecision includes ExtendLife).</summary>
         public int? AddedLifeMonths { get; set; }
+
+        /// <summary>Actual maintenance spend cost (required if FinanceDecision is Expense). Records the actual amount spent on maintenance work.</summary>
+        public decimal? MaintenanceSpendCost { get; set; }
     }
 
     /// <summary>

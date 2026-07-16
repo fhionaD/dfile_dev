@@ -18,6 +18,7 @@ namespace DFile.backend.Data
         public DbSet<RoomSubCategory> RoomSubCategories { get; set; }
         public DbSet<Employee> Employees { get; set; }
         public DbSet<MaintenanceRecord> MaintenanceRecords { get; set; }
+        public DbSet<FinancialImpactTransaction> FinancialImpactTransactions { get; set; }
         public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
         public DbSet<PurchaseOrderItem> PurchaseOrderItems { get; set; }
         public DbSet<TaskItem> Tasks { get; set; }

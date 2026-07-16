@@ -364,6 +364,7 @@ export interface ApproveRepairFinancialImpactPayload {
     financeDecision: "Expense" | "IncreaseValue" | "ExtendLife" | "Both";
     adjustmentValue?: number;
     addedLifeMonths?: number;
+    maintenanceSpendCost?: number;
 }
 
 export function useFinanceApproveRepairFinancialImpact() {
@@ -376,6 +377,7 @@ export function useFinanceApproveRepairFinancialImpact() {
                     financeDecision: payload.financeDecision,
                     adjustmentValue: payload.adjustmentValue,
                     addedLifeMonths: payload.addedLifeMonths,
+                    maintenanceSpendCost: payload.maintenanceSpendCost,
                 }
             );
             return response.data; // Return the response data with updated asset info

@@ -5,6 +5,7 @@ using DFile.backend.DTOs;
 using DFile.backend.Models;
 using DFile.backend.Services;
 using System.Security.Claims;
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -483,6 +484,14 @@ namespace DFile.backend.Controllers
                  decision.Equals("Both", StringComparison.OrdinalIgnoreCase)) && !dto.AddedLifeMonths.HasValue)
                 return BadRequest(new { message = "AddedLifeMonths is required for ExtendLife or Both decisions." });
 
+            if (decision.Equals("Expense", StringComparison.OrdinalIgnoreCase) && !dto.MaintenanceSpendCost.HasValue)
+                return BadRequest(new { message = "MaintenanceSpendCost is required for Expense decisions." });
+
+            // Store previous asset values for audit trail
+            var previousPurchasePrice = record.Asset.PurchasePrice;
+            var previousTotalLifeMonths = record.Asset.TotalLifeMonths;
+            var previousMonthlyDepreciation = record.Asset.MonthlyDepreciation;
+
             // Apply asset changes based on decision
             if (decision.Equals("IncreaseValue", StringComparison.OrdinalIgnoreCase) ||
                 decision.Equals("Both", StringComparison.OrdinalIgnoreCase))
@@ -513,6 +522,7 @@ namespace DFile.backend.Controllers
             record.FinanceDecision = decision;
             record.AdjustmentValue = dto.AdjustmentValue;
             record.AddedLifeMonths = dto.AddedLifeMonths;
+            record.MaintenanceSpendCost = decision.Equals("Expense", StringComparison.OrdinalIgnoreCase) ? dto.MaintenanceSpendCost : null;
             record.ApprovedBy = userId?.ToString(CultureInfo.InvariantCulture);
             record.ApprovedAt = DateTime.UtcNow;
             record.UpdatedAt = DateTime.UtcNow;
@@ -521,11 +531,31 @@ namespace DFile.backend.Controllers
             record.Asset.UpdatedAt = DateTime.UtcNow;
             record.Asset.UpdatedBy = userId;
 
+            // Create financial impact transaction for audit trail
+            var transaction = new FinancialImpactTransaction
+            {
+                MaintenanceRecordId = id,
+                AssetId = record.Asset.Id,
+                FinanceDecision = decision,
+                AdjustmentValue = dto.AdjustmentValue,
+                AddedLifeMonths = dto.AddedLifeMonths,
+                MaintenanceSpendCost = record.MaintenanceSpendCost,
+                PreviousPurchasePrice = previousPurchasePrice,
+                PreviousTotalLifeMonths = previousTotalLifeMonths,
+                PreviousMonthlyDepreciation = previousMonthlyDepreciation,
+                ApprovedBy = userId,
+                ApprovedAt = DateTime.UtcNow,
+                TenantId = tenantId,
+                CreatedAt = DateTime.UtcNow,
+            };
+            _context.FinancialImpactTransactions.Add(transaction);
+
             _auditService.AddEntry(HttpContext, tenantId, userId, null, "Finance", "Approve", "MaintenanceRecord", id,
                 $"Finance approved repair {record.RequestId ?? id} with decision: {decision}. " +
-                (dto.AdjustmentValue.HasValue ? $"Adjusted asset value by ${dto.AdjustmentValue}. " : "") +
+                (dto.AdjustmentValue.HasValue ? $"Adjusted asset value by ₱{dto.AdjustmentValue:F2}. " : "") +
                 (dto.AddedLifeMonths.HasValue ? $"Extended useful life by {dto.AddedLifeMonths} months. " : "") +
-                $"New total life: {record.Asset.TotalLifeMonths} months, monthly depreciation: ${record.Asset.MonthlyDepreciation}.");
+                (dto.MaintenanceSpendCost.HasValue ? $"Recorded maintenance spend: ₱{dto.MaintenanceSpendCost:F2}. " : "") +
+                $"New total life: {record.Asset.TotalLifeMonths} months, monthly depreciation: ₱{record.Asset.MonthlyDepreciation:F2}.");
 
             var saveResult = await TrySaveMaintenanceFinanceAsync();
             if (saveResult != null) return saveResult;

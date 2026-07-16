@@ -63,6 +63,10 @@ namespace DFile.backend.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal? ReplacementCost { get; set; }
 
+        /// <summary>Actual maintenance spend cost for "Treat as Expense" decisions. Records the actual amount spent on maintenance work.</summary>
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? MaintenanceSpendCost { get; set; }
+
         public string? LinkedPurchaseOrderId { get; set; }
 
         public string? ReplacementRegisteredAssetId { get; set; }

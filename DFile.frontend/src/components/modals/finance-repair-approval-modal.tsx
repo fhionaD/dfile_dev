@@ -33,6 +33,7 @@ interface ApproveRepairFinancialImpactPayload {
     financeDecision: "Expense" | "IncreaseValue" | "ExtendLife" | "Both";
     adjustmentValue?: number;
     addedLifeMonths?: number;
+    maintenanceSpendCost?: number;
 }
 
 interface ApproveReplacementPayload {
@@ -59,6 +60,7 @@ export function FinanceRepairApprovalModal({
     const [adjustmentValue, setAdjustmentValue] = useState<string>("");
     const [addedLifeMonths, setAddedLifeMonths] = useState<string>("");
     const [replacementCost, setReplacementCost] = useState<string>("");
+    const [maintenanceSpendCost, setMaintenanceSpendCost] = useState<string>("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const isReplacement = maintenanceRecord?.financeRequestType === "Replacement";
@@ -68,6 +70,7 @@ export function FinanceRepairApprovalModal({
         setAdjustmentValue("");
         setAddedLifeMonths("");
         setReplacementCost("");
+        setMaintenanceSpendCost("");
     };
 
     const handleClose = (v: boolean) => {
@@ -85,12 +88,22 @@ export function FinanceRepairApprovalModal({
 
         // For repair requests: need decision and conditional fields
         if (!decision) return false;
+
+        // Validate Expense decision requires maintenance spend cost
+        if (decision === "Expense") {
+            if (!maintenanceSpendCost || parseFloat(maintenanceSpendCost) <= 0) return false;
+        }
+
+        // Validate IncreaseValue and Both decisions require adjustment value
         if (decision === "IncreaseValue" || decision === "Both") {
             if (!adjustmentValue || parseFloat(adjustmentValue) <= 0) return false;
         }
+
+        // Validate ExtendLife and Both decisions require added life months
         if (decision === "ExtendLife" || decision === "Both") {
             if (!addedLifeMonths || parseInt(addedLifeMonths) <= 0) return false;
         }
+
         return true;
     };
 
@@ -112,6 +125,7 @@ export function FinanceRepairApprovalModal({
                     financeDecision: decision as "Expense" | "IncreaseValue" | "ExtendLife" | "Both",
                     adjustmentValue: decision === "IncreaseValue" || decision === "Both" ? parseFloat(adjustmentValue) : undefined,
                     addedLifeMonths: decision === "ExtendLife" || decision === "Both" ? parseInt(addedLifeMonths) : undefined,
+                    maintenanceSpendCost: decision === "Expense" ? parseFloat(maintenanceSpendCost) : undefined,
                 } as ApproveRepairFinancialImpactPayload);
             }
             reset();
@@ -317,36 +331,70 @@ export function FinanceRepairApprovalModal({
 
                         {/* Conditional Input Fields */}
                         {!isReplacement && (
-                            <div className="space-y-2">
-                                <Label htmlFor="adjustment-value" className="text-sm">Amount to Increase Asset Value (PHP)</Label>
-                                <Input
-                                    id="adjustment-value"
-                                    type="number"
-                                    min={0}
-                                    step="1"
-                                    value={adjustmentValue}
-                                    onChange={(e) => setAdjustmentValue(e.target.value)}
-                                    placeholder={`e.g., ${formatMoneyPhp(estimatedCost || 0)}`}
-                                    className="h-10"
-                                />
-                                <p className="text-xs text-muted-foreground">Default: use estimated repair cost ({formatMoneyPhp(estimatedCost)})</p>
-                            </div>
-                        )}
+                            <>
+                                {/* Maintenance Spend Cost - For Expense Only */}
+                                {decision === "Expense" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="maintenance-spend-cost" className="text-sm">
+                                            Actual Maintenance Spend Cost (PHP)
+                                        </Label>
+                                        <Input
+                                            id="maintenance-spend-cost"
+                                            type="number"
+                                            min={0}
+                                            step="1"
+                                            value={maintenanceSpendCost}
+                                            onChange={(e) => setMaintenanceSpendCost(e.target.value)}
+                                            placeholder={`e.g., ${formatMoneyPhp(estimatedCost || 0)}`}
+                                            className="h-10"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            This amount will be recorded as Maintenance Spend and included in KPI reports. No changes to asset value or useful life.
+                                        </p>
+                                    </div>
+                                )}
 
-                        {(decision === "ExtendLife" || decision === "Both") && (
-                            <div className="space-y-2">
-                                <Label htmlFor="added-life-months" className="text-sm">Additional Useful Life (months)</Label>
-                                <Input
-                                    id="added-life-months"
-                                    type="number"
-                                    min={1}
-                                    step="1"
-                                    value={addedLifeMonths}
-                                    onChange={(e) => setAddedLifeMonths(e.target.value)}
-                                    placeholder="e.g., 12 (for 1 year)"
-                                    className="h-10"
-                                />
-                            </div>
+                                {/* Amount to Increase Asset Value - For IncreaseValue or Both */}
+                                {(decision === "IncreaseValue" || decision === "Both") && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="adjustment-value" className="text-sm">
+                                            Amount to Increase Asset Value (PHP)
+                                        </Label>
+                                        <Input
+                                            id="adjustment-value"
+                                            type="number"
+                                            min={0}
+                                            step="1"
+                                            value={adjustmentValue}
+                                            onChange={(e) => setAdjustmentValue(e.target.value)}
+                                            placeholder={`e.g., ${formatMoneyPhp(estimatedCost || 0)}`}
+                                            className="h-10"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Default: use estimated repair cost ({formatMoneyPhp(estimatedCost)})
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Additional Useful Life - For ExtendLife or Both */}
+                                {(decision === "ExtendLife" || decision === "Both") && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="added-life-months" className="text-sm">
+                                            Additional Useful Life (months)
+                                        </Label>
+                                        <Input
+                                            id="added-life-months"
+                                            type="number"
+                                            min={1}
+                                            step="1"
+                                            value={addedLifeMonths}
+                                            onChange={(e) => setAddedLifeMonths(e.target.value)}
+                                            placeholder="e.g., 12 (for 1 year)"
+                                            className="h-10"
+                                        />
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
