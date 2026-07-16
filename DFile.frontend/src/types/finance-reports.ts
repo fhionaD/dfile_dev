@@ -32,6 +32,24 @@ export interface FinanceKpi {
 }
 
 /**
+ * Detail view of a maintenance spend item for reports.
+ * Represents actual maintenance expense (not estimated cost).
+ */
+export interface MaintenanceSpendDetail {
+  maintenanceRecordId: string;
+  requestId?: string;
+  assetId: string;
+  assetName?: string;
+  assetCode?: string;
+  maintenanceSpendCost: number;
+  description?: string;
+  status?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  dateReported: string;
+}
+
+/**
  * Detail view of a replacement procurement item for reports.
  */
 export interface ReplacementProcurementDetail {

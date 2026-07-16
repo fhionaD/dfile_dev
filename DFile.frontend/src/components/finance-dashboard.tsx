@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
     TrendingDown, AlertTriangle, PhilippinePeso,
     Wrench, BarChart3
@@ -9,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAssets } from "@/hooks/use-assets";
 import { useMaintenanceRecords } from "@/hooks/use-maintenance";
+import { useFinanceKpi } from "@/hooks/use-finance-reports";
 
 interface FinanceDashboardProps {
     cardClassName?: string;
@@ -18,8 +20,10 @@ interface FinanceDashboardProps {
 
 export function FinanceDashboard({ cardClassName = "", variant = "full" }: FinanceDashboardProps) {
     const isFull = variant === "full";
+    const router = useRouter();
     const { data: assets = [], isLoading: isLoadingAssets } = useAssets();
     const { data: records = [], isLoading: isLoadingRecords } = useMaintenanceRecords(false, { enabled: isFull });
+    const { data: kpi, isLoading: isLoadingKpi } = useFinanceKpi({ enabled: isFull });
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(amount);
@@ -47,9 +51,11 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         return { totalCost, totalBookValue, monthlyDep, accDep: Math.max(0, accDep) };
     }, [assets]);
 
-    // ── Maintenance Cost Analytics ──
+    // ── Maintenance Cost Analytics (FROM DATABASE) ──
     const maintenanceStats = useMemo(() => {
-        let totalMaintenanceCost = 0;
+        // Use actual maintenance spend from KPI (Expense decisions only)
+        // Plus other analytics for monthly trends
+        let totalMaintenanceCost = kpi?.maintenanceSpendCost || 0;
         let completedCost = 0;
         let pendingCost = 0;
         const costByPriority: Record<string, number> = { High: 0, Medium: 0, Low: 0 };
@@ -57,13 +63,12 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         const monthlyCosts: Record<string, number> = {};
 
         records.forEach(r => {
-            // Only count approved requests - pending and rejected should not be included
-            if (r.financeWorkflowStatus !== "Approved") {
+            // For analytics, use expense records
+            if (r.financeDecision !== "Expense" || !r.maintenanceSpendCost) {
                 return;
             }
 
-            const cost = r.cost || 0;
-            totalMaintenanceCost += cost;
+            const cost = r.maintenanceSpendCost || 0;
             if (r.status === "Completed") completedCost += cost;
             else pendingCost += cost;
 
@@ -76,8 +81,8 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
             costByStatus[r.status] += cost;
 
             // Monthly trend (last 6 months)
-            if (r.dateReported) {
-                const d = new Date(r.dateReported);
+            if (r.approvedAt) {
+                const d = new Date(r.approvedAt);
                 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
                 if (!monthlyCosts[key]) monthlyCosts[key] = 0;
                 monthlyCosts[key] += cost;
@@ -92,7 +97,7 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         const maxMonthlyCost = Math.max(...sortedMonths.map(([, v]) => v), 1);
 
         return { totalMaintenanceCost, completedCost, pendingCost, costByPriority, costByStatus, sortedMonths, maxMonthlyCost };
-    }, [records]);
+    }, [records, kpi]);
 
     // ── Procurement Spend (Replacement Costs) ──
     const procurementStats = useMemo(() => {
@@ -119,7 +124,7 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
         return { eol, warranty };
     }, [assets]);
 
-    const isLoading = isLoadingAssets || (isFull && isLoadingRecords);
+    const isLoading = isLoadingAssets || (isFull && (isLoadingRecords || isLoadingKpi));
 
     if (isLoading) {
         const skeletonKpis = isFull ? 4 : 2;
@@ -195,27 +200,33 @@ export function FinanceDashboard({ cardClassName = "", variant = "full" }: Finan
                 {isFull ? (
                     <>
                         {/* Maintenance Spend */}
-                        <Card className={`relative overflow-hidden ${cardClassName}`}>
+                        <Card 
+                            className={`relative overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:border-blue-300 ${cardClassName}`}
+                            onClick={() => router.push('/finance/reports/maintenance-spend-details')}
+                        >
                             <div className="p-5 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Maintenance Spend</p>
                                     <Wrench className="h-4 w-4 text-blue-600" />
                                 </div>
                                 <p className="text-2xl font-bold tracking-tight">{formatShort(maintenanceStats.totalMaintenanceCost)}</p>
-                                <p className="text-xs text-muted-foreground">{records.length} total records</p>
+                                <p className="text-xs text-muted-foreground">{kpi?.maintenanceExpenseCount || 0} expense records</p>
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-300" />
                         </Card>
 
                         {/* Procurement Spend */}
-                        <Card className={`relative overflow-hidden ${cardClassName}`}>
+                        <Card 
+                            className={`relative overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:border-purple-300 ${cardClassName}`}
+                            onClick={() => router.push('/finance/reports/replacement-cost-details')}
+                        >
                             <div className="p-5 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Procurement Spend</p>
                                     <Wrench className="h-4 w-4 text-purple-600" />
                                 </div>
                                 <p className="text-2xl font-bold tracking-tight">{formatShort(procurementStats.total)}</p>
-                                <p className="text-xs text-muted-foreground">From approved replacements</p>
+                                <p className="text-xs text-muted-foreground">From {kpi?.approvedReplacementCount || 0} replacements</p>
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-300" />
                         </Card>

@@ -145,6 +145,65 @@ namespace DFile.backend.Services
 
             return details;
         }
+
+        /// <summary>
+        /// Get detailed breakdown of maintenance spend costs (actual expenses, not estimated).
+        /// Returns each maintenance record where Finance selected "Treat as Expense" with actual maintenance spend cost.
+        /// </summary>
+        public async Task<List<MaintenanceSpendDetailDto>> GetMaintenanceSpendDetailsAsync(int? tenantId = null)
+        {
+            var query = _context.MaintenanceRecords
+                .Include(m => m.Asset)
+                .AsQueryable();
+
+            if (tenantId.HasValue)
+            {
+                query = query.Where(m => m.TenantId == tenantId);
+            }
+
+            var details = await query
+                .Where(m =>
+                    !m.IsArchived &&
+                    m.FinanceDecision == "Expense" &&
+                    m.MaintenanceSpendCost.HasValue &&
+                    m.MaintenanceSpendCost > 0)
+                .Select(m => new MaintenanceSpendDetailDto
+                {
+                    MaintenanceRecordId = m.Id,
+                    RequestId = m.RequestId,
+                    AssetId = m.AssetId,
+                    AssetName = m.Asset!.AssetName,
+                    AssetCode = m.Asset!.AssetCode,
+                    MaintenanceSpendCost = m.MaintenanceSpendCost.Value,
+                    Description = m.Description,
+                    Status = m.Status,
+                    ApprovedBy = m.ApprovedBy,
+                    ApprovedAt = m.ApprovedAt,
+                    DateReported = m.DateReported
+                })
+                .OrderByDescending(d => d.ApprovedAt)
+                .ToListAsync();
+
+            return details;
+        }
+    }
+
+    /// <summary>
+    /// Detail view of maintenance spend item for reports.
+    /// </summary>
+    public class MaintenanceSpendDetailDto
+    {
+        public string MaintenanceRecordId { get; set; } = string.Empty;
+        public string? RequestId { get; set; }
+        public string AssetId { get; set; } = string.Empty;
+        public string? AssetName { get; set; }
+        public string? AssetCode { get; set; }
+        public decimal MaintenanceSpendCost { get; set; }
+        public string? Description { get; set; }
+        public string? Status { get; set; }
+        public string? ApprovedBy { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public DateTime DateReported { get; set; }
     }
 
     /// <summary>

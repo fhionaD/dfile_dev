@@ -193,6 +193,8 @@ export interface MaintenanceRecord {
     approvedAt?: string | null;
     /** Replacement cost entered by Finance when approving a replacement request. Becomes the Procurement Spend. */
     replacementCost?: number | null;
+    /** Actual maintenance spend cost (only for "Treat as Expense" financial decisions). */
+    maintenanceSpendCost?: number | null;
     scheduleSeriesId?: string | null;
 }
 

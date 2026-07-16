@@ -38,6 +38,29 @@ namespace DFile.backend.Controllers
         }
 
         /// <summary>
+        /// Get detailed breakdown of maintenance spend costs (actual expenses).
+        /// Returns each maintenance record where Finance selected "Treat as Expense" with actual maintenance spend amount.
+        /// </summary>
+        /// <remarks>
+        /// Details include:
+        /// - Maintenance record ID and request ID
+        /// - Associated asset name and code
+        /// - Actual maintenance spend amount (not estimated cost)
+        /// - Description and current status
+        /// - Finance approval info (approver and timestamp)
+        /// - Date reported
+        /// 
+        /// Sorted by approval date (newest first).
+        /// </remarks>
+        [HttpGet("maintenance-spend-details")]
+        public async Task<ActionResult<List<MaintenanceSpendDetailDto>>> GetMaintenanceSpendDetails()
+        {
+            var tenantId = GetCurrentTenantId();
+            var details = await _kpiService.GetMaintenanceSpendDetailsAsync(tenantId);
+            return Ok(details);
+        }
+
+        /// <summary>
         /// Get detailed breakdown of replacement asset costs for procurement report.
         /// Returns each approved replacement with its cost, asset, and approval details.
         /// </summary>

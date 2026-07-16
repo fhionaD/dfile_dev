@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { FinanceKpi, ReplacementProcurementDetail } from '@/types/finance-reports';
+import { FinanceKpi, ReplacementProcurementDetail, MaintenanceSpendDetail } from '@/types/finance-reports';
 
 /**
  * Fetch Finance KPIs for Reports dashboard.
@@ -15,6 +15,24 @@ export function useFinanceKpi(options?: { enabled?: boolean }) {
       return data;
     },
     staleTime: 5 * 60 * 1000, // KPI aggregates are stable for 5 minutes
+    enabled: options?.enabled !== false,
+  });
+}
+
+/**
+ * Fetch detailed breakdown of maintenance spend costs (actual expenses).
+ * Returns each maintenance record where Finance selected "Treat as Expense" with actual maintenance spend amount.
+ */
+export function useMaintenanceSpendDetails(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['maintenance-spend-details'],
+    queryFn: async () => {
+      const { data } = await api.get<MaintenanceSpendDetail[]>(
+        '/api/reports/maintenance-spend-details'
+      );
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
     enabled: options?.enabled !== false,
   });
 }

@@ -1,21 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileBarChart, Package, DollarSign, TrendingDown, ShoppingCart, Calculator } from "lucide-react";
+import { FileBarChart, Package, Wrench } from "lucide-react";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
 import { useFinanceKpi } from "@/hooks/use-finance-reports";
-import { KpiDetailsModal } from "@/components/modals/kpi-details-modal";
 
 export default function ReportsPage() {
+    const router = useRouter();
     const { data: assets = [], isLoading: assetsLoading } = useAssets();
     const { data: kpi, isLoading: kpiLoading } = useFinanceKpi();
-
-    const [kpiDetailOpen, setKpiDetailOpen] = useState(false);
-    const [kpiDetailType, setKpiDetailType] = useState<"repairs" | "replacements" | "all">("all");
-    const [kpiDetailTitle, setKpiDetailTitle] = useState("KPI Details");
 
     const isLoading = assetsLoading || kpiLoading;
 
@@ -25,7 +22,6 @@ export default function ReportsPage() {
     const totalDepreciation = totalAcquisitionCost - totalCurrentValue;
     const depreciationRate = totalAcquisitionCost > 0 ? ((totalDepreciation / totalAcquisitionCost) * 100) : 0;
 
-    // Category breakdown
     const categoryBreakdown = useMemo(() => {
         const map: Record<string, { count: number; value: number; bookValue: number }> = {};
         activeAssets.forEach(a => {
@@ -40,12 +36,6 @@ export default function ReportsPage() {
             .map(([name, data]) => ({ name, ...data }));
     }, [activeAssets]);
 
-    const openKpiDetail = (type: "repairs" | "replacements" | "all", title: string) => {
-        setKpiDetailType(type);
-        setKpiDetailTitle(title);
-        setKpiDetailOpen(true);
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -59,34 +49,27 @@ export default function ReportsPage() {
             </div>
 
             {/* Key Financial Metrics */}
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("repairs", "Total Estimated Cost - Maintenance Records")}>
+            <section className="grid gap-4 sm:grid-cols-2">
+                <Card 
+                    className="cursor-pointer transition-all hover:shadow-lg hover:border-blue-300"
+                    onClick={() => router.push('/finance/reports/maintenance-spend-details')}
+                >
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Total Estimated Cost</p>
-                            <DollarSign className="h-4 w-4 text-blue-600" />
+                            <p className="text-sm font-medium text-muted-foreground">Maintenance Spend</p>
+                            <Wrench className="h-4 w-4 text-blue-600" />
                         </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.totalEstimatedCost ?? 0} className="text-2xl font-bold" />}
+                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.maintenanceSpendCost ?? 0} className="text-2xl font-bold" />}
                         <p className="text-xs text-muted-foreground">
-                            {kpi?.approvedMaintenanceCount ?? 0} approved maintenance items
+                            {kpi?.maintenanceExpenseCount ?? 0} expense records
                         </p>
                         <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
                 </Card>
-                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("all", "Purchase Orders - Approved Orders")}>
-                    <div className="p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Purchase Orders (Approved)</p>
-                            <ShoppingCart className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.approvedPurchaseOrderAmount ?? 0} className="text-2xl font-bold text-emerald-600" />}
-                        <p className="text-xs text-muted-foreground">
-                            {kpi?.approvedPurchaseOrderCount ?? 0} approved orders
-                        </p>
-                        <p className="text-xs text-primary/70">Click to view details</p>
-                    </div>
-                </Card>
-                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("replacements", "Replacement Asset Cost - Approved Replacements")}>
+                <Card 
+                    className="cursor-pointer transition-all hover:shadow-lg hover:border-orange-300"
+                    onClick={() => router.push('/finance/reports/replacement-cost-details')}
+                >
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-muted-foreground">Replacement Asset Cost</p>
@@ -95,19 +78,6 @@ export default function ReportsPage() {
                         {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.replacementAssetCost ?? 0} className="text-2xl font-bold text-orange-600" />}
                         <p className="text-xs text-muted-foreground">
                             {kpi?.approvedReplacementCount ?? 0} approved replacements
-                        </p>
-                        <p className="text-xs text-primary/70">Click to view details</p>
-                    </div>
-                </Card>
-                <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => openKpiDetail("all", "Total Procurement Spend - All Procurement Items")}>
-                    <div className="p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Total Procurement Spend</p>
-                            <Calculator className="h-4 w-4 text-violet-600" />
-                        </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={kpi?.totalProcurementSpend ?? 0} className="text-2xl font-bold text-violet-600" />}
-                        <p className="text-xs text-muted-foreground">
-                            PO + Replacement costs
                         </p>
                         <p className="text-xs text-primary/70">Click to view details</p>
                     </div>
@@ -176,14 +146,6 @@ export default function ReportsPage() {
                     )}
                 </CardContent>
             </Card>
-
-            {/* KPI Details Modal */}
-            <KpiDetailsModal
-                open={kpiDetailOpen}
-                onOpenChange={setKpiDetailOpen}
-                type={kpiDetailType}
-                title={kpiDetailTitle}
-            />
         </div>
     );
 }
