@@ -49,17 +49,6 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
         return start >= firstday && start <= lastday;
     }).length;
 
-    // MTTR Calculation (Average Resolution Time in Days)
-    const completedRepairs = records.filter(r => r.status === "Completed" && r.endDate && r.startDate);
-    const totalRepairTime = completedRepairs.reduce((acc, r) => {
-        const start = new Date(r.startDate!);
-        const end = new Date(r.endDate!);
-        return acc + (end.getTime() - start.getTime());
-    }, 0);
-    const mttrDays = completedRepairs.length > 0
-        ? Math.round((totalRepairTime / completedRepairs.length) / (1000 * 60 * 60 * 24))
-        : 0;
-
     // Upcoming Schedule List (Next 5 items)
     const upcomingSchedules = activeRecords
         .filter(r => r.status === "Scheduled" && r.startDate && new Date(r.startDate) >= new Date())
@@ -74,13 +63,12 @@ export function MaintenanceDashboard({ onScheduleMaintenance }: MaintenanceDashb
     return (
         <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <StatCard label="Open Requests" value={openRequests} icon={AlertTriangle} iconClassName="bg-red-500/10 text-red-600" valueClassName="text-red-600" />
                 <StatCard label="Overdue" value={overdueRequests} icon={Clock} iconClassName="bg-orange-500/10 text-orange-600" valueClassName="text-orange-600" />
                 <StatCard label="In Repair" value={inRepair} icon={Wrench} iconClassName="bg-blue-500/10 text-blue-600" valueClassName="text-blue-600" />
                 <StatCard label="Attention Needed" value={immediateAttention} icon={AlertTriangle} iconClassName="bg-yellow-500/10 text-yellow-600" valueClassName="text-yellow-600" />
                 <StatCard label="Scheduled (Week)" value={scheduledThisWeek} icon={CalendarIcon} iconClassName="bg-emerald-500/10 text-emerald-600" valueClassName="text-emerald-600" />
-                <StatCard label="Avg MTTR" value={`${mttrDays}d`} icon={TrendingDown} iconClassName="bg-indigo-500/10 text-indigo-600" valueClassName="text-indigo-600" />
             </div>
 
             {/* Secondary Dashboard Grid */}

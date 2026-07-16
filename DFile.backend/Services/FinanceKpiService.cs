@@ -136,7 +136,7 @@ namespace DFile.backend.Services
                 query = query.Where(m => m.TenantId == tenantId);
             }
 
-            var details = await query
+            var maintenanceRecords = await query
                 .Where(m =>
                     !m.IsArchived &&
                     m.FinanceRequestType == "Replacement" &&
@@ -144,7 +144,31 @@ namespace DFile.backend.Services
                      m.FinanceWorkflowStatus == "Replacement Completed") &&
                     m.ReplacementCost.HasValue &&
                     m.ReplacementCost > 0)
-                .Select(m => new ReplacementProcurementDetailDto
+                .OrderByDescending(d => d.ApprovedAt)
+                .ToListAsync();
+
+            var userIds = maintenanceRecords
+                .Where(m => !string.IsNullOrEmpty(m.ApprovedBy) && int.TryParse(m.ApprovedBy, out _))
+                .Select(m => int.Parse(m.ApprovedBy!))
+                .Distinct()
+                .ToList();
+
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToListAsync();
+
+            var userDict = users.ToDictionary(u => u.Id, u => $"{u.FirstName} {u.LastName}");
+
+            var result = new List<ReplacementProcurementDetailDto>();
+            foreach (var m in maintenanceRecords)
+            {
+                string? approverName = m.ApprovedBy;
+                if (!string.IsNullOrEmpty(m.ApprovedBy) && int.TryParse(m.ApprovedBy, out var userId) && userDict.TryGetValue(userId, out var fullName))
+                {
+                    approverName = fullName;
+                }
+
+                result.Add(new ReplacementProcurementDetailDto
                 {
                     MaintenanceRecordId = m.Id,
                     RequestId = m.RequestId,
@@ -152,14 +176,13 @@ namespace DFile.backend.Services
                     AssetName = m.Asset!.AssetName,
                     AssetCode = m.Asset!.AssetCode,
                     ReplacementCost = m.ReplacementCost.Value,
-                    ApprovedBy = m.ApprovedBy,
+                    ApprovedBy = approverName,
                     ApprovedAt = m.ApprovedAt,
                     LinkedPurchaseOrderId = m.LinkedPurchaseOrderId
-                })
-                .OrderByDescending(d => d.ApprovedAt)
-                .ToListAsync();
+                });
+            }
 
-            return details;
+            return result;
         }
 
         /// <summary>
@@ -177,13 +200,37 @@ namespace DFile.backend.Services
                 query = query.Where(m => m.TenantId == tenantId);
             }
 
-            var details = await query
+            var maintenanceRecords = await query
                 .Where(m =>
                     !m.IsArchived &&
                     m.FinanceDecision == "Expense" &&
                     m.MaintenanceSpendCost.HasValue &&
                     m.MaintenanceSpendCost > 0)
-                .Select(m => new MaintenanceSpendDetailDto
+                .OrderByDescending(d => d.ApprovedAt)
+                .ToListAsync();
+
+            var userIds = maintenanceRecords
+                .Where(m => !string.IsNullOrEmpty(m.ApprovedBy) && int.TryParse(m.ApprovedBy, out _))
+                .Select(m => int.Parse(m.ApprovedBy!))
+                .Distinct()
+                .ToList();
+
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToListAsync();
+
+            var userDict = users.ToDictionary(u => u.Id, u => $"{u.FirstName} {u.LastName}");
+
+            var result = new List<MaintenanceSpendDetailDto>();
+            foreach (var m in maintenanceRecords)
+            {
+                string? approverName = m.ApprovedBy;
+                if (!string.IsNullOrEmpty(m.ApprovedBy) && int.TryParse(m.ApprovedBy, out var userId) && userDict.TryGetValue(userId, out var fullName))
+                {
+                    approverName = fullName;
+                }
+
+                result.Add(new MaintenanceSpendDetailDto
                 {
                     MaintenanceRecordId = m.Id,
                     RequestId = m.RequestId,
@@ -193,14 +240,13 @@ namespace DFile.backend.Services
                     MaintenanceSpendCost = m.MaintenanceSpendCost.Value,
                     Description = m.Description,
                     Status = m.Status,
-                    ApprovedBy = m.ApprovedBy,
+                    ApprovedBy = approverName,
                     ApprovedAt = m.ApprovedAt,
                     DateReported = m.DateReported
-                })
-                .OrderByDescending(d => d.ApprovedAt)
-                .ToListAsync();
+                });
+            }
 
-            return details;
+            return result;
         }
     }
 

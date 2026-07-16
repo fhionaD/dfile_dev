@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Wrench, AlertTriangle, CheckCircle2, Clock, Search, Filter, Calendar as CalendarIcon, TrendingDown } from "lucide-react";
+import { Wrench, AlertTriangle, CheckCircle2, Clock, Search, Filter, Calendar as CalendarIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusText } from "@/components/ui/status-text";
@@ -123,17 +123,6 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
         return start >= firstday && start <= lastday;
     }).length;
 
-    // MTTR Calculation (Average Resolution Time in Days)
-    const completedRepairs = records.filter(r => r.status === "Completed" && r.endDate && r.startDate);
-    const totalRepairTime = completedRepairs.reduce((acc, r) => {
-        const start = new Date(r.startDate!);
-        const end = new Date(r.endDate!);
-        return acc + (end.getTime() - start.getTime());
-    }, 0);
-    const mttrDays = completedRepairs.length > 0
-        ? Math.round((totalRepairTime / completedRepairs.length) / (1000 * 60 * 60 * 24))
-        : 0;
-
     const statusVariant: Record<string, "warning" | "info" | "success" | "muted" | "danger"> = {
         Open: "info",
         Inspection: "warning",
@@ -216,18 +205,6 @@ export function MaintenanceView({ onScheduleMaintenance, onRequestReplacement }:
                         </div>
                         <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                              <CalendarIcon className="h-5 w-5 text-emerald-600" />
-                        </div>
-                    </div>
-                </Card>
-
-                <Card className={cardClassName}>
-                    <div className="p-6 flex items-center justify-between">
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground">Avg MTTR</p>
-                            <p className="text-3xl font-bold tracking-tight text-indigo-600">{mttrDays} <span className="text-sm font-normal text-muted-foreground">days</span></p>
-                        </div>
-                        <div className="h-12 w-12 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                             <TrendingDown className="h-5 w-5 text-indigo-600" />
                         </div>
                     </div>
                 </Card>

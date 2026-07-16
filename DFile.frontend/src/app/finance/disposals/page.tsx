@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { StatusText } from "@/components/ui/status-text";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Search, Package } from "lucide-react";
+import { Trash2, Search, Package, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CurrencyCell } from "@/components/ui/currency-cell";
 import { useAssets } from "@/hooks/use-assets";
+import * as XLSX from 'xlsx';
 
 export default function DisposalsPage() {
     const { data: assets = [], isLoading } = useAssets(false, { includeDisposed: true });
@@ -34,6 +35,34 @@ export default function DisposalsPage() {
     const totalBookValue = filtered.reduce((sum, a) => sum + (a.currentBookValue ?? 0), 0);
     const totalWriteOff = totalOriginalValue - totalBookValue;
 
+    const handleExport = (data: typeof filtered) => {
+        const exportData = data.map(a => ({
+            'Asset Code': a.assetCode ?? a.id ?? '',
+            'Description': a.desc ?? '',
+            'Category': a.categoryName ?? '',
+            'Purchase Date': a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString() : '',
+            'Original Value': a.purchasePrice ?? a.value ?? 0,
+            'Book Value': a.currentBookValue ?? 0,
+            'Write-Off Amount': (a.purchasePrice ?? a.value ?? 0) - (a.currentBookValue ?? 0),
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Disposed Assets');
+
+        worksheet['!cols'] = [
+            { wch: 12 },
+            { wch: 25 },
+            { wch: 15 },
+            { wch: 14 },
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 },
+        ];
+
+        XLSX.writeFile(workbook, `disposed-assets-${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-3">
@@ -47,7 +76,7 @@ export default function DisposalsPage() {
             </div>
 
             {/* Summary Cards */}
-            <section className="grid gap-4 sm:grid-cols-3">
+            <section className="grid gap-4 sm:grid-cols-2">
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
@@ -60,19 +89,10 @@ export default function DisposalsPage() {
                 <Card>
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Original Value</p>
+                            <p className="text-sm font-medium text-muted-foreground">Total Original Value</p>
                             <span className="text-lg font-bold text-muted-foreground">₱</span>
                         </div>
                         {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalOriginalValue} className="text-2xl font-bold" />}
-                    </div>
-                </Card>
-                <Card>
-                    <div className="p-5 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">Write-Off Amount</p>
-                            <span className="text-lg font-bold text-red-600">₱</span>
-                        </div>
-                        {isLoading ? <Skeleton className="h-8 w-24" /> : <CurrencyCell value={totalWriteOff} className="text-2xl font-bold text-red-600" />}
                     </div>
                 </Card>
             </section>
@@ -80,12 +100,18 @@ export default function DisposalsPage() {
             {/* Disposal Table */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">Disposal Registry</h2>
+                    <h2 className="text-lg font-semibold">Disposed Assets Registry</h2>
                     <span className="text-sm text-muted-foreground">({filtered.length})</span>
                 </div>
-                <div className="relative sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search disposals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                <div className="flex gap-2 flex-col sm:flex-row sm:w-auto w-full">
+                    <div className="relative flex-1 sm:flex-none sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search disposals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleExport(filtered)} className="gap-2 whitespace-nowrap">
+                        <Download className="h-4 w-4" />
+                        Export
+                    </Button>
                 </div>
             </div>
 
@@ -107,7 +133,6 @@ export default function DisposalsPage() {
                                 <TableHead>Purchase Date</TableHead>
                                 <TableHead className="text-right">Original Value</TableHead>
                                 <TableHead className="text-right">Book Value</TableHead>
-                                <TableHead>Status</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -121,9 +146,6 @@ export default function DisposalsPage() {
                                     </TableCell>
                                     <TableCell className="text-right"><CurrencyCell value={a.purchasePrice ?? a.value ?? 0} /></TableCell>
                                     <TableCell className="text-right"><CurrencyCell value={a.currentBookValue ?? 0} /></TableCell>
-                                    <TableCell>
-                                        <StatusText variant={a.archived ? "muted" : "danger"}>{a.status}</StatusText>
-                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
